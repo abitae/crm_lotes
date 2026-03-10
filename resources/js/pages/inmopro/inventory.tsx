@@ -1,7 +1,15 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { Search, MapPin, UserPlus, Info, Eye } from 'lucide-react';
+import { Search, MapPin, UserPlus, Info, Eye, Pencil, FileDown } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import type { BreadcrumbItem } from '@/types';
 
 type LotStatus = { id: number; name: string; code: string; color: string };
@@ -23,6 +31,7 @@ type Lot = {
     operation_number?: string;
     contract_date?: string;
     contract_number?: string;
+    observations?: string;
     status: LotStatus;
     client?: { id: number; name: string };
     advisor?: { id: number; name: string };
@@ -47,6 +56,10 @@ export default function Inventory({
 }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+
+    const formatDate = (d: string | undefined) => (d ? new Date(d).toLocaleDateString('es') : '—');
+    const formatMoney = (v: string | undefined) => (v != null && v !== '' ? Number(v).toLocaleString('es') : '—');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -105,6 +118,28 @@ export default function Inventory({
                     )}
                     {project && (
                         <>
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-tight text-slate-400">
+                                    {lotStatuses.slice(0, 3).map((s) => (
+                                        <div key={s.id} className="flex items-center gap-1.5">
+                                            <div
+                                                className="h-3 w-3 rounded"
+                                                style={{ backgroundColor: s.color }}
+                                            />
+                                            <span>{s.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <a
+                                    href={`/inmopro/lots/export-pdf?project_id=${project.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                                >
+                                    <FileDown className="h-4 w-4" />
+                                    Exportar PDF
+                                </a>
+                            </div>
                             <div className="mb-8 flex flex-col gap-4 sm:flex-row">
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -267,13 +302,14 @@ export default function Inventory({
                                     </div>
                                 )}
                                 <div>
-                                    <Link
-                                        href={'/inmopro/lots/' + selectedLot.id}
-                                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-3 px-4 font-bold text-slate-600 hover:bg-slate-50"
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        onClick={() => setDetailModalOpen(true)}
                                     >
                                         <Eye className="h-4 w-4" />
                                         Ver detalle
-                                    </Link>
+                                    </Button>
                                 </div>
                             </div>
                         </div>
@@ -292,6 +328,145 @@ export default function Inventory({
                     )}
                 </div>
             </div>
+
+            <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+                <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto sm:max-w-2xl">
+                    {selectedLot && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    Lote {selectedLot.block}-{selectedLot.number}
+                                </DialogTitle>
+                                <p className="text-sm text-slate-500">{project?.name}</p>
+                            </DialogHeader>
+                            <div className="space-y-6 py-2">
+                                <div className="grid gap-6 sm:grid-cols-2">
+                                    <div>
+                                        <h3 className="mb-3 font-bold text-slate-700">Identificación</h3>
+                                        <dl className="space-y-2 text-sm">
+                                            <div>
+                                                <dt className="text-slate-500">Estado</dt>
+                                                <dd>
+                                                    <span
+                                                        className="inline-block rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                                                        style={{
+                                                            backgroundColor:
+                                                                lotStatuses.find((s) => s.id === selectedLot.lot_status_id)?.color ?? '#94a3b8',
+                                                        }}
+                                                    >
+                                                        {lotStatuses.find((s) => s.id === selectedLot.lot_status_id)?.name ?? '—'}
+                                                    </span>
+                                                </dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-slate-500">Área (m²)</dt>
+                                                <dd className="font-medium">{selectedLot.area ?? '—'}</dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-slate-500">Precio</dt>
+                                                <dd className="font-medium">{formatMoney(selectedLot.price)}</dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+                                    <div>
+                                        <h3 className="mb-3 font-bold text-slate-700">Finanzas / Reserva</h3>
+                                        <dl className="space-y-2 text-sm">
+                                            <div>
+                                                <dt className="text-slate-500">Adelanto</dt>
+                                                <dd className="font-medium">{formatMoney(selectedLot.advance)}</dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-slate-500">Monto restante</dt>
+                                                <dd className="font-medium">{formatMoney(selectedLot.remaining_balance)}</dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-slate-500">Fecha límite de pago</dt>
+                                                <dd className="font-medium">{formatDate(selectedLot.payment_limit_date)}</dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-slate-500">N° operación / Contrato</dt>
+                                                <dd className="font-medium">
+                                                    {selectedLot.operation_number ?? '—'} / {selectedLot.contract_number ?? '—'}
+                                                </dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-slate-500">Fecha de contrato</dt>
+                                                <dd className="font-medium">{formatDate(selectedLot.contract_date)}</dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+                                </div>
+                                <div className="border-t border-slate-200 pt-4">
+                                    <h3 className="mb-3 font-bold text-slate-700">Asignaciones</h3>
+                                    <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                                        <div>
+                                            <dt className="text-slate-500">Cliente</dt>
+                                            <dd className="font-medium">
+                                                {selectedLot.client_id || selectedLot.client_name ? (
+                                                    selectedLot.client?.id ? (
+                                                        <Link
+                                                            href={`/inmopro/clients/${selectedLot.client.id}`}
+                                                            className="text-emerald-600 hover:underline"
+                                                            onClick={() => setDetailModalOpen(false)}
+                                                        >
+                                                            {selectedLot.client_name ?? selectedLot.client.name}
+                                                        </Link>
+                                                    ) : (
+                                                        <span>{selectedLot.client_name ?? selectedLot.client?.name ?? '—'}</span>
+                                                    )
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-slate-500">DNI</dt>
+                                            <dd className="font-medium">{selectedLot.client_dni ?? '—'}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-slate-500">Asesor</dt>
+                                            <dd className="font-medium">
+                                                {selectedLot.advisor_id ? (
+                                                    selectedLot.advisor?.id ? (
+                                                        <Link
+                                                            href={`/inmopro/advisors/${selectedLot.advisor.id}`}
+                                                            className="text-emerald-600 hover:underline"
+                                                            onClick={() => setDetailModalOpen(false)}
+                                                        >
+                                                            {selectedLot.advisor.name}
+                                                        </Link>
+                                                    ) : (
+                                                        <span>{selectedLot.advisor?.name ?? '—'}</span>
+                                                    )
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </div>
+                                {selectedLot.observations && (
+                                    <div className="border-t border-slate-200 pt-4">
+                                        <h3 className="mb-2 font-bold text-slate-700">Observaciones</h3>
+                                        <p className="whitespace-pre-wrap text-sm text-slate-600">{selectedLot.observations}</p>
+                                    </div>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setDetailModalOpen(false)}>
+                                    Cerrar
+                                </Button>
+                                <Button asChild>
+                                    <Link href={`/inmopro/lots/${selectedLot.id}/edit`}>
+                                        <Pencil className="h-4 w-4" />
+                                        Editar
+                                    </Link>
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

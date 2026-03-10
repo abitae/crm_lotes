@@ -1,26 +1,94 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { Search, UserPlus, ChevronRight, Phone } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { FormEvent, useEffect, useState } from 'react';
+import { Search, UserPlus, ChevronRight, Phone, Calendar, Eye, Plus, Pencil, Trash2, Receipt } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import InputError from '@/components/input-error';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import Pagination, { type PaginationLink } from '@/components/pagination';
+import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
+type AdvisorLevel = { id: number; name: string };
 type Advisor = {
     id: number;
     name: string;
     email: string;
     phone: string;
     personal_quota: string;
+    advisor_level_id?: number;
+    superior_id?: number | null;
     lots_count?: number;
     level?: { name: string; color?: string };
     superior?: { name: string };
+    memberships?: Membership[];
 };
+type Payment = { id: number; amount: string; paid_at: string; notes?: string | null };
+type Membership = {
+    id: number;
+    advisor_id: number;
+    year: number;
+    amount: string;
+    advisor?: { id: number; name: string };
+    payments?: Payment[];
+};
+type MembershipDetail = {
+    membership: Membership;
+    totalPaid: number;
+    balanceDue: number;
+    isPaid: boolean;
+};
+type Paginated<T> = { data: T[]; links: PaginationLink[]; current_page: number; last_page: number };
+
+type PageProps = {
+    advisors: Paginated<Advisor>;
+    advisorLevels: AdvisorLevel[];
+    advisorsList: { id: number; name: string }[];
+    membershipDetail: MembershipDetail | null;
+    advisorForModal: Advisor | null;
+    openModal: string | null;
+    filters: { search?: string };
+};
+
+const MEMBERSHIP_YEARS = [2026, 2025, 2024, 2023];
+
+function membershipToDetail(m: Membership, advisor?: { id: number; name: string }): MembershipDetail {
+    const totalPaid = (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+    const balanceDue = Math.max(0, Number(m.amount) - totalPaid);
+    const membership = { ...m, advisor: m.advisor ?? advisor };
+    return { membership, totalPaid, balanceDue, isPaid: balanceDue <= 0 };
+}
 
 export default function AdvisorsIndex({
     advisors,
+    advisorLevels,
+    advisorsList,
+    membershipDetail,
+    advisorForModal,
+    openModal,
     filters,
-}: {
-    advisors: { data: Advisor[]; links: unknown[] };
-    filters: { search?: string };
-}) {
+}: PageProps) {
+    const [modalCreateAdvisor, setModalCreateAdvisor] = useState(false);
+    const [modalEditAdvisor, setModalEditAdvisor] = useState<Advisor | null>(null);
+    const [modalCreateMembership, setModalCreateMembership] = useState(false);
+    const [modalMembershipDetail, setModalMembershipDetail] = useState<MembershipDetail | null>(null);
+
+    useEffect(() => {
+        if (openModal === 'create_advisor') setModalCreateAdvisor(true);
+        if (openModal === 'edit_advisor' && advisorForModal) setModalEditAdvisor(advisorForModal);
+        if (openModal === 'create_membership') setModalCreateMembership(true);
+        if (membershipDetail) setModalMembershipDetail(membershipDetail);
+    }, [openModal, advisorForModal, membershipDetail]);
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Vendedores', href: '/inmopro/advisors' },
@@ -30,7 +98,15 @@ export default function AdvisorsIndex({
         e.preventDefault();
         const form = e.target as HTMLFormElement;
         const q = new FormData(form).get('search') as string;
-        router.get('/inmopro/advisors', { search: q || undefined }, { preserveState: true });
+        router.get('/inmopro/advisors', { ...filters, search: q || undefined }, { preserveState: true });
+    };
+
+    const totalPaid = (m: Membership) => (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+    const balanceDue = (m: Membership) => Math.max(0, Number(m.amount) - totalPaid(m));
+    const isPaid = (m: Membership) => balanceDue(m) <= 0;
+
+    const openMembershipDetailFromRow = (m: Membership, advisor?: { id: number; name: string }) => {
+        setModalMembershipDetail(membershipToDetail(m, advisor));
     };
 
     return (
@@ -40,105 +116,626 @@ export default function AdvisorsIndex({
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div>
                         <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800">
-                            Estructura Comercial
+                            Estructura Comercial y Membresías
                         </h2>
                         <p className="text-sm italic font-medium text-slate-500">
-                            Gestión de jerarquías y reporte directo.
+                            Vendedores, jerarquías y control de membresías anuales.
                         </p>
                     </div>
-                    <Link
-                        href="/inmopro/advisors/create"
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 font-black text-white shadow-xl shadow-slate-200 transition-all hover:bg-slate-800 active:scale-95 sm:w-auto"
-                    >
-                        <UserPlus className="h-5 w-5" />
-                        NUEVO ASESOR
-                    </Link>
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={() => setModalCreateAdvisor(true)} className="flex items-center gap-2">
+                            <UserPlus className="h-5 w-5" />
+                            Nuevo vendedor
+                        </Button>
+                        <Button onClick={() => setModalCreateMembership(true)} variant="outline" className="flex items-center gap-2">
+                            <Plus className="h-5 w-5" />
+                            Nueva membresía
+                        </Button>
+                    </div>
                 </div>
 
-                <form
-                    onSubmit={handleSearch}
-                    className="flex gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-                >
-                    <div className="relative w-full sm:w-80">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                        <input
-                            name="search"
-                            type="text"
-                            placeholder="Buscar por nombre o email..."
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 font-medium outline-none transition-all focus:ring-2 focus:ring-emerald-500"
-                            defaultValue={filters.search}
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="rounded-xl bg-slate-900 px-4 py-2.5 font-bold text-white hover:bg-slate-800"
-                    >
-                        Buscar
-                    </button>
+                <form onSubmit={handleSearch} className="flex gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                            <div className="relative w-full sm:w-80">
+                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    name="search"
+                                    type="text"
+                                    placeholder="Buscar por nombre o email..."
+                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 font-medium outline-none transition-all focus:ring-2 focus:ring-emerald-500"
+                                    defaultValue={filters.search}
+                                />
+                            </div>
+                            <Button type="submit">Buscar</Button>
                 </form>
 
                 <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full border-collapse text-left">
+                        <table className="w-full border-collapse text-left text-sm">
                             <thead>
                                 <tr className="border-b border-slate-100 bg-slate-50/50">
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        Nivel / Vendedor
-                                    </th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        Superior
-                                    </th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        Cuota
-                                    </th>
-                                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        Acciones
-                                    </th>
+                                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Nivel / Vendedor</th>
+                                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Superior</th>
+                                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Cuota</th>
+                                    {MEMBERSHIP_YEARS.map((y) => (
+                                        <th key={y} className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">{y}</th>
+                                    ))}
+                                    <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {advisors.data.map((adv) => (
                                     <tr key={adv.id} className="transition-colors hover:bg-slate-50">
-                                        <td className="px-6 py-5">
-                                            <div className="flex items-center gap-3">
-                                                <span className="rounded-lg bg-slate-900 px-2.5 py-1 text-[10px] font-black text-white">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="rounded bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white">
                                                     {adv.level?.name ?? '-'}
                                                 </span>
                                                 <div>
-                                                    <p className="text-sm font-black leading-none text-slate-800">
-                                                        {adv.name}
-                                                    </p>
-                                                    <p className="mt-1 text-[9px] font-medium uppercase text-slate-400">
-                                                        {adv.email}
-                                                    </p>
+                                                    <p className="font-bold leading-none text-slate-800">{adv.name}</p>
+                                                    <p className="text-[10px] text-slate-400">{adv.email}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-5">
-                                            <p className="text-xs font-bold text-slate-700">
-                                                {adv.superior?.name ?? 'Alta Gerencia'}
-                                            </p>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <span className="text-xs font-bold text-slate-700">
-                                                S/ {Number(adv.personal_quota).toLocaleString()}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-5 text-right">
-                                            <Link
-                                                href={`/inmopro/advisors/${adv.id}`}
-                                                className="inline-flex p-2 text-slate-400 transition-all hover:rounded-lg hover:bg-slate-100 hover:text-slate-900"
+                                        <td className="px-4 py-3 text-slate-700">{adv.superior?.name ?? 'Alta Gerencia'}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-700">S/ {Number(adv.personal_quota).toLocaleString()}</td>
+                                        {MEMBERSHIP_YEARS.map((year) => {
+                                            const mem = (adv.memberships ?? []).find((m) => m.year === year);
+                                            if (!mem) {
+                                                return (
+                                                    <td key={year} className="px-2 py-2 text-center text-slate-300">—</td>
+                                                );
+                                            }
+                                            const paid = isPaid(mem);
+                                            return (
+                                                <td key={year} className="px-2 py-2 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openMembershipDetailFromRow(mem, { id: adv.id, name: adv.name })}
+                                                        className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
+                                                            paid
+                                                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                                                : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                                                        }`}
+                                                        title={paid ? 'Al día · Ver detalle' : `Pendiente S/ ${balanceDue(mem).toLocaleString('es-PE')}`}
+                                                    >
+                                                        {paid ? 'Al día' : 'Pend.'}
+                                                    </button>
+                                                </td>
+                                            );
+                                        })}
+                                        <td className="px-4 py-3 text-right">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-slate-400 hover:text-slate-900"
+                                                onClick={() => setModalEditAdvisor(adv)}
+                                                title="Editar"
                                             >
-                                                <ChevronRight className="h-5 w-5" />
-                                            </Link>
+                                                <Pencil className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="Ver perfil">
+                                                <a href={`/inmopro/advisors/${adv.id}`}>
+                                                    <ChevronRight className="h-4 w-4" />
+                                                </a>
+                                            </Button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
+                    {advisors.data.length === 0 ? (
+                        <div className="py-12 text-center text-slate-500">
+                            <Receipt className="mx-auto h-10 w-10" />
+                            <p className="mt-2">No hay vendedores. Cree uno o busque con otro criterio.</p>
+                        </div>
+                    ) : (
+                        <div className="border-t border-slate-100 px-4 py-3">
+                            <Pagination links={advisors.links} />
+                        </div>
+                    )}
                 </div>
+
+                {/* Modal: Crear vendedor */}
+                <CreateAdvisorModal
+                    open={modalCreateAdvisor}
+                    onOpenChange={setModalCreateAdvisor}
+                    advisorLevels={advisorLevels}
+                    advisorsList={advisorsList}
+                />
+
+                {/* Modal: Editar vendedor */}
+                {modalEditAdvisor && (
+                    <EditAdvisorModal
+                        open={!!modalEditAdvisor}
+                        onOpenChange={(open) => !open && setModalEditAdvisor(null)}
+                        advisor={modalEditAdvisor}
+                        advisorLevels={advisorLevels}
+                        advisorsList={advisorsList.filter((a) => a.id !== modalEditAdvisor.id)}
+                    />
+                )}
+
+                {/* Modal: Nueva membresía */}
+                <CreateMembershipModal open={modalCreateMembership} onOpenChange={setModalCreateMembership} advisorsList={advisorsList} />
+
+                {/* Modal: Detalle membresía + abonos */}
+                {modalMembershipDetail && (
+                    <MembershipDetailModal
+                        open={!!modalMembershipDetail}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setModalMembershipDetail(null);
+                                router.get('/inmopro/advisors', { ...filters }, { preserveState: true });
+                            }
+                        }}
+                        detail={modalMembershipDetail}
+                    />
+                )}
             </div>
         </AppLayout>
+    );
+}
+
+function CreateAdvisorModal({
+    open,
+    onOpenChange,
+    advisorLevels,
+    advisorsList,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    advisorLevels: AdvisorLevel[];
+    advisorsList: { id: number; name: string }[];
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        phone: '',
+        email: '',
+        advisor_level_id: advisorLevels[0]?.id ?? 0,
+        superior_id: null as number | null,
+        personal_quota: 0,
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        post('/inmopro/advisors', { onSuccess: () => { reset(); onOpenChange(false); } });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Nuevo vendedor</DialogTitle>
+                    <DialogDescription>Registre los datos del asesor.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="name">Nombre</Label>
+                        <Input id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} className="mt-1" />
+                        <InputError message={errors.name} />
+                    </div>
+                    <div>
+                        <Label htmlFor="phone">Teléfono</Label>
+                        <Input id="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className="mt-1" />
+                        <InputError message={errors.phone} />
+                    </div>
+                    <div>
+                        <Label htmlFor="email">Email</Label>
+                        <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
+                        <InputError message={errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="advisor_level_id">Nivel</Label>
+                        <select
+                            id="advisor_level_id"
+                            value={data.advisor_level_id}
+                            onChange={(e) => setData('advisor_level_id', Number(e.target.value))}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                            {advisorLevels.map((l) => (
+                                <option key={l.id} value={l.id}>{l.name}</option>
+                            ))}
+                        </select>
+                        <InputError message={errors.advisor_level_id} />
+                    </div>
+                    <div>
+                        <Label htmlFor="superior_id">Superior</Label>
+                        <select
+                            id="superior_id"
+                            value={data.superior_id ?? ''}
+                            onChange={(e) => setData('superior_id', e.target.value ? Number(e.target.value) : null)}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                            <option value="">— Ninguno —</option>
+                            {advisorsList.map((a) => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <Label htmlFor="personal_quota">Cuota personal</Label>
+                        <Input
+                            id="personal_quota"
+                            type="number"
+                            min={0}
+                            value={data.personal_quota}
+                            onChange={(e) => setData('personal_quota', Number(e.target.value))}
+                            className="mt-1"
+                        />
+                        <InputError message={errors.personal_quota} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={processing}>Guardar</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function EditAdvisorModal({
+    open,
+    onOpenChange,
+    advisor,
+    advisorLevels,
+    advisorsList,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    advisor: Advisor;
+    advisorLevels: AdvisorLevel[];
+    advisorsList: { id: number; name: string }[];
+}) {
+    const { data, setData, put, processing, errors } = useForm({
+        name: advisor.name,
+        phone: advisor.phone,
+        email: advisor.email,
+        advisor_level_id: advisor.advisor_level_id ?? advisorLevels[0]?.id ?? 0,
+        superior_id: advisor.superior_id ?? (null as number | null),
+        personal_quota: Number(advisor.personal_quota),
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        put(`/inmopro/advisors/${advisor.id}`, { onSuccess: () => onOpenChange(false) });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Editar vendedor</DialogTitle>
+                    <DialogDescription>Modifique los datos del asesor.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="edit-name">Nombre</Label>
+                        <Input id="edit-name" value={data.name} onChange={(e) => setData('name', e.target.value)} className="mt-1" />
+                        <InputError message={errors.name} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-phone">Teléfono</Label>
+                        <Input id="edit-phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className="mt-1" />
+                        <InputError message={errors.phone} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-email">Email</Label>
+                        <Input id="edit-email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
+                        <InputError message={errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-level">Nivel</Label>
+                        <select
+                            id="edit-level"
+                            value={data.advisor_level_id}
+                            onChange={(e) => setData('advisor_level_id', Number(e.target.value))}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                            {advisorLevels.map((l) => (
+                                <option key={l.id} value={l.id}>{l.name}</option>
+                            ))}
+                        </select>
+                        <InputError message={errors.advisor_level_id} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-superior">Superior</Label>
+                        <select
+                            id="edit-superior"
+                            value={data.superior_id ?? ''}
+                            onChange={(e) => setData('superior_id', e.target.value ? Number(e.target.value) : null)}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                            <option value="">— Ninguno —</option>
+                            {advisorsList.map((a) => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-quota">Cuota personal</Label>
+                        <Input
+                            id="edit-quota"
+                            type="number"
+                            min={0}
+                            value={data.personal_quota}
+                            onChange={(e) => setData('personal_quota', Number(e.target.value))}
+                            className="mt-1"
+                        />
+                        <InputError message={errors.personal_quota} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={processing}>Actualizar</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function CreateMembershipModal({
+    open,
+    onOpenChange,
+    advisorsList,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    advisorsList: { id: number; name: string }[];
+}) {
+    const currentYear = new Date().getFullYear();
+    const { data, setData, post, processing, errors, reset } = useForm({
+        advisor_id: '',
+        year: String(currentYear),
+        amount: '',
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        post('/inmopro/advisor-memberships', { onSuccess: () => { reset(); onOpenChange(false); } });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Nueva membresía anual</DialogTitle>
+                    <DialogDescription>Vendedor, año y monto total a pagar.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="mem-advisor">Vendedor</Label>
+                        <select
+                            id="mem-advisor"
+                            value={data.advisor_id}
+                            onChange={(e) => setData('advisor_id', e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                            required
+                        >
+                            <option value="">— Seleccione —</option>
+                            {advisorsList.map((a) => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                        </select>
+                        <InputError message={errors.advisor_id} />
+                    </div>
+                    <div>
+                        <Label htmlFor="mem-year">Año</Label>
+                        <Input
+                            id="mem-year"
+                            type="number"
+                            min={2020}
+                            max={2100}
+                            value={data.year}
+                            onChange={(e) => setData('year', e.target.value)}
+                            className="mt-1"
+                            required
+                        />
+                        <InputError message={errors.year} />
+                    </div>
+                    <div>
+                        <Label htmlFor="mem-amount">Monto anual (S/)</Label>
+                        <Input
+                            id="mem-amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={data.amount}
+                            onChange={(e) => setData('amount', e.target.value)}
+                            className="mt-1"
+                            required
+                        />
+                        <InputError message={errors.amount} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={processing}>Crear membresía</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function MembershipDetailModal({
+    open,
+    onOpenChange,
+    detail,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    detail: MembershipDetail;
+}) {
+    const { membership, totalPaid, balanceDue, isPaid } = detail;
+    const defaultDate = () => new Date().toISOString().slice(0, 10);
+    const paymentForm = useForm({
+        amount: '',
+        paid_at: defaultDate(),
+        notes: '',
+    });
+
+    const submitPayment = (e: FormEvent) => {
+        e.preventDefault();
+        paymentForm.post(`/inmopro/advisor-memberships/${membership.id}/payments`, {
+            onSuccess: () => paymentForm.reset('amount', 'paid_at', 'notes'),
+        });
+    };
+
+    const handleDestroy = async () => {
+        if (await confirmDelete(`¿Eliminar la membresía de ${membership.advisor?.name ?? 'este vendedor'} (${membership.year})? Se eliminarán también todos los abonos.`)) {
+            router.delete(`/inmopro/advisor-memberships/${membership.id}`);
+            onOpenChange(false);
+        }
+    };
+
+    const [editAmountOpen, setEditAmountOpen] = useState(false);
+    const payments = membership.payments ?? [];
+    const sortedPayments = [...payments].sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Membresía {membership.year} – {membership.advisor?.name ?? 'Vendedor'}</DialogTitle>
+                    <DialogDescription>
+                        Monto anual S/ {Number(membership.amount).toLocaleString('es-PE')}
+                        {isPaid ? ' · Al día' : ` · Pendiente S/ ${balanceDue.toLocaleString('es-PE')}`}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="rounded-lg bg-slate-50 p-3">
+                            <p className="text-slate-500">Monto anual</p>
+                            <p className="font-bold">S/ {Number(membership.amount).toLocaleString('es-PE')}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 p-3">
+                            <p className="text-slate-500">Abonado</p>
+                            <p className="font-bold text-emerald-700">S/ {totalPaid.toLocaleString('es-PE')}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 p-3">
+                            <p className="text-slate-500">Pendiente</p>
+                            <p className={`font-bold ${balanceDue > 0 ? 'text-amber-600' : 'text-slate-500'}`}>S/ {balanceDue.toLocaleString('es-PE')}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="mb-2 text-sm font-semibold text-slate-700">Registrar abono</h4>
+                        <form onSubmit={submitPayment} className="flex flex-wrap items-end gap-2">
+                            <div className="min-w-24">
+                                <Label className="text-xs">Monto (S/)</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={paymentForm.data.amount}
+                                    onChange={(e) => paymentForm.setData('amount', e.target.value)}
+                                    className="mt-1 h-9"
+                                    required
+                                />
+                                <InputError message={paymentForm.errors.amount} />
+                            </div>
+                            <div className="min-w-32">
+                                <Label className="text-xs">Fecha</Label>
+                                <Input
+                                    type="date"
+                                    value={paymentForm.data.paid_at}
+                                    onChange={(e) => paymentForm.setData('paid_at', e.target.value)}
+                                    className="mt-1 h-9"
+                                    required
+                                />
+                            </div>
+                            <div className="min-w-28 flex-1">
+                                <Label className="text-xs">Observ.</Label>
+                                <Input
+                                    value={paymentForm.data.notes}
+                                    onChange={(e) => paymentForm.setData('notes', e.target.value)}
+                                    className="mt-1 h-9"
+                                />
+                            </div>
+                            <Button type="submit" size="sm" disabled={paymentForm.processing}>Agregar</Button>
+                        </form>
+                    </div>
+
+                    <div>
+                        <h4 className="mb-2 text-sm font-semibold text-slate-700">Abonos ({sortedPayments.length})</h4>
+                        {sortedPayments.length === 0 ? (
+                            <p className="text-sm text-slate-500">Aún no hay abonos.</p>
+                        ) : (
+                            <ul className="max-h-40 space-y-1 overflow-y-auto rounded border border-slate-100 p-2 text-sm">
+                                {sortedPayments.map((p) => (
+                                    <li key={p.id} className="flex justify-between">
+                                        <span>{new Date(p.paid_at).toLocaleDateString('es-PE')} {p.notes ? `· ${p.notes}` : ''}</span>
+                                        <span className="font-medium">S/ {Number(p.amount).toLocaleString('es-PE')}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setEditAmountOpen(true)}>Editar monto anual</Button>
+                    <Button type="button" variant="outline" className="text-red-600" onClick={handleDestroy}>Eliminar membresía</Button>
+                    <Button type="button" onClick={() => onOpenChange(false)}>Cerrar</Button>
+                </DialogFooter>
+
+                {editAmountOpen && (
+                    <EditMembershipAmountModal
+                        membership={membership}
+                        open={editAmountOpen}
+                        onOpenChange={setEditAmountOpen}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function EditMembershipAmountModal({
+    membership,
+    open,
+    onOpenChange,
+}: {
+    membership: Membership;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const { data, setData, put, processing, errors } = useForm({
+        amount: String(membership.amount),
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        put(`/inmopro/advisor-memberships/${membership.id}`, { onSuccess: () => onOpenChange(false) });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Editar monto anual</DialogTitle>
+                    <DialogDescription>Membresía {membership.year} – {membership.advisor?.name}</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="edit-amount">Monto anual (S/)</Label>
+                        <Input
+                            id="edit-amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={data.amount}
+                            onChange={(e) => setData('amount', e.target.value)}
+                            className="mt-1"
+                            required
+                        />
+                        <InputError message={errors.amount} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={processing}>Guardar</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }

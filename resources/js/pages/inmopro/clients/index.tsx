@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Pagination, { type PaginationLink } from '@/components/pagination';
 import type { BreadcrumbItem } from '@/types';
 
 type Client = {
@@ -19,7 +20,7 @@ export default function ClientsIndex({
     clients,
     filters,
 }: {
-    clients: { data: Client[]; links: unknown[] };
+    clients: { data: Client[]; links: PaginationLink[] };
     filters: { search?: string };
 }) {
     const breadcrumbs: BreadcrumbItem[] = [
@@ -85,55 +86,62 @@ export default function ClientsIndex({
                                 </Button>
                             </div>
                         ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/80">
-                                    <th className="px-4 py-3 text-left font-medium text-slate-600">Nombre / DNI</th>
-                                    <th className="px-4 py-3 text-left font-medium text-slate-600">Contacto</th>
-                                    <th className="px-4 py-3 text-right font-medium text-slate-600">Lotes</th>
-                                    <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {clients.data.map((client) => (
-                                    <tr key={client.id} className="hover:bg-slate-50/50">
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-600">
-                                                    {client.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{client.name}</p>
-                                                    <p className="text-xs text-slate-500">DNI: {client.dni}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="space-y-1 text-slate-600">
-                                                <div className="flex items-center gap-1.5 text-xs">
-                                                    <Phone className="h-3.5 w-3.5 text-slate-400" />
-                                                    {client.phone}
-                                                </div>
-                                                <div className="flex items-center gap-1.5 text-xs">
-                                                    <Mail className="h-3.5 w-3.5 text-slate-400" />
-                                                    {client.email ?? '—'}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-right tabular-nums text-slate-600">{client.lots_count ?? 0}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                                <Link href={`/inmopro/clients/${client.id}`} title="Ver">
-                                                    <Eye className="h-4 w-4" />
-                                                </Link>
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                            <>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-100 bg-slate-50/80">
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Nombre / DNI</th>
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Contacto</th>
+                                                <th className="px-4 py-3 text-right font-medium text-slate-600">Lotes</th>
+                                                <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {clients.data.map((client) => (
+                                                <tr key={client.id} className="hover:bg-slate-50/50">
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-600">
+                                                                {client.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium text-slate-900">{client.name}</p>
+                                                                <p className="text-xs text-slate-500">DNI: {client.dni}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="space-y-1 text-slate-600">
+                                                            <div className="flex items-center gap-1.5 text-xs">
+                                                                <Phone className="h-3.5 w-3.5 text-slate-400" />
+                                                                {client.phone}
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 text-xs">
+                                                                <Mail className="h-3.5 w-3.5 text-slate-400" />
+                                                                {client.email ?? '—'}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{client.lots_count ?? 0}</td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                            <Link href={`/inmopro/clients/${client.id}`} title="Ver">
+                                                                <Eye className="h-4 w-4" />
+                                                            </Link>
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {clients.data.length > 0 && (
+                                    <div className="border-t border-slate-100 px-4 py-3">
+                                        <Pagination links={clients.links} />
+                                    </div>
+                                )}
+                            </>
                         )}
                     </CardContent>
                 </Card>

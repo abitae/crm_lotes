@@ -69,4 +69,12 @@ class Advisor extends Model
     {
         return $this->hasMany(Commission::class, 'advisor_id');
     }
+
+    /**
+     * @return HasMany<AdvisorMembership, $this>
+     */
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(AdvisorMembership::class);
+    }
 }

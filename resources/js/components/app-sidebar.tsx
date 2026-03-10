@@ -13,6 +13,7 @@ import {
     Tag,
     Layers,
     Receipt,
+    FileCheck,
 } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavUser } from '@/components/nav-user';
@@ -47,6 +48,10 @@ const ventasNavItems: NavItem[] = [
     { title: 'Clientes', href: '/inmopro/clients', icon: Users },
     { title: 'Vendedores', href: '/inmopro/advisors', icon: UserCheck },
     { title: 'Reportes', href: '/inmopro/reports', icon: BarChart3 },
+];
+
+const operacionesNavItems: NavItem[] = [
+    { title: 'Tickets de atención', href: '/inmopro/attention-tickets', icon: FileCheck },
 ];
 
 const administracionNavItems: NavItem[] = [
@@ -124,6 +129,7 @@ export function AppSidebar() {
                 <NavGroup label="Principal" items={principalNavItems} isCurrentUrl={isCurrentUrl} />
                 <NavGroup label="Inventario" items={inventarioNavItems} isCurrentUrl={isCurrentUrl} />
                 <NavGroup label="Ventas" items={ventasNavItems} isCurrentUrl={isCurrentUrl} />
+                <NavGroup label="Operaciones" items={operacionesNavItems} isCurrentUrl={isCurrentUrl} />
                 <NavGroup label="Administración" items={administracionNavItems} isCurrentUrl={isCurrentUrl} />
             </SidebarContent>
 

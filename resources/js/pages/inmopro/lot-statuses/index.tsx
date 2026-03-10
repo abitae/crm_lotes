@@ -1,18 +1,23 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Tag, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import Pagination, { type PaginationLink } from '@/components/pagination';
+import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
 type LotStatus = { id: number; name: string; code: string; color?: string; sort_order?: number };
 
-export default function LotStatusesIndex({ lotStatuses }: { lotStatuses: LotStatus[] }) {
+export default function LotStatusesIndex({ lotStatuses }: { lotStatuses: { data: LotStatus[]; links: PaginationLink[] } }) {
+    const items = lotStatuses.data;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Estados de lote', href: '/inmopro/lot-statuses' },
     ];
 
-    const handleDestroy = (id: number, name: string) => {
-        if (window.confirm('Eliminar estado "' + name + '"?')) router.delete('/inmopro/lot-statuses/' + id);
+    const handleDestroy = async (id: number, name: string) => {
+        if (await confirmDelete(`¿Eliminar estado "${name}"?`)) {
+            router.delete('/inmopro/lot-statuses/' + id);
+        }
     };
 
     return (
@@ -39,7 +44,7 @@ export default function LotStatusesIndex({ lotStatuses }: { lotStatuses: LotStat
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {lotStatuses.map((s) => (
+                            {items.map((s) => (
                                 <tr key={s.id} className="hover:bg-slate-50/50">
                                     <td className="px-4 py-3 font-medium text-slate-800">{s.name}</td>
                                     <td className="px-4 py-3 text-slate-600">{s.code}</td>
@@ -57,10 +62,14 @@ export default function LotStatusesIndex({ lotStatuses }: { lotStatuses: LotStat
                             ))}
                         </tbody>
                     </table>
-                    {lotStatuses.length === 0 && (
+                    {items.length === 0 ? (
                         <div className="py-12 text-center text-slate-500">
                             <Tag className="mx-auto mb-2 h-10 w-10" />
                             <p>No hay estados. <Link href="/inmopro/lot-statuses/create" className="text-emerald-600 hover:underline">Crear uno</Link></p>
+                        </div>
+                    ) : (
+                        <div className="border-t border-slate-100 px-4 py-3">
+                            <Pagination links={lotStatuses.links} />
                         </div>
                     )}
                 </div>

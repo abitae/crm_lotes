@@ -13,8 +13,11 @@ use App\Models\Inmopro\Project;
 use App\Services\Inmopro\CommissionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Facades\View;
 use Inertia\Inertia;
 use Inertia\Response;
+use Mpdf\Mpdf;
 
 class LotController extends Controller
 {
@@ -138,6 +141,46 @@ class LotController extends Controller
         $lot = Lot::create($request->validated());
 
         return redirect()->route('inmopro.lots.index', ['project_id' => $lot->project_id]);
+    }
+
+    public function exportPdf(Request $request): HttpResponse
+    {
+        $projectId = $request->query('project_id');
+        $project = $projectId ? Project::find($projectId) : Project::orderBy('name')->first();
+        if (! $project) {
+            abort(404, 'Proyecto no encontrado');
+        }
+
+        $lots = Lot::with('status')
+            ->where('project_id', $project->id)
+            ->orderBy('block')
+            ->orderBy('number')
+            ->get();
+
+        $blockGroups = $lots->groupBy('block');
+
+        $html = View::make('inmopro.lots-export-pdf', [
+            'project' => $project,
+            'blockGroups' => $blockGroups,
+        ])->render();
+
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_left' => 12,
+            'margin_right' => 12,
+            'margin_top' => 16,
+            'margin_bottom' => 16,
+        ]);
+        $mpdf->WriteHTML($html);
+        $pdf = $mpdf->Output('', 'S');
+
+        $filename = 'inventario-lotes-'.str($project->name)->slug().'-'.now()->format('Y-m-d').'.pdf';
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     public function show(Lot $lot): Response

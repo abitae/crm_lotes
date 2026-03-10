@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { Percent, DollarSign, Search, Calendar, CheckCircle2 } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import Pagination, { type PaginationLink } from '@/components/pagination';
 import type { BreadcrumbItem } from '@/types';
 
 type Commission = {
@@ -20,7 +21,7 @@ export default function Commissions({
     totalCommissions,
     filters,
 }: {
-    commissions: { data: Commission[]; links: unknown[] };
+    commissions: { data: Commission[]; links: PaginationLink[] };
     totalCommissions: number;
     filters: { start_date?: string; end_date?: string; search?: string };
 }) {
@@ -186,6 +187,11 @@ export default function Commissions({
                             </tbody>
                         </table>
                     </div>
+                    {commissions.data.length > 0 && (
+                        <div className="border-t border-slate-100 px-4 py-3">
+                            <Pagination links={commissions.links} />
+                        </div>
+                    )}
                     {commissions.data.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-24 text-center">
                             <Percent className="mb-4 h-12 w-12 text-slate-300 opacity-10" />

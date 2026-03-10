@@ -87,4 +87,12 @@ class Lot extends Model
     {
         return $this->hasMany(Commission::class, 'lot_id');
     }
+
+    /**
+     * @return HasMany<AttentionTicket, $this>
+     */
+    public function attentionTickets(): HasMany
+    {
+        return $this->hasMany(AttentionTicket::class, 'lot_id');
+    }
 }

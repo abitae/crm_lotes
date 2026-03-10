@@ -1,0 +1,90 @@
+import { Head, useForm } from '@inertiajs/react';
+import { FormEvent } from 'react';
+import AppLayout from '@/layouts/app-layout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import InputError from '@/components/input-error';
+import type { BreadcrumbItem } from '@/types';
+
+type Ticket = {
+    id: number;
+    status: string;
+    notes: string | null;
+};
+
+export default function AttentionTicketsEdit({ ticket }: { ticket: Ticket }) {
+    const { data, setData, put, processing, errors } = useForm({
+        status: ticket.status,
+        notes: ticket.notes ?? '',
+    });
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Inmopro', href: '/inmopro/dashboard' },
+        { title: 'Operaciones', href: '/inmopro/attention-tickets' },
+        { title: 'Tickets de atención', href: '/inmopro/attention-tickets' },
+        { title: `Ticket #${ticket.id}`, href: `/inmopro/attention-tickets/${ticket.id}` },
+        { title: 'Editar', href: `/inmopro/attention-tickets/${ticket.id}/edit` },
+    ];
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        put(`/inmopro/attention-tickets/${ticket.id}`);
+    };
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={`Editar ticket #${ticket.id} - Operaciones - Inmopro`} />
+            <div className="p-4 md:p-6">
+                <div className="mb-6">
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">Editar ticket #{ticket.id}</h1>
+                    <p className="mt-1 text-sm text-slate-500">Actualice estado u observaciones.</p>
+                </div>
+                <Card className="max-w-lg">
+                    <CardHeader>
+                        <CardTitle>Datos del ticket</CardTitle>
+                        <CardDescription>Estado y observaciones.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={submit} className="space-y-4">
+                            <div>
+                                <Label htmlFor="status">Estado</Label>
+                                <select
+                                    id="status"
+                                    value={data.status}
+                                    onChange={(e) => setData('status', e.target.value)}
+                                    className="mt-1 flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm"
+                                >
+                                    <option value="pendiente">Pendiente</option>
+                                    <option value="agendado">Agendado</option>
+                                    <option value="realizado">Realizado</option>
+                                    <option value="cancelado">Cancelado</option>
+                                </select>
+                                <InputError message={errors.status} />
+                            </div>
+                            <div>
+                                <Label htmlFor="notes">Observaciones</Label>
+                                <textarea
+                                    id="notes"
+                                    value={data.notes}
+                                    onChange={(e) => setData('notes', e.target.value)}
+                                    className="mt-1 flex min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    rows={3}
+                                />
+                                <InputError message={errors.notes} />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button type="submit" disabled={processing}>
+                                    Guardar
+                                </Button>
+                                <Button type="button" variant="outline" asChild>
+                                    <a href={`/inmopro/attention-tickets/${ticket.id}`}>Cancelar</a>
+                                </Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        </AppLayout>
+    );
+}

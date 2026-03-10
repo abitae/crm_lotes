@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { Target, TrendingUp, Flag, Trophy, AlertTriangle } from 'lucide-react';
+import { Target, TrendingUp, Flag, Trophy, AlertTriangle, FileDown } from 'lucide-react';
 import {
     BarChart,
     Bar,
@@ -59,10 +59,28 @@ export default function Reports({
     };
     const themeColor = levelColors[advisorLevels.findIndex((l) => l.id === selectedLevelId) + 1] ?? '#3b82f6';
 
+    const pdfUrl = () => {
+        const params = new URLSearchParams();
+        if (selectedLevelId) params.set('level_id', String(selectedLevelId));
+        return `/inmopro/reports/pdf?${params.toString()}`;
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Reportes - Inmopro" />
             <div className="space-y-8 p-4 pb-12">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <span className="text-sm text-slate-500">Previsualice o imprima el reporte en PDF</span>
+                    <a
+                        href={pdfUrl()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+                    >
+                        <FileDown className="h-4 w-4" />
+                        Ver PDF / Imprimir
+                    </a>
+                </div>
                 <div className="flex flex-col gap-6 xl:flex-row">
                     <div className="relative flex-1 overflow-hidden rounded-3xl bg-slate-900 p-8 text-white shadow-2xl">
                         <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">

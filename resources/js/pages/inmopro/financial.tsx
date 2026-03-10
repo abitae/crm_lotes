@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { DollarSign, Building2, Search, Calendar } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import Pagination, { type PaginationLink } from '@/components/pagination';
 import type { BreadcrumbItem } from '@/types';
 
 type Lot = {
@@ -24,7 +25,7 @@ export default function Financial({
     totalPending,
     filters,
 }: {
-    lots: Lot[];
+    lots: { data: Lot[]; links: PaginationLink[]; total: number };
     projects: Project[];
     totalValue: number;
     totalCollected: number;
@@ -129,7 +130,7 @@ export default function Financial({
                             S/ {totalValue.toLocaleString()}
                         </p>
                         <p className="mt-2 text-xs font-bold text-blue-600">
-                            {lots.length} Ventas registradas
+                            {lots.total} Ventas registradas
                         </p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 border-l-emerald-500 bg-white p-6">
@@ -197,7 +198,7 @@ export default function Financial({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {lots.map((lot) => {
+                                {lots.data.map((lot) => {
                                     const percent =
                                         Number(lot.price) > 0
                                             ? Math.round((Number(lot.advance ?? 0) / Number(lot.price)) * 100)
@@ -240,13 +241,17 @@ export default function Financial({
                             </tbody>
                         </table>
                     </div>
-                    {lots.length === 0 && (
+                    {lots.data.length === 0 ? (
                         <div className="flex flex-col items-center justify-center p-20 text-center">
                             <Search className="mb-4 h-8 w-8 text-slate-300" />
                             <h4 className="font-black uppercase text-slate-800">Sin resultados</h4>
                             <p className="text-sm text-slate-400">
                                 No se encontraron ventas para los criterios seleccionados.
                             </p>
+                        </div>
+                    ) : (
+                        <div className="border-t border-slate-100 px-4 py-3">
+                            <Pagination links={lots.links} />
                         </div>
                     )}
                 </div>

@@ -21,7 +21,7 @@ class ProjectController extends Controller
 {
     public function index(Request $request): Response
     {
-        $projects = Project::withCount('lots')->orderBy('name')->get();
+        $projects = Project::withCount('lots')->orderBy('name')->paginate(15)->withQueryString();
 
         return Inertia::render('inmopro/projects/index', [
             'projects' => $projects,

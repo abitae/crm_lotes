@@ -7,14 +7,15 @@ use App\Http\Requests\Inmopro\StoreLotStatusRequest;
 use App\Http\Requests\Inmopro\UpdateLotStatusRequest;
 use App\Models\Inmopro\LotStatus;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class LotStatusController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $lotStatuses = LotStatus::orderBy('sort_order')->get();
+        $lotStatuses = LotStatus::orderBy('sort_order')->paginate(10)->withQueryString();
 
         return Inertia::render('inmopro/lot-statuses/index', [
             'lotStatuses' => $lotStatuses,

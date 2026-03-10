@@ -1,16 +1,23 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import Pagination, { type PaginationLink } from '@/components/pagination';
+import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
-export default function AdvisorLevelsIndex({ advisorLevels }: { advisorLevels: Array<{ id: number; name: string; code?: string; direct_rate?: string; pyramid_rate?: string; advisors_count?: number }> }) {
+type AdvisorLevelRow = { id: number; name: string; code?: string; direct_rate?: string; pyramid_rate?: string; advisors_count?: number };
+
+export default function AdvisorLevelsIndex({ advisorLevels }: { advisorLevels: { data: AdvisorLevelRow[]; links: PaginationLink[] } }) {
+    const items = advisorLevels.data;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Niveles de asesor', href: '/inmopro/advisor-levels' },
     ];
 
-    const handleDestroy = (id: number, name: string) => {
-        if (window.confirm('Eliminar nivel ' + name + '?')) router.delete('/inmopro/advisor-levels/' + id);
+    const handleDestroy = async (id: number, name: string) => {
+        if (await confirmDelete(`¿Eliminar nivel "${name}"?`)) {
+            router.delete('/inmopro/advisor-levels/' + id);
+        }
     };
 
     return (
@@ -52,6 +59,11 @@ export default function AdvisorLevelsIndex({ advisorLevels }: { advisorLevels: A
                             ))}
                         </tbody>
                     </table>
+                    {items.length > 0 && (
+                        <div className="border-t border-slate-100 px-4 py-3">
+                            <Pagination links={advisorLevels.links} />
+                        </div>
+                    )}
                 </div>
             </div>
         </AppLayout>

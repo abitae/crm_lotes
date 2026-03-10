@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Inmopro\AdvisorController;
 use App\Http\Controllers\Inmopro\AdvisorLevelController;
+use App\Http\Controllers\Inmopro\AdvisorMembershipController;
+use App\Http\Controllers\Inmopro\AttentionTicketController;
 use App\Http\Controllers\Inmopro\ClientController;
 use App\Http\Controllers\Inmopro\CommissionController;
 use App\Http\Controllers\Inmopro\CommissionStatusController;
@@ -18,11 +20,14 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::get('projects/excel-template', [ProjectController::class, 'excelTemplate'])->name('projects.excel-template');
     Route::post('projects/import-from-excel', [ProjectController::class, 'importFromExcel'])->name('projects.import-from-excel');
     Route::resource('projects', ProjectController::class);
+    Route::get('lots/export-pdf', [LotController::class, 'exportPdf'])->name('lots.export-pdf');
     Route::resource('lots', LotController::class);
     Route::get('clients/search', [ClientController::class, 'search'])->name('clients.search');
     Route::resource('clients', ClientController::class);
     Route::get('advisors/search', [AdvisorController::class, 'search'])->name('advisors.search');
     Route::resource('advisors', AdvisorController::class)->except(['destroy']);
+    Route::post('advisor-memberships/{advisor_membership}/payments', [AdvisorMembershipController::class, 'storePayment'])->name('advisor-memberships.payments.store');
+    Route::resource('advisor-memberships', AdvisorMembershipController::class)->parameters(['advisor-memberships' => 'advisor_membership']);
     Route::resource('lot-statuses', LotStatusController::class)->parameters(['lot-statuses' => 'lot_status']);
     Route::resource('commission-statuses', CommissionStatusController::class)->parameters(['commission-statuses' => 'commission_status']);
     Route::resource('advisor-levels', AdvisorLevelController::class)->parameters(['advisor-levels' => 'advisor_level']);
@@ -30,4 +35,9 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::get('commissions', [CommissionController::class, 'index'])->name('commissions.index');
     Route::post('commissions/{commission}/mark-as-paid', [CommissionController::class, 'markAsPaid'])->name('commissions.mark-as-paid');
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('reports/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
+    Route::get('attention-tickets/calendar', [AttentionTicketController::class, 'calendar'])->name('attention-tickets.calendar');
+    Route::get('attention-tickets/{attention_ticket}/delivery-deed', [AttentionTicketController::class, 'deliveryDeed'])->name('attention-tickets.delivery-deed');
+    Route::post('attention-tickets/{attention_ticket}/delivery-deed/mark-signed', [AttentionTicketController::class, 'markDeedSigned'])->name('attention-tickets.delivery-deed.mark-signed');
+    Route::resource('attention-tickets', AttentionTicketController::class)->parameters(['attention-tickets' => 'attention_ticket']);
 });

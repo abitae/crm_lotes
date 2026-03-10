@@ -1,18 +1,23 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import Pagination, { type PaginationLink } from '@/components/pagination';
+import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
 type CommissionStatus = { id: number; name: string; code: string; color?: string };
 
-export default function CommissionStatusesIndex({ commissionStatuses }: { commissionStatuses: CommissionStatus[] }) {
+export default function CommissionStatusesIndex({ commissionStatuses }: { commissionStatuses: { data: CommissionStatus[]; links: PaginationLink[] } }) {
+    const items = commissionStatuses.data;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Estados de comision', href: '/inmopro/commission-statuses' },
     ];
 
-    const handleDestroy = (id: number, name: string) => {
-        if (window.confirm('Eliminar estado ' + name + '?')) router.delete('/inmopro/commission-statuses/' + id);
+    const handleDestroy = async (id: number, name: string) => {
+        if (await confirmDelete(`¿Eliminar estado "${name}"?`)) {
+            router.delete('/inmopro/commission-statuses/' + id);
+        }
     };
 
     return (
@@ -37,7 +42,7 @@ export default function CommissionStatusesIndex({ commissionStatuses }: { commis
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {commissionStatuses.map((s) => (
+                            {items.map((s) => (
                                 <tr key={s.id}>
                                     <td className="px-4 py-3 font-medium">{s.name}</td>
                                     <td className="px-4 py-3">{s.code}</td>
@@ -52,6 +57,11 @@ export default function CommissionStatusesIndex({ commissionStatuses }: { commis
                             ))}
                         </tbody>
                     </table>
+                    {items.length > 0 && (
+                        <div className="border-t border-slate-100 px-4 py-3">
+                            <Pagination links={commissionStatuses.links} />
+                        </div>
+                    )}
                 </div>
             </div>
         </AppLayout>

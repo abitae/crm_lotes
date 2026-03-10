@@ -7,14 +7,15 @@ use App\Http\Requests\Inmopro\StoreAdvisorLevelRequest;
 use App\Http\Requests\Inmopro\UpdateAdvisorLevelRequest;
 use App\Models\Inmopro\AdvisorLevel;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class AdvisorLevelController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $advisorLevels = AdvisorLevel::withCount('advisors')->orderBy('sort_order')->get();
+        $advisorLevels = AdvisorLevel::withCount('advisors')->orderBy('sort_order')->paginate(10)->withQueryString();
 
         return Inertia::render('inmopro/advisor-levels/index', [
             'advisorLevels' => $advisorLevels,
