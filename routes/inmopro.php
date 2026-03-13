@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Inmopro\AccountsReceivableController;
 use App\Http\Controllers\Inmopro\AdvisorController;
 use App\Http\Controllers\Inmopro\AdvisorLevelController;
 use App\Http\Controllers\Inmopro\AdvisorMembershipController;
 use App\Http\Controllers\Inmopro\AttentionTicketController;
+use App\Http\Controllers\Inmopro\CashAccountController;
 use App\Http\Controllers\Inmopro\ClientController;
 use App\Http\Controllers\Inmopro\CommissionController;
 use App\Http\Controllers\Inmopro\CommissionStatusController;
@@ -32,6 +34,12 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::resource('commission-statuses', CommissionStatusController::class)->parameters(['commission-statuses' => 'commission_status']);
     Route::resource('advisor-levels', AdvisorLevelController::class)->parameters(['advisor-levels' => 'advisor_level']);
     Route::get('financial', [FinancialController::class, 'index'])->name('financial.index');
+    Route::get('accounts-receivable', [AccountsReceivableController::class, 'index'])->name('accounts-receivable.index');
+    Route::post('lots/{lot}/installments', [AccountsReceivableController::class, 'storeInstallment'])->name('lots.installments.store');
+    Route::post('lots/{lot}/payments', [AccountsReceivableController::class, 'storePayment'])->name('lots.payments.store');
+    Route::get('cash-accounts', [CashAccountController::class, 'index'])->name('cash-accounts.index');
+    Route::post('cash-accounts', [CashAccountController::class, 'store'])->name('cash-accounts.store');
+    Route::post('cash-accounts/{cash_account}/entries', [CashAccountController::class, 'storeEntry'])->name('cash-accounts.entries.store');
     Route::get('commissions', [CommissionController::class, 'index'])->name('commissions.index');
     Route::post('commissions/{commission}/mark-as-paid', [CommissionController::class, 'markAsPaid'])->name('commissions.mark-as-paid');
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');

@@ -1,0 +1,89 @@
+<?php
+
+namespace Tests\Feature\Inmopro;
+
+use App\Models\Inmopro\CashAccount;
+use App\Models\Inmopro\Lot;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class InmoproAccountsReceivableTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+        $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\LotStatusSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\CommissionStatusSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\ProjectSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\ClientSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\LotSeeder::class);
+    }
+
+    public function test_authenticated_users_can_visit_accounts_receivable_index(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $response = $this->get(route('inmopro.accounts-receivable.index'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->component('inmopro/accounts-receivable')->has('lots'));
+    }
+
+    public function test_authenticated_users_can_create_installment_and_payment(): void
+    {
+        $user = User::factory()->create();
+        $lot = Lot::whereNotNull('client_id')->firstOrFail();
+        $cashAccount = CashAccount::create([
+            'name' => 'Caja Principal',
+            'type' => 'CAJA',
+            'currency' => 'PEN',
+            'initial_balance' => 100,
+            'current_balance' => 100,
+            'is_active' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->post(route('inmopro.lots.installments.store', $lot), [
+            'due_date' => now()->addDays(15)->toDateString(),
+            'amount' => 2500,
+            'notes' => 'Primera cuota',
+        ])->assertRedirect();
+
+        $installment = $lot->installments()->first();
+        $this->assertNotNull($installment);
+
+        $this->post(route('inmopro.lots.payments.store', $lot), [
+            'lot_installment_id' => $installment->id,
+            'cash_account_id' => $cashAccount->id,
+            'amount' => 2500,
+            'paid_at' => now()->toDateString(),
+            'payment_method' => 'TRANSFERENCIA',
+            'reference' => 'OP-100',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('lot_payments', [
+            'lot_id' => $lot->id,
+            'amount' => 2500,
+        ]);
+        $this->assertDatabaseHas('lot_installments', [
+            'id' => $installment->id,
+            'status' => 'PAGADA',
+        ]);
+        $this->assertDatabaseHas('cash_entries', [
+            'cash_account_id' => $cashAccount->id,
+            'type' => 'INGRESO',
+            'amount' => 2500,
+        ]);
+        $this->assertDatabaseHas('cash_accounts', [
+            'id' => $cashAccount->id,
+            'current_balance' => 2600,
+        ]);
+    }
+}

@@ -1,19 +1,21 @@
 import { Link } from '@inertiajs/react';
 import {
+    BarChart3,
     BookOpen,
+    Building2,
+    DollarSign,
+    FileCheck,
     Folder,
+    Landmark,
+    Layers,
     LayoutGrid,
     MapPin,
-    DollarSign,
     Percent,
-    Users,
-    UserCheck,
-    BarChart3,
-    Building2,
-    Tag,
-    Layers,
     Receipt,
-    FileCheck,
+    Tag,
+    UserCheck,
+    Users,
+    WalletCards,
 } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavUser } from '@/components/nav-user';
@@ -29,10 +31,10 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useCurrentUrl, type IsCurrentUrlFn } from '@/hooks/use-current-url';
+import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 import AppLogo from './app-logo';
-import { dashboard } from '@/routes';
-import { useCurrentUrl, type IsCurrentUrlFn } from '@/hooks/use-current-url';
 
 const principalNavItems: NavItem[] = [
     { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
@@ -44,6 +46,7 @@ const inventarioNavItems: NavItem[] = [
 
 const ventasNavItems: NavItem[] = [
     { title: 'Control Financiero', href: '/inmopro/financial', icon: DollarSign },
+    { title: 'Cuentas por cobrar', href: '/inmopro/accounts-receivable', icon: WalletCards },
     { title: 'Comisiones', href: '/inmopro/commissions', icon: Percent },
     { title: 'Clientes', href: '/inmopro/clients', icon: Users },
     { title: 'Vendedores', href: '/inmopro/advisors', icon: UserCheck },
@@ -51,13 +54,14 @@ const ventasNavItems: NavItem[] = [
 ];
 
 const operacionesNavItems: NavItem[] = [
-    { title: 'Tickets de atención', href: '/inmopro/attention-tickets', icon: FileCheck },
+    { title: 'Tickets de atencion', href: '/inmopro/attention-tickets', icon: FileCheck },
 ];
 
 const administracionNavItems: NavItem[] = [
     { title: 'Proyectos', href: '/inmopro/projects', icon: Building2 },
+    { title: 'Caja y bancos', href: '/inmopro/cash-accounts', icon: Landmark },
     { title: 'Estados de lote', href: '/inmopro/lot-statuses', icon: Tag },
-    { title: 'Estados de comisión', href: '/inmopro/commission-statuses', icon: Receipt },
+    { title: 'Estados de comision', href: '/inmopro/commission-statuses', icon: Receipt },
     { title: 'Niveles de asesor', href: '/inmopro/advisor-levels', icon: Layers },
 ];
 
@@ -130,7 +134,7 @@ export function AppSidebar() {
                 <NavGroup label="Inventario" items={inventarioNavItems} isCurrentUrl={isCurrentUrl} />
                 <NavGroup label="Ventas" items={ventasNavItems} isCurrentUrl={isCurrentUrl} />
                 <NavGroup label="Operaciones" items={operacionesNavItems} isCurrentUrl={isCurrentUrl} />
-                <NavGroup label="Administración" items={administracionNavItems} isCurrentUrl={isCurrentUrl} />
+                <NavGroup label="Administracion" items={administracionNavItems} isCurrentUrl={isCurrentUrl} />
             </SidebarContent>
 
             <SidebarFooter>

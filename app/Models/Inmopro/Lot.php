@@ -95,4 +95,20 @@ class Lot extends Model
     {
         return $this->hasMany(AttentionTicket::class, 'lot_id');
     }
+
+    /**
+     * @return HasMany<LotInstallment, $this>
+     */
+    public function installments(): HasMany
+    {
+        return $this->hasMany(LotInstallment::class, 'lot_id')->orderBy('sequence');
+    }
+
+    /**
+     * @return HasMany<LotPayment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(LotPayment::class, 'lot_id')->latest('paid_at');
+    }
 }
