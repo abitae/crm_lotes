@@ -7,8 +7,9 @@ use App\Http\Requests\Inmopro\StoreAttentionTicketRequest;
 use App\Http\Requests\Inmopro\UpdateAttentionTicketRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AttentionTicket;
+use App\Models\Inmopro\Client;
 use App\Models\Inmopro\DeliveryDeed;
-use App\Models\Inmopro\Lot;
+use App\Models\Inmopro\Project;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,8 +20,10 @@ class AttentionTicketController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = AttentionTicket::with(['advisor', 'lot.project', 'lot.client', 'deliveryDeed'])
-            ->orderBy('scheduled_at', 'desc');
+        $query = AttentionTicket::with(['advisor', 'client', 'project', 'lot', 'deliveryDeed'])
+            ->orderByRaw('case when scheduled_at is null then 1 else 0 end')
+            ->orderByDesc('scheduled_at')
+            ->orderByDesc('created_at');
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
@@ -36,37 +39,34 @@ class AttentionTicketController extends Controller
 
     public function calendar(Request $request): Response
     {
-        $query = AttentionTicket::with(['advisor', 'lot.project', 'lot.client'])
+        $query = AttentionTicket::with(['advisor', 'client', 'project'])
+            ->whereNotNull('scheduled_at')
             ->orderBy('scheduled_at');
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }
 
-        $tickets = $query->get();
-        $events = $tickets->map(function (AttentionTicket $t) {
-            $start = Carbon::parse($t->scheduled_at);
+        $events = $query->get()->map(function (AttentionTicket $ticket): array {
+            $start = Carbon::parse($ticket->scheduled_at);
             $end = $start->copy()->addHour();
-            $title = sprintf(
-                '#%d · %s · %s-%s %s',
-                $t->id,
-                $t->advisor?->name ?? '—',
-                $t->lot?->block ?? '',
-                $t->lot?->number ?? '',
-                $t->lot?->project?->name ?? ''
-            );
 
             return [
-                'id' => (string) $t->id,
-                'title' => $title,
+                'id' => (string) $ticket->id,
+                'title' => sprintf(
+                    '#%d · %s · %s',
+                    $ticket->id,
+                    $ticket->advisor?->name ?? 'Sin vendedor',
+                    $ticket->project?->name ?? 'Sin proyecto'
+                ),
                 'start' => $start->toIso8601String(),
                 'end' => $end->toIso8601String(),
-                'url' => route('inmopro.attention-tickets.show', $t),
+                'url' => route('inmopro.attention-tickets.show', $ticket),
                 'extendedProps' => [
-                    'status' => $t->status,
-                    'advisor' => $t->advisor?->name,
-                    'lot' => $t->lot ? $t->lot->block.'-'.$t->lot->number : null,
-                    'client' => $t->lot?->client?->name,
+                    'status' => $ticket->status,
+                    'advisor' => $ticket->advisor?->name,
+                    'project' => $ticket->project?->name,
+                    'client' => $ticket->client?->name,
                 ],
             ];
         })->values()->all();
@@ -77,27 +77,23 @@ class AttentionTicketController extends Controller
         ]);
     }
 
-    public function create(Request $request): Response
+    public function create(): Response
     {
-        $lots = Lot::with(['project', 'client', 'status'])
-            ->whereNotNull('client_id')
-            ->orderBy('block')
-            ->orderBy('number')
-            ->get();
-
-        $advisors = Advisor::orderBy('name')->get(['id', 'name']);
-
         return Inertia::render('inmopro/operations/attention-tickets/create', [
-            'lots' => $lots,
-            'advisors' => $advisors,
+            'advisors' => Advisor::query()->orderBy('name')->get(['id', 'name']),
+            'clients' => Client::query()
+                ->with('advisor:id,name')
+                ->orderBy('name')
+                ->get(['id', 'name', 'advisor_id']),
+            'projects' => Project::query()->orderBy('name')->get(['id', 'name', 'location']),
         ]);
     }
 
     public function store(StoreAttentionTicketRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $validated['scheduled_at'] = Carbon::parse($validated['scheduled_at']);
-        $validated['status'] = 'agendado';
+        $validated['scheduled_at'] = ! empty($validated['scheduled_at']) ? Carbon::parse($validated['scheduled_at']) : null;
+        $validated['status'] = 'pendiente';
 
         AttentionTicket::create($validated);
 
@@ -106,7 +102,7 @@ class AttentionTicketController extends Controller
 
     public function show(AttentionTicket $attention_ticket): Response
     {
-        $attention_ticket->load(['advisor', 'lot.project', 'lot.client', 'deliveryDeed']);
+        $attention_ticket->load(['advisor', 'client', 'project', 'lot.project', 'lot.client', 'deliveryDeed']);
 
         return Inertia::render('inmopro/operations/attention-tickets/show', [
             'ticket' => $attention_ticket,
@@ -115,7 +111,7 @@ class AttentionTicketController extends Controller
 
     public function edit(AttentionTicket $attention_ticket): Response
     {
-        $attention_ticket->load(['lot.project', 'lot.client', 'advisor']);
+        $attention_ticket->load(['advisor', 'client', 'project', 'lot.project', 'lot.client']);
 
         return Inertia::render('inmopro/operations/attention-tickets/edit', [
             'ticket' => $attention_ticket,
@@ -124,7 +120,12 @@ class AttentionTicketController extends Controller
 
     public function update(UpdateAttentionTicketRequest $request, AttentionTicket $attention_ticket): RedirectResponse
     {
-        $attention_ticket->update($request->validated());
+        $validated = $request->validated();
+        $validated['scheduled_at'] = isset($validated['scheduled_at']) && $validated['scheduled_at']
+            ? Carbon::parse($validated['scheduled_at'])
+            : null;
+
+        $attention_ticket->update($validated);
 
         return redirect()->route('inmopro.attention-tickets.show', $attention_ticket);
     }
@@ -138,6 +139,8 @@ class AttentionTicketController extends Controller
 
     public function deliveryDeed(AttentionTicket $attention_ticket): Response
     {
+        abort_if(! $attention_ticket->lot_id, 422, 'El ticket no tiene lote asociado para generar acta.');
+
         $attention_ticket->load(['lot.project', 'lot.client', 'advisor']);
 
         $deed = $attention_ticket->deliveryDeed;
@@ -151,17 +154,17 @@ class AttentionTicketController extends Controller
             $deed->update(['printed_at' => now()]);
         }
 
-        $companyName = config('app.name');
-
         return Inertia::render('inmopro/operations/delivery-deed-print', [
             'ticket' => $attention_ticket->load(['lot.project', 'lot.client', 'advisor']),
             'deed' => $deed,
-            'companyName' => $companyName,
+            'companyName' => config('app.name'),
         ]);
     }
 
     public function markDeedSigned(AttentionTicket $attention_ticket): RedirectResponse
     {
+        abort_if(! $attention_ticket->lot_id, 422, 'El ticket no tiene lote asociado para registrar acta.');
+
         $deed = $attention_ticket->deliveryDeed;
         if (! $deed) {
             $deed = DeliveryDeed::create([

@@ -5,12 +5,32 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
+import { todayIsoDate } from '@/lib/date';
 import type { BreadcrumbItem } from '@/types';
 
 type Project = { id: number; name: string };
 type LotStatus = { id: number; name: string; code: string };
 type Client = { id: number; name: string; dni: string };
 type Advisor = { id: number; name: string };
+type LotCreateForm = {
+    project_id: number | string;
+    block: string;
+    number: string;
+    area: string;
+    price: string;
+    lot_status_id: number | string;
+    client_id: number | '';
+    advisor_id: number | '';
+    client_name: string;
+    client_dni: string;
+    advance: string;
+    remaining_balance: string;
+    payment_limit_date: string;
+    operation_number: string;
+    contract_date: string;
+    contract_number: string;
+    observations: string;
+};
 
 export default function LotsCreate({ projects, project, lotStatuses, clients, advisors }: {
     projects: Project[];
@@ -21,8 +41,7 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
 }) {
     const defaultProject = project?.id ?? projects[0]?.id ?? '';
     const defaultStatus = lotStatuses.find((s) => s.code === 'LIBRE')?.id ?? lotStatuses[0]?.id ?? '';
-    const { data, setData, post, processing, errors } = useForm(
-        {
+    const { data, setData, post, processing, errors, transform } = useForm<LotCreateForm>({
             project_id: defaultProject,
             block: '',
             number: '',
@@ -35,31 +54,12 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
             client_dni: '',
             advance: '',
             remaining_balance: '',
-            payment_limit_date: '',
+            payment_limit_date: todayIsoDate(),
             operation_number: '',
-            contract_date: '',
+            contract_date: todayIsoDate(),
             contract_number: '',
             observations: '',
-        },
-        {
-            transform: (formData) => ({
-                ...formData,
-                project_id: Number(formData.project_id),
-                number: Number(formData.number) || 0,
-                lot_status_id: Number(formData.lot_status_id),
-                client_id: formData.client_id === '' ? null : Number(formData.client_id),
-                advisor_id: formData.advisor_id === '' ? null : Number(formData.advisor_id),
-                area: formData.area ? Number(formData.area) : null,
-                price: formData.price ? Number(formData.price) : null,
-                advance: formData.advance ? Number(formData.advance) : null,
-                remaining_balance: formData.remaining_balance ? Number(formData.remaining_balance) : null,
-                payment_limit_date: formData.payment_limit_date || null,
-                contract_date: formData.contract_date || null,
-                client_name: formData.client_name || null,
-                client_dni: formData.client_dni || null,
-            }),
-        }
-    );
+        });
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -69,6 +69,22 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        transform((formData) => ({
+            ...formData,
+            project_id: Number(formData.project_id),
+            number: Number(formData.number) || 0,
+            lot_status_id: Number(formData.lot_status_id),
+            client_id: formData.client_id === '' ? null : Number(formData.client_id),
+            advisor_id: formData.advisor_id === '' ? null : Number(formData.advisor_id),
+            area: formData.area ? Number(formData.area) : null,
+            price: formData.price ? Number(formData.price) : null,
+            advance: formData.advance ? Number(formData.advance) : null,
+            remaining_balance: formData.remaining_balance ? Number(formData.remaining_balance) : null,
+            payment_limit_date: formData.payment_limit_date || null,
+            contract_date: formData.contract_date || null,
+            client_name: formData.client_name || null,
+            client_dni: formData.client_dni || null,
+        }));
         post('/inmopro/lots');
     };
 
@@ -124,7 +140,7 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label htmlFor="client_id">Cliente</Label>
-                                    <select id="client_id" value={data.client_id} onChange={(e) => setData('client_id', e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <select id="client_id" value={data.client_id} onChange={(e) => setData('client_id', e.target.value === '' ? '' : Number(e.target.value))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2">
                                         <option value="">—</option>
                                         {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
@@ -143,7 +159,7 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
                                 </div>
                                 <div>
                                     <Label htmlFor="advisor_id">Asesor</Label>
-                                    <select id="advisor_id" value={data.advisor_id} onChange={(e) => setData('advisor_id', e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                    <select id="advisor_id" value={data.advisor_id} onChange={(e) => setData('advisor_id', e.target.value === '' ? '' : Number(e.target.value))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2">
                                         <option value="">—</option>
                                         {advisors.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>

@@ -14,8 +14,11 @@ class InmoproReportsPdfTest extends TestCase
     {
         parent::setUp();
         $this->withoutVite();
+        $this->seed(\Database\Seeders\Inmopro\TeamSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\ProjectSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\LotStatusSeeder::class);
     }
 
     public function test_guests_cannot_access_reports_pdf(): void
@@ -29,8 +32,10 @@ class InmoproReportsPdfTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        $response = $this->get(route('inmopro.reports.pdf'));
-        $response->assertOk();
-        $response->assertHeader('Content-Type', 'application/pdf');
+        foreach (['projects', 'teams', 'advisors'] as $view) {
+            $response = $this->get(route('inmopro.reports.pdf', ['view' => $view]));
+            $response->assertOk();
+            $response->assertHeader('Content-Type', 'application/pdf');
+        }
     }
 }

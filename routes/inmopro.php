@@ -6,15 +6,19 @@ use App\Http\Controllers\Inmopro\AdvisorLevelController;
 use App\Http\Controllers\Inmopro\AdvisorMembershipController;
 use App\Http\Controllers\Inmopro\AttentionTicketController;
 use App\Http\Controllers\Inmopro\CashAccountController;
+use App\Http\Controllers\Inmopro\CityController;
 use App\Http\Controllers\Inmopro\ClientController;
+use App\Http\Controllers\Inmopro\ClientTypeController;
 use App\Http\Controllers\Inmopro\CommissionController;
 use App\Http\Controllers\Inmopro\CommissionStatusController;
 use App\Http\Controllers\Inmopro\DashboardController;
 use App\Http\Controllers\Inmopro\FinancialController;
 use App\Http\Controllers\Inmopro\LotController;
+use App\Http\Controllers\Inmopro\LotPreReservationController;
 use App\Http\Controllers\Inmopro\LotStatusController;
 use App\Http\Controllers\Inmopro\ProjectController;
 use App\Http\Controllers\Inmopro\ReportController;
+use App\Http\Controllers\Inmopro\TeamController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->group(function (): void {
@@ -26,8 +30,11 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::resource('lots', LotController::class);
     Route::get('clients/search', [ClientController::class, 'search'])->name('clients.search');
     Route::resource('clients', ClientController::class);
+    Route::resource('client-types', ClientTypeController::class)->parameters(['client-types' => 'client_type']);
+    Route::resource('cities', CityController::class);
     Route::get('advisors/search', [AdvisorController::class, 'search'])->name('advisors.search');
     Route::resource('advisors', AdvisorController::class)->except(['destroy']);
+    Route::resource('teams', TeamController::class);
     Route::post('advisor-memberships/{advisor_membership}/payments', [AdvisorMembershipController::class, 'storePayment'])->name('advisor-memberships.payments.store');
     Route::resource('advisor-memberships', AdvisorMembershipController::class)->parameters(['advisor-memberships' => 'advisor_membership']);
     Route::resource('lot-statuses', LotStatusController::class)->parameters(['lot-statuses' => 'lot_status']);
@@ -48,4 +55,7 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::get('attention-tickets/{attention_ticket}/delivery-deed', [AttentionTicketController::class, 'deliveryDeed'])->name('attention-tickets.delivery-deed');
     Route::post('attention-tickets/{attention_ticket}/delivery-deed/mark-signed', [AttentionTicketController::class, 'markDeedSigned'])->name('attention-tickets.delivery-deed.mark-signed');
     Route::resource('attention-tickets', AttentionTicketController::class)->parameters(['attention-tickets' => 'attention_ticket']);
+    Route::get('lot-pre-reservations', [LotPreReservationController::class, 'index'])->name('lot-pre-reservations.index');
+    Route::post('lot-pre-reservations/{lot_pre_reservation}/approve', [LotPreReservationController::class, 'approve'])->name('lot-pre-reservations.approve');
+    Route::post('lot-pre-reservations/{lot_pre_reservation}/reject', [LotPreReservationController::class, 'reject'])->name('lot-pre-reservations.reject');
 });

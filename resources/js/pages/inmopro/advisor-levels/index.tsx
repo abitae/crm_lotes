@@ -43,7 +43,7 @@ export default function AdvisorLevelsIndex({ advisorLevels }: { advisorLevels: {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {advisorLevels.map((s) => (
+                            {items.map((s) => (
                                 <tr key={s.id}>
                                     <td className="px-4 py-3 font-medium">{s.name}</td>
                                     <td className="px-4 py-3 text-right">{s.direct_rate ?? '—'}</td>

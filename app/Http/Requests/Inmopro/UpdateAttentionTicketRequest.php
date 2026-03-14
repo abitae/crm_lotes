@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Inmopro;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateAttentionTicketRequest extends FormRequest
 {
@@ -21,6 +22,7 @@ class UpdateAttentionTicketRequest extends FormRequest
     {
         return [
             'status' => ['sometimes', 'string', 'in:pendiente,agendado,realizado,cancelado'],
+            'scheduled_at' => ['nullable', 'date', Rule::requiredIf(fn (): bool => $this->input('status') === 'agendado')],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }

@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Models\Inmopro;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class City extends Model
+{
+    /**
+     * @var list<string>
+     */
+    protected $fillable = [
+        'name',
+        'code',
+        'department',
+        'sort_order',
+        'is_active',
+    ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
+
+    /**
+     * @return HasMany<Client, $this>
+     */
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class);
+    }
+}

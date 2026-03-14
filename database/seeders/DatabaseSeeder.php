@@ -29,9 +29,13 @@ class DatabaseSeeder extends Seeder
             Inmopro\LotStatusSeeder::class,
             Inmopro\CommissionStatusSeeder::class,
             Inmopro\ProjectSeeder::class,
+            Inmopro\TeamSeeder::class,
+            Inmopro\ClientTypeSeeder::class,
+            Inmopro\CitySeeder::class,
             Inmopro\AdvisorSeeder::class,
             Inmopro\ClientSeeder::class,
             Inmopro\LotSeeder::class,
+            Inmopro\LotPreReservationSeeder::class,
         ]);
     }
 }

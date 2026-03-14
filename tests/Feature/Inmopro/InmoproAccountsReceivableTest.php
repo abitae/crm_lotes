@@ -86,4 +86,22 @@ class InmoproAccountsReceivableTest extends TestCase
             'current_balance' => 2600,
         ]);
     }
+
+    public function test_accounts_receivable_can_filter_by_project_and_client(): void
+    {
+        $user = User::factory()->create();
+        $lot = Lot::whereNotNull('client_id')->with(['project', 'client'])->firstOrFail();
+        $this->actingAs($user);
+
+        $response = $this->get(route('inmopro.accounts-receivable.index', [
+            'project_id' => $lot->project_id,
+            'search' => $lot->client?->name,
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('inmopro/accounts-receivable')
+            ->where('filters.project_id', (string) $lot->project_id)
+            ->where('filters.search', $lot->client?->name));
+    }
 }

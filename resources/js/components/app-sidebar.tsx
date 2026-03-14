@@ -1,8 +1,8 @@
 import { Link } from '@inertiajs/react';
 import {
-    BarChart3,
     BookOpen,
     Building2,
+    ChevronRight,
     DollarSign,
     FileCheck,
     Folder,
@@ -12,6 +12,7 @@ import {
     MapPin,
     Percent,
     Receipt,
+    ShieldCheck,
     Tag,
     UserCheck,
     Users,
@@ -19,50 +20,76 @@ import {
 } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavUser } from '@/components/nav-user';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
     SidebarGroup,
-    SidebarGroupContent,
     SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubButton,
+    SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl, type IsCurrentUrlFn } from '@/hooks/use-current-url';
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 import AppLogo from './app-logo';
 
-const principalNavItems: NavItem[] = [
-    { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
-];
+type NavSection = {
+    label: string;
+    icon: NonNullable<NavItem['icon']>;
+    items: NavItem[];
+};
 
-const inventarioNavItems: NavItem[] = [
-    { title: 'Inventario de Lotes', href: '/inmopro/lots', icon: MapPin },
-];
+const principalNavItems: NavItem[] = [{ title: 'Dashboard', href: dashboard(), icon: LayoutGrid }];
 
-const ventasNavItems: NavItem[] = [
-    { title: 'Control Financiero', href: '/inmopro/financial', icon: DollarSign },
-    { title: 'Cuentas por cobrar', href: '/inmopro/accounts-receivable', icon: WalletCards },
-    { title: 'Comisiones', href: '/inmopro/commissions', icon: Percent },
-    { title: 'Clientes', href: '/inmopro/clients', icon: Users },
-    { title: 'Vendedores', href: '/inmopro/advisors', icon: UserCheck },
-    { title: 'Reportes', href: '/inmopro/reports', icon: BarChart3 },
-];
-
-const operacionesNavItems: NavItem[] = [
-    { title: 'Tickets de atencion', href: '/inmopro/attention-tickets', icon: FileCheck },
-];
-
-const administracionNavItems: NavItem[] = [
-    { title: 'Proyectos', href: '/inmopro/projects', icon: Building2 },
-    { title: 'Caja y bancos', href: '/inmopro/cash-accounts', icon: Landmark },
-    { title: 'Estados de lote', href: '/inmopro/lot-statuses', icon: Tag },
-    { title: 'Estados de comision', href: '/inmopro/commission-statuses', icon: Receipt },
-    { title: 'Niveles de asesor', href: '/inmopro/advisor-levels', icon: Layers },
+const managementSections: NavSection[] = [
+    {
+        label: 'Inventario',
+        icon: MapPin,
+        items: [
+            { title: 'Inventario de lotes', href: '/inmopro/lots', icon: MapPin },
+            { title: 'Proyectos', href: '/inmopro/projects', icon: Building2 },
+        ],
+    },
+    {
+        label: 'Ventas',
+        icon: DollarSign,
+        items: [
+            { title: 'Control financiero', href: '/inmopro/financial', icon: DollarSign },
+            { title: 'Cuentas por cobrar', href: '/inmopro/accounts-receivable', icon: WalletCards },
+            { title: 'Comisiones', href: '/inmopro/commissions', icon: Percent },
+            { title: 'Reportes', href: '/inmopro/reports', icon: LayoutGrid },
+        ],
+    },
+    {
+        label: 'Comercial',
+        icon: Users,
+        items: [
+            { title: 'Clientes', href: '/inmopro/clients', icon: Users },
+            { title: 'Tipos de cliente', href: '/inmopro/client-types', icon: Users },
+            { title: 'Ciudades', href: '/inmopro/cities', icon: MapPin },
+            { title: 'Vendedores', href: '/inmopro/advisors', icon: UserCheck },
+            { title: 'Teams comerciales', href: '/inmopro/teams', icon: ShieldCheck },
+            { title: 'Niveles de asesor', href: '/inmopro/advisor-levels', icon: Layers },
+        ],
+    },
+    {
+        label: 'Operación',
+        icon: FileCheck,
+        items: [
+            { title: 'Tickets de atención', href: '/inmopro/attention-tickets', icon: FileCheck },
+            { title: 'Pre-reservas', href: '/inmopro/lot-pre-reservations', icon: FileCheck },
+            { title: 'Caja y bancos', href: '/inmopro/cash-accounts', icon: Landmark },
+            { title: 'Estados de lote', href: '/inmopro/lot-statuses', icon: Tag },
+            { title: 'Estados de comisión', href: '/inmopro/commission-statuses', icon: Receipt },
+        ],
+    },
 ];
 
 const footerNavItems: NavItem[] = [
@@ -78,36 +105,43 @@ const footerNavItems: NavItem[] = [
     },
 ];
 
-function NavGroup({
-    label,
-    items,
+function NavSectionGroup({
+    section,
     isCurrentUrl,
 }: {
-    label: string;
-    items: NavItem[];
+    section: NavSection;
     isCurrentUrl: IsCurrentUrlFn;
 }) {
+    const isOpen = section.items.some((item) => isCurrentUrl(item.href));
+
     return (
         <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>{label}</SidebarGroupLabel>
-            <SidebarGroupContent>
+            <Collapsible defaultOpen={isOpen} className="group/collapsible">
                 <SidebarMenu>
-                    {items.map((item) => (
-                        <SidebarMenuItem key={item.title}>
-                            <SidebarMenuButton
-                                asChild
-                                isActive={isCurrentUrl(item.href)}
-                                tooltip={{ children: item.title }}
-                            >
-                                <Link href={item.href} prefetch>
-                                    {item.icon && <item.icon />}
-                                    <span>{item.title}</span>
-                                </Link>
+                    <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                            <SidebarMenuButton tooltip={{ children: section.label }} className="font-semibold text-slate-700">
+                                <section.icon />
+                                <span>{section.label}</span>
+                                <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                             </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    ))}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <SidebarMenuSub>
+                                {section.items.map((item) => (
+                                    <SidebarMenuSubItem key={item.title}>
+                                        <SidebarMenuSubButton asChild isActive={isCurrentUrl(item.href)}>
+                                            <Link href={item.href} prefetch>
+                                                <span>{item.title}</span>
+                                            </Link>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                ))}
+                            </SidebarMenuSub>
+                        </CollapsibleContent>
+                    </SidebarMenuItem>
                 </SidebarMenu>
-            </SidebarGroupContent>
+            </Collapsible>
         </SidebarGroup>
     );
 }
@@ -130,11 +164,29 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavGroup label="Principal" items={principalNavItems} isCurrentUrl={isCurrentUrl} />
-                <NavGroup label="Inventario" items={inventarioNavItems} isCurrentUrl={isCurrentUrl} />
-                <NavGroup label="Ventas" items={ventasNavItems} isCurrentUrl={isCurrentUrl} />
-                <NavGroup label="Operaciones" items={operacionesNavItems} isCurrentUrl={isCurrentUrl} />
-                <NavGroup label="Administracion" items={administracionNavItems} isCurrentUrl={isCurrentUrl} />
+                <SidebarGroup className="px-2 py-0">
+                    <SidebarGroupLabel>Principal</SidebarGroupLabel>
+                    <SidebarMenu>
+                        {principalNavItems.map((item) => (
+                            <SidebarMenuItem key={item.title}>
+                                <SidebarMenuButton asChild isActive={isCurrentUrl(item.href)} tooltip={{ children: item.title }}>
+                                    <Link href={item.href} prefetch>
+                                        {item.icon && <item.icon />}
+                                        <span>{item.title}</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
+                </SidebarGroup>
+
+                <SidebarGroup className="px-2 py-0">
+                    <SidebarGroupLabel>Módulos</SidebarGroupLabel>
+                </SidebarGroup>
+
+                {managementSections.map((section) => (
+                    <NavSectionGroup key={section.label} section={section} isCurrentUrl={isCurrentUrl} />
+                ))}
             </SidebarContent>
 
             <SidebarFooter>

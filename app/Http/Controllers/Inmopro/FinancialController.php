@@ -39,7 +39,12 @@ class FinancialController extends Controller
         $totalValue = (clone $query)->sum('price');
         $totalCollected = (clone $query)->sum('advance');
         $totalPending = $totalValue - $totalCollected;
-        $lots = $query->orderBy('contract_date', 'desc')->paginate(20)->withQueryString();
+        $lots = $query
+            ->orderByRaw('contract_date IS NULL')
+            ->orderByDesc('contract_date')
+            ->orderByDesc('updated_at')
+            ->paginate(20)
+            ->withQueryString();
         $projects = Project::orderBy('name')->get();
 
         return Inertia::render('inmopro/financial', [

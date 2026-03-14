@@ -14,15 +14,22 @@ type Client = {
     phone: string;
     email?: string;
     lots_count?: number;
+    type?: { name: string; color?: string };
+    city?: { name: string; department?: string | null };
+    advisor?: { name: string; team?: { name: string } | null };
 };
 
 export default function ClientsIndex({
     clients,
     filters,
 }: {
-    clients: { data: Client[]; links: PaginationLink[] };
+    clients: { data: Client[]; links: PaginationLink[]; total?: number };
     filters: { search?: string };
 }) {
+    const totalClients = clients.total ?? clients.data.length;
+    const clientsWithLots = clients.data.filter((client) => (client.lots_count ?? 0) > 0).length;
+    const clientsWithEmail = clients.data.filter((client) => Boolean(client.email)).length;
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Clientes', href: '/inmopro/clients' },
@@ -52,10 +59,16 @@ export default function ClientsIndex({
                     </Button>
                 </div>
 
+                <div className="grid gap-4 md:grid-cols-3">
+                    <SummaryCard label="Clientes totales" value={String(totalClients)} />
+                    <SummaryCard label="Con lotes asociados" value={String(clientsWithLots)} tone="emerald" />
+                    <SummaryCard label="Con email registrado" value={String(clientsWithEmail)} tone="blue" />
+                </div>
+
                 <Card>
                     <CardHeader>
                         <CardTitle>Buscar</CardTitle>
-                        <CardDescription>Por nombre, DNI o teléfono.</CardDescription>
+                        <CardDescription>Por nombre, DNI o telefono.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSearch} className="flex gap-2">
@@ -80,7 +93,7 @@ export default function ClientsIndex({
                                     <Users className="h-10 w-10 text-slate-400" />
                                 </div>
                                 <p className="mt-4 font-medium text-slate-700">Sin coincidencias</p>
-                                <p className="mt-1 text-sm text-slate-500">No hay clientes con los criterios de búsqueda.</p>
+                                <p className="mt-1 text-sm text-slate-500">No hay clientes con los criterios de busqueda.</p>
                                 <Button className="mt-4" variant="outline" asChild>
                                     <Link href="/inmopro/clients/create">Nuevo cliente</Link>
                                 </Button>
@@ -92,7 +105,8 @@ export default function ClientsIndex({
                                         <thead>
                                             <tr className="border-b border-slate-100 bg-slate-50/80">
                                                 <th className="px-4 py-3 text-left font-medium text-slate-600">Nombre / DNI</th>
-                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Contacto</th>
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Tipo / Contacto</th>
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Procedencia / Vendedor</th>
                                                 <th className="px-4 py-3 text-right font-medium text-slate-600">Lotes</th>
                                                 <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
                                             </tr>
@@ -113,14 +127,29 @@ export default function ClientsIndex({
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <div className="space-y-1 text-slate-600">
+                                                            <div>
+                                                                <span
+                                                                    className="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white"
+                                                                    style={{ backgroundColor: client.type?.color ?? '#475569' }}
+                                                                >
+                                                                    {client.type?.name ?? 'Sin tipo'}
+                                                                </span>
+                                                            </div>
                                                             <div className="flex items-center gap-1.5 text-xs">
                                                                 <Phone className="h-3.5 w-3.5 text-slate-400" />
                                                                 {client.phone}
                                                             </div>
                                                             <div className="flex items-center gap-1.5 text-xs">
                                                                 <Mail className="h-3.5 w-3.5 text-slate-400" />
-                                                                {client.email ?? '—'}
+                                                                {client.email ?? '-'}
                                                             </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="space-y-1 text-xs text-slate-600">
+                                                            <p>{client.city?.name ?? 'Sin ciudad'}{client.city?.department ? ` · ${client.city.department}` : ''}</p>
+                                                            <p className="font-medium text-slate-700">{client.advisor?.name ?? 'Sin vendedor asignado'}</p>
+                                                            <p className="text-slate-400">{client.advisor?.team?.name ?? '-'}</p>
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-right tabular-nums text-slate-600">{client.lots_count ?? 0}</td>
@@ -136,16 +165,37 @@ export default function ClientsIndex({
                                         </tbody>
                                     </table>
                                 </div>
-                                {clients.data.length > 0 && (
-                                    <div className="border-t border-slate-100 px-4 py-3">
-                                        <Pagination links={clients.links} />
-                                    </div>
-                                )}
+                                <div className="border-t border-slate-100 px-4 py-3">
+                                    <Pagination links={clients.links} />
+                                </div>
                             </>
                         )}
                     </CardContent>
                 </Card>
             </div>
         </AppLayout>
+    );
+}
+
+function SummaryCard({
+    label,
+    value,
+    tone = 'slate',
+}: {
+    label: string;
+    value: string;
+    tone?: 'slate' | 'emerald' | 'blue';
+}) {
+    const tones = {
+        slate: 'text-slate-900',
+        emerald: 'text-emerald-600',
+        blue: 'text-blue-600',
+    };
+
+    return (
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+            <p className={`mt-3 text-3xl font-black ${tones[tone]}`}>{value}</p>
+        </div>
     );
 }

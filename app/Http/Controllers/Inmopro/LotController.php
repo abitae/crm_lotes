@@ -7,6 +7,7 @@ use App\Http\Requests\Inmopro\StoreLotRequest;
 use App\Http\Requests\Inmopro\UpdateLotRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\Client;
+use App\Models\Inmopro\ClientType;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
@@ -93,13 +94,18 @@ class LotController extends Controller
                     'name' => $clientName,
                     'dni' => $clientDni ?? $client->dni,
                     'phone' => $clientPhone ?? $client->phone,
+                    'advisor_id' => $validated['advisor_id'] ?? $lot->advisor_id ?? $client->advisor_id ?? Advisor::query()->value('id'),
                 ]);
                 $validated['client_id'] = $client->id;
             } else {
+                $defaultClientTypeId = ClientType::query()->where('code', 'PROSPECTO')->value('id')
+                    ?? ClientType::query()->orderBy('sort_order')->value('id');
                 $client = Client::create([
                     'name' => $clientName,
                     'dni' => $clientDni ?: null,
                     'phone' => $clientPhone ?: null,
+                    'client_type_id' => $defaultClientTypeId,
+                    'advisor_id' => $validated['advisor_id'] ?? $lot->advisor_id ?? Advisor::query()->value('id'),
                 ]);
                 $validated['client_id'] = $client->id;
             }

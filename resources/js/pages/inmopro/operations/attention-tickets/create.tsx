@@ -3,40 +3,27 @@ import { FormEvent } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
 import type { BreadcrumbItem } from '@/types';
 
-type Project = { id: number; name: string };
-type Client = { id: number; name: string };
-type Lot = {
-    id: number;
-    block: string;
-    number: number;
-    project?: Project;
-    client?: Client | null;
-    client_name?: string;
-};
 type Advisor = { id: number; name: string };
+type Project = { id: number; name: string; location?: string | null };
+type Client = { id: number; name: string; advisor_id: number; advisor?: { id: number; name: string } | null };
 
 export default function AttentionTicketsCreate({
-    lots,
     advisors,
+    clients,
+    projects,
 }: {
-    lots: Lot[];
     advisors: Advisor[];
+    clients: Client[];
+    projects: Project[];
 }) {
-    const defaultDateTime = () => {
-        const d = new Date();
-        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-        return d.toISOString().slice(0, 16);
-    };
-
     const { data, setData, post, processing, errors } = useForm({
         advisor_id: '',
-        lot_id: '',
-        scheduled_at: defaultDateTime(),
+        client_id: '',
+        project_id: '',
         notes: '',
     });
 
@@ -47,8 +34,12 @@ export default function AttentionTicketsCreate({
         { title: 'Nuevo', href: '/inmopro/attention-tickets/create' },
     ];
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    const visibleClients = data.advisor_id
+        ? clients.filter((client) => String(client.advisor_id) === data.advisor_id)
+        : clients;
+
+    const submit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         post('/inmopro/attention-tickets');
     };
 
@@ -58,73 +49,103 @@ export default function AttentionTicketsCreate({
             <div className="p-4 md:p-6">
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900">Nuevo ticket de atención</h1>
-                    <p className="mt-1 text-sm text-slate-500">Solicite un acta de entrega y agenda fecha y hora.</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                        Registra la solicitud por proyecto. El ticket inicia en pendiente y se agenda desde administración.
+                    </p>
                 </div>
-                <Card className="max-w-lg">
+                <Card className="max-w-2xl">
                     <CardHeader>
-                        <CardTitle>Datos del ticket</CardTitle>
-                        <CardDescription>Seleccione el lote y el vendedor que solicita. Solo se listan lotes con cliente asignado.</CardDescription>
+                        <CardTitle>Datos de la solicitud</CardTitle>
+                        <CardDescription>Selecciona vendedor, cliente y proyecto. El agendado se realiza después.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={submit} className="space-y-4">
-                            <div>
-                                <Label htmlFor="advisor_id">Vendedor que solicita</Label>
+                        <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
+                            <div className="md:col-span-1">
+                                <Label htmlFor="advisor_id">Vendedor</Label>
                                 <select
                                     id="advisor_id"
                                     value={data.advisor_id}
-                                    onChange={(e) => setData('advisor_id', e.target.value)}
+                                    onChange={(event) => {
+                                        const nextAdvisorId = event.target.value;
+                                        setData('advisor_id', nextAdvisorId);
+
+                                        if (
+                                            data.client_id &&
+                                            !clients.some(
+                                                (client) =>
+                                                    String(client.id) === data.client_id &&
+                                                    String(client.advisor_id) === nextAdvisorId,
+                                            )
+                                        ) {
+                                            setData('client_id', '');
+                                        }
+                                    }}
                                     className="mt-1 flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm"
                                     required
                                 >
-                                    <option value="">— Seleccione —</option>
-                                    {advisors.map((a) => (
-                                        <option key={a.id} value={a.id}>{a.name}</option>
+                                    <option value="">Seleccione</option>
+                                    {advisors.map((advisor) => (
+                                        <option key={advisor.id} value={advisor.id}>
+                                            {advisor.name}
+                                        </option>
                                     ))}
                                 </select>
                                 <InputError message={errors.advisor_id} />
                             </div>
-                            <div>
-                                <Label htmlFor="lot_id">Lote</Label>
+
+                            <div className="md:col-span-1">
+                                <Label htmlFor="client_id">Cliente</Label>
                                 <select
-                                    id="lot_id"
-                                    value={data.lot_id}
-                                    onChange={(e) => setData('lot_id', e.target.value)}
+                                    id="client_id"
+                                    value={data.client_id}
+                                    onChange={(event) => setData('client_id', event.target.value)}
                                     className="mt-1 flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm"
                                     required
                                 >
-                                    <option value="">— Seleccione —</option>
-                                    {lots.map((lot) => (
-                                        <option key={lot.id} value={lot.id}>
-                                            {lot.block}-{lot.number} · {lot.project?.name ?? 'Proyecto'} · {lot.client?.name ?? lot.client_name ?? 'Cliente'}
+                                    <option value="">Seleccione</option>
+                                    {visibleClients.map((client) => (
+                                        <option key={client.id} value={client.id}>
+                                            {client.name}
+                                            {client.advisor?.name ? ` · ${client.advisor.name}` : ''}
                                         </option>
                                     ))}
                                 </select>
-                                <InputError message={errors.lot_id} />
+                                <InputError message={errors.client_id} />
                             </div>
-                            <div>
-                                <Label htmlFor="scheduled_at">Fecha y hora</Label>
-                                <Input
-                                    id="scheduled_at"
-                                    type="datetime-local"
-                                    value={data.scheduled_at}
-                                    onChange={(e) => setData('scheduled_at', e.target.value)}
-                                    className="mt-1"
+
+                            <div className="md:col-span-2">
+                                <Label htmlFor="project_id">Proyecto</Label>
+                                <select
+                                    id="project_id"
+                                    value={data.project_id}
+                                    onChange={(event) => setData('project_id', event.target.value)}
+                                    className="mt-1 flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm"
                                     required
-                                />
-                                <InputError message={errors.scheduled_at} />
+                                >
+                                    <option value="">Seleccione</option>
+                                    {projects.map((project) => (
+                                        <option key={project.id} value={project.id}>
+                                            {project.name}
+                                            {project.location ? ` · ${project.location}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.project_id} />
                             </div>
-                            <div>
+
+                            <div className="md:col-span-2">
                                 <Label htmlFor="notes">Observaciones</Label>
                                 <textarea
                                     id="notes"
                                     value={data.notes}
-                                    onChange={(e) => setData('notes', e.target.value)}
-                                    className="mt-1 flex min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                                    rows={3}
+                                    onChange={(event) => setData('notes', event.target.value)}
+                                    className="mt-1 flex min-h-[100px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    rows={4}
                                 />
                                 <InputError message={errors.notes} />
                             </div>
-                            <div className="flex gap-2 pt-2">
+
+                            <div className="flex gap-2 pt-2 md:col-span-2">
                                 <Button type="submit" disabled={processing}>
                                     Crear ticket
                                 </Button>

@@ -10,7 +10,7 @@ import type { BreadcrumbItem } from '@/types';
 type LotStatus = { id: number; name: string; code: string; color?: string; sort_order?: number };
 
 export default function LotStatusesEdit({ lotStatus }: { lotStatus: LotStatus }) {
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors, transform } = useForm({
         name: lotStatus.name,
         code: lotStatus.code,
         color: lotStatus.color ?? '#10b981',
@@ -25,7 +25,8 @@ export default function LotStatusesEdit({ lotStatus }: { lotStatus: LotStatus })
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/inmopro/lot-statuses/${lotStatus.id}`, { data: { ...data, sort_order: data.sort_order ? Number(data.sort_order) : 0 } });
+        transform((formData) => ({ ...formData, sort_order: formData.sort_order ? Number(formData.sort_order) : 0 }));
+        put(`/inmopro/lot-statuses/${lotStatus.id}`);
     };
 
     return (

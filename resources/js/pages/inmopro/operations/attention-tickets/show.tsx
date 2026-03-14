@@ -3,19 +3,23 @@ import { Calendar, FileText, Pencil, PenLine, User } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/date';
 import type { BreadcrumbItem } from '@/types';
 
-type Project = { id: number; name: string; location?: string };
+type Project = { id: number; name: string; location?: string | null };
 type Client = { id: number; name: string; dni?: string; phone?: string };
 type Advisor = { id: number; name: string };
-type Lot = { id: number; block: string; number: number; area?: string; price?: string; project?: Project; client?: Client | null };
+type Lot = { id: number; block: string; number: number; area?: string; price?: string } | null;
 type DeliveryDeed = { id: number; printed_at: string | null; signed_at: string | null } | null;
 type Ticket = {
     id: number;
-    scheduled_at: string;
+    created_at: string;
+    scheduled_at: string | null;
     status: string;
     notes: string | null;
-    advisor: Advisor;
+    advisor: Advisor | null;
+    client: Client | null;
+    project: Project | null;
     lot: Lot;
     delivery_deed: DeliveryDeed;
 };
@@ -35,6 +39,10 @@ export default function AttentionTicketsShow({ ticket }: { ticket: Ticket }) {
         cancelado: 'Cancelado',
     };
 
+    const canUseDeliveryDeed = ticket.lot !== null;
+    const deed = ticket.delivery_deed;
+    const isSigned = deed?.signed_at != null;
+
     const handlePrintDeed = () => {
         window.open(`/inmopro/attention-tickets/${ticket.id}/delivery-deed`, '_blank', 'noopener,noreferrer');
     };
@@ -42,9 +50,6 @@ export default function AttentionTicketsShow({ ticket }: { ticket: Ticket }) {
     const handleMarkSigned = () => {
         router.post(`/inmopro/attention-tickets/${ticket.id}/delivery-deed/mark-signed`, {}, { preserveScroll: true });
     };
-
-    const deed = ticket.delivery_deed;
-    const isSigned = deed?.signed_at != null;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -54,7 +59,9 @@ export default function AttentionTicketsShow({ ticket }: { ticket: Ticket }) {
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Ticket #{ticket.id}</h1>
                         <p className="mt-1 text-sm text-slate-500">
-                            {new Date(ticket.scheduled_at).toLocaleString('es-PE', { dateStyle: 'long', timeStyle: 'short' })}
+                            Solicitud: {formatDateTime(ticket.created_at)}
+                            {' · '}
+                            Agendado: {formatDateTime(ticket.scheduled_at)}
                             {' · '}
                             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                                 {statusLabels[ticket.status] ?? ticket.status}
@@ -68,14 +75,16 @@ export default function AttentionTicketsShow({ ticket }: { ticket: Ticket }) {
                                 Editar
                             </Link>
                         </Button>
-                        <Button size="sm" onClick={handlePrintDeed}>
-                            <FileText className="h-4 w-4" />
-                            Imprimir acta de entrega
-                        </Button>
-                        {!isSigned && (
+                        {canUseDeliveryDeed && (
+                            <Button size="sm" onClick={handlePrintDeed}>
+                                <FileText className="h-4 w-4" />
+                                Imprimir acta
+                            </Button>
+                        )}
+                        {canUseDeliveryDeed && !isSigned && (
                             <Button size="sm" variant="secondary" onClick={handleMarkSigned}>
                                 <PenLine className="h-4 w-4" />
-                                Registrar firma del cliente
+                                Registrar firma
                             </Button>
                         )}
                     </div>
@@ -86,17 +95,23 @@ export default function AttentionTicketsShow({ ticket }: { ticket: Ticket }) {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Calendar className="h-5 w-5" />
-                                Lote y proyecto
+                                Proyecto solicitado
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-1 text-sm">
-                            <p><span className="font-medium text-slate-600">Lote:</span> {ticket.lot?.block}-{ticket.lot?.number}</p>
-                            <p><span className="font-medium text-slate-600">Proyecto:</span> {ticket.lot?.project?.name ?? '—'}</p>
-                            {ticket.lot?.project?.location && (
-                                <p><span className="font-medium text-slate-600">Ubicación:</span> {ticket.lot.project.location}</p>
+                            <p>
+                                <span className="font-medium text-slate-600">Proyecto:</span> {ticket.project?.name ?? '-'}
+                            </p>
+                            {ticket.project?.location && (
+                                <p>
+                                    <span className="font-medium text-slate-600">Ubicación:</span> {ticket.project.location}
+                                </p>
                             )}
-                            {ticket.lot?.area != null && <p><span className="font-medium text-slate-600">Área:</span> {ticket.lot.area}</p>}
-                            {ticket.lot?.price != null && <p><span className="font-medium text-slate-600">Precio:</span> {ticket.lot.price}</p>}
+                            {ticket.lot && (
+                                <p>
+                                    <span className="font-medium text-slate-600">Lote legado:</span> {ticket.lot.block}-{ticket.lot.number}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                     <Card>
@@ -107,28 +122,52 @@ export default function AttentionTicketsShow({ ticket }: { ticket: Ticket }) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-1 text-sm">
-                            <p><span className="font-medium text-slate-600">Nombre:</span> {ticket.lot?.client?.name ?? '—'}</p>
-                            {ticket.lot?.client?.dni && <p><span className="font-medium text-slate-600">DNI:</span> {ticket.lot.client.dni}</p>}
-                            {ticket.lot?.client?.phone && <p><span className="font-medium text-slate-600">Teléfono:</span> {ticket.lot.client.phone}</p>}
+                            <p>
+                                <span className="font-medium text-slate-600">Nombre:</span> {ticket.client?.name ?? '-'}
+                            </p>
+                            {ticket.client?.dni && (
+                                <p>
+                                    <span className="font-medium text-slate-600">DNI:</span> {ticket.client.dni}
+                                </p>
+                            )}
+                            {ticket.client?.phone && (
+                                <p>
+                                    <span className="font-medium text-slate-600">Teléfono:</span> {ticket.client.phone}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Vendedor y acta</CardTitle>
-                        <CardDescription>Quien solicitó el ticket y estado del acta de entrega.</CardDescription>
+                        <CardTitle>Seguimiento</CardTitle>
+                        <CardDescription>Estado de la solicitud, agenda y observaciones.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
-                        <p><span className="font-medium text-slate-600">Vendedor que solicitó:</span> {ticket.advisor?.name ?? '—'}</p>
+                        <p>
+                            <span className="font-medium text-slate-600">Vendedor:</span> {ticket.advisor?.name ?? '-'}
+                        </p>
+                        <p>
+                            <span className="font-medium text-slate-600">Fecha solicitada:</span> {formatDateTime(ticket.created_at)}
+                        </p>
+                        <p>
+                            <span className="font-medium text-slate-600">Fecha agendada:</span> {formatDateTime(ticket.scheduled_at)}
+                        </p>
                         {deed?.printed_at && (
-                            <p><span className="font-medium text-slate-600">Acta impresa:</span> {new Date(deed.printed_at).toLocaleString('es-PE')}</p>
+                            <p>
+                                <span className="font-medium text-slate-600">Acta impresa:</span> {formatDateTime(deed.printed_at)}
+                            </p>
                         )}
                         {deed?.signed_at && (
-                            <p><span className="font-medium text-slate-600">Firma registrada:</span> {new Date(deed.signed_at).toLocaleString('es-PE')}</p>
+                            <p>
+                                <span className="font-medium text-slate-600">Firma registrada:</span> {formatDateTime(deed.signed_at)}
+                            </p>
                         )}
                         {ticket.notes && (
-                            <p className="pt-2"><span className="font-medium text-slate-600">Observaciones:</span> {ticket.notes}</p>
+                            <p className="pt-2">
+                                <span className="font-medium text-slate-600">Observaciones:</span> {ticket.notes}
+                            </p>
                         )}
                     </CardContent>
                 </Card>

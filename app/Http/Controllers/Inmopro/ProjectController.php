@@ -10,6 +10,7 @@ use App\Http\Requests\Inmopro\UpdateProjectRequest;
 use App\Imports\Inmopro\ProjectWithLotsImport;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,10 +22,95 @@ class ProjectController extends Controller
 {
     public function index(Request $request): Response
     {
-        $projects = Project::withCount('lots')->orderBy('name')->paginate(15)->withQueryString();
+        $query = Project::query()
+            ->withCount('lots')
+            ->withCount([
+                'lots as free_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'LIBRE')),
+                'lots as reserved_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'RESERVADO')),
+                'lots as transferred_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'TRANSFERIDO')),
+                'lots as installments_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'CUOTAS')),
+            ])
+            ->withSum('lots as portfolio_value', 'price')
+            ->withSum('lots as receivable_balance', 'remaining_balance');
+
+        if ($request->filled('search')) {
+            $term = trim((string) $request->input('search'));
+            $query->where(function (Builder $builder) use ($term): void {
+                $builder->where('name', 'like', "%{$term}%")
+                    ->orWhere('location', 'like', "%{$term}%");
+            });
+        }
+
+        if ($request->filled('location')) {
+            $query->where('location', (string) $request->input('location'));
+        }
+
+        if ($request->filled('health')) {
+            match ((string) $request->input('health')) {
+                'with_stock' => $query->whereHas('lots.status', fn (Builder $builder) => $builder->where('code', 'LIBRE')),
+                'sold_out' => $query->whereDoesntHave('lots.status', fn (Builder $builder) => $builder->where('code', 'LIBRE')),
+                'inconsistent' => $query->whereRaw('(select count(*) from lots where lots.project_id = projects.id) <> COALESCE(total_lots, 0)'),
+                default => null,
+            };
+        }
+
+        match ((string) $request->input('order')) {
+            'lots_desc' => $query->orderByDesc('lots_count')->orderBy('name'),
+            'balance_desc' => $query->orderByDesc('receivable_balance')->orderBy('name'),
+            'value_desc' => $query->orderByDesc('portfolio_value')->orderBy('name'),
+            'availability_desc' => $query->orderByDesc('free_lots_count')->orderBy('name'),
+            default => $query->orderBy('name'),
+        };
+
+        $projects = $query->paginate(15)->withQueryString()->through(function (Project $project): array {
+            $plannedLots = $project->total_lots ?? 0;
+            $actualLots = $project->lots_count ?? 0;
+            $soldLots = ($project->reserved_lots_count ?? 0) + ($project->transferred_lots_count ?? 0) + ($project->installments_lots_count ?? 0);
+            $occupancyRate = $actualLots > 0 ? round(($soldLots / $actualLots) * 100, 1) : 0.0;
+
+            return [
+                'id' => $project->id,
+                'name' => $project->name,
+                'location' => $project->location,
+                'total_lots' => $project->total_lots,
+                'blocks' => $project->blocks,
+                'lots_count' => $actualLots,
+                'free_lots_count' => $project->free_lots_count ?? 0,
+                'reserved_lots_count' => $project->reserved_lots_count ?? 0,
+                'transferred_lots_count' => $project->transferred_lots_count ?? 0,
+                'installments_lots_count' => $project->installments_lots_count ?? 0,
+                'portfolio_value' => (float) ($project->portfolio_value ?? 0),
+                'receivable_balance' => (float) ($project->receivable_balance ?? 0),
+                'occupancy_rate' => $occupancyRate,
+                'consistency_gap' => $plannedLots - $actualLots,
+                'is_consistent' => $plannedLots === $actualLots,
+                'blocks_count' => count($project->blocks ?? []),
+            ];
+        });
+
+        $projectCollection = $projects->getCollection();
 
         return Inertia::render('inmopro/projects/index', [
             'projects' => $projects,
+            'filters' => [
+                'search' => $request->input('search'),
+                'location' => $request->input('location'),
+                'health' => $request->input('health'),
+                'order' => $request->input('order'),
+            ],
+            'locations' => Project::query()
+                ->whereNotNull('location')
+                ->where('location', '!=', '')
+                ->orderBy('location')
+                ->distinct()
+                ->pluck('location'),
+            'summary' => [
+                'totalProjects' => $projects->total(),
+                'totalLots' => $projectCollection->sum('lots_count'),
+                'totalFreeLots' => $projectCollection->sum('free_lots_count'),
+                'totalBalance' => round((float) $projectCollection->sum('receivable_balance'), 2),
+                'inconsistentProjects' => $projectCollection->where('is_consistent', false)->count(),
+            ],
         ]);
     }
 

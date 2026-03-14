@@ -10,7 +10,7 @@ import type { BreadcrumbItem } from '@/types';
 type CommissionStatus = { id: number; name: string; code: string; color?: string; sort_order?: number };
 
 export default function CommissionStatusesEdit({ commissionStatus }: { commissionStatus: CommissionStatus }) {
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors, transform } = useForm({
         name: commissionStatus.name,
         code: commissionStatus.code,
         color: commissionStatus.color ?? '#10b981',
@@ -25,7 +25,8 @@ export default function CommissionStatusesEdit({ commissionStatus }: { commissio
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put('/inmopro/commission-statuses/' + commissionStatus.id, { data: { ...data, sort_order: data.sort_order ? Number(data.sort_order) : 0 } });
+        transform((formData) => ({ ...formData, sort_order: formData.sort_order ? Number(formData.sort_order) : 0 }));
+        put('/inmopro/commission-statuses/' + commissionStatus.id);
     };
 
     return (

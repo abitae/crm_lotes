@@ -1,22 +1,26 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Calendar, Eye, List, Plus, Ticket } from 'lucide-react';
+import { Calendar, Eye, Plus, Ticket } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Pagination, { type PaginationLink } from '@/components/pagination';
+import { formatDateTime } from '@/lib/date';
 import type { BreadcrumbItem } from '@/types';
 
 type Project = { id: number; name: string };
 type Client = { id: number; name: string; dni?: string };
 type Advisor = { id: number; name: string };
-type Lot = { id: number; block: string; number: number; project?: Project; client?: Client | null };
+type Lot = { id: number; block: string; number: number } | null;
 type DeliveryDeed = { id: number; printed_at: string | null; signed_at: string | null } | null;
 type TicketItem = {
     id: number;
-    scheduled_at: string;
+    created_at: string;
+    scheduled_at: string | null;
     status: string;
     notes: string | null;
-    advisor: Advisor;
+    advisor: Advisor | null;
+    client: Client | null;
+    project: Project | null;
     lot: Lot;
     delivery_deed: DeliveryDeed;
 };
@@ -48,7 +52,9 @@ export default function AttentionTicketsIndex({
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Tickets de atención</h1>
-                        <p className="mt-1 text-sm text-slate-500">Solicitudes de acta de entrega agendadas por los vendedores.</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Solicitudes creadas por vendedor y agendadas desde administración.
+                        </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" asChild>
@@ -73,21 +79,17 @@ export default function AttentionTicketsIndex({
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant={!filters.status ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => router.get('/inmopro/attention-tickets')}
-                            >
+                            <Button variant={!filters.status ? 'secondary' : 'outline'} size="sm" onClick={() => router.get('/inmopro/attention-tickets')}>
                                 Todos
                             </Button>
-                            {['pendiente', 'agendado', 'realizado', 'cancelado'].map((s) => (
+                            {['pendiente', 'agendado', 'realizado', 'cancelado'].map((status) => (
                                 <Button
-                                    key={s}
-                                    variant={filters.status === s ? 'secondary' : 'outline'}
+                                    key={status}
+                                    variant={filters.status === status ? 'secondary' : 'outline'}
                                     size="sm"
-                                    onClick={() => router.get('/inmopro/attention-tickets', { status: s }, { preserveState: true })}
+                                    onClick={() => router.get('/inmopro/attention-tickets', { status }, { preserveState: true })}
                                 >
-                                    {statusLabels[s] ?? s}
+                                    {statusLabels[status] ?? status}
                                 </Button>
                             ))}
                         </div>
@@ -106,7 +108,7 @@ export default function AttentionTicketsIndex({
                                     <Ticket className="h-10 w-10 text-slate-400" />
                                 </div>
                                 <p className="mt-4 font-medium text-slate-700">Sin tickets</p>
-                                <p className="mt-1 text-sm text-slate-500">Cree un ticket para solicitar un acta de entrega.</p>
+                                <p className="mt-1 text-sm text-slate-500">Cree una solicitud para iniciar el flujo de atención.</p>
                                 <Button className="mt-4" variant="outline" asChild>
                                     <Link href="/inmopro/attention-tickets/create">Nuevo ticket</Link>
                                 </Button>
@@ -117,33 +119,35 @@ export default function AttentionTicketsIndex({
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-slate-100 bg-slate-50/80">
-                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Fecha / Hora</th>
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Solicitud</th>
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Agendado para</th>
                                                 <th className="px-4 py-3 text-left font-medium text-slate-600">Estado</th>
                                                 <th className="px-4 py-3 text-left font-medium text-slate-600">Vendedor</th>
-                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Lote / Proyecto</th>
                                                 <th className="px-4 py-3 text-left font-medium text-slate-600">Cliente</th>
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Proyecto</th>
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Lote legado</th>
                                                 <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {tickets.data.map((t) => (
-                                                <tr key={t.id} className="hover:bg-slate-50/50">
-                                                    <td className="px-4 py-3 text-slate-700">
-                                                        {new Date(t.scheduled_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}
-                                                    </td>
+                                            {tickets.data.map((ticket) => (
+                                                <tr key={ticket.id} className="hover:bg-slate-50/50">
+                                                    <td className="px-4 py-3 text-slate-700">{formatDateTime(ticket.created_at)}</td>
+                                                    <td className="px-4 py-3 text-slate-700">{formatDateTime(ticket.scheduled_at)}</td>
                                                     <td className="px-4 py-3">
                                                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                                                            {statusLabels[t.status] ?? t.status}
+                                                            {statusLabels[ticket.status] ?? ticket.status}
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3 text-slate-700">{t.advisor?.name ?? '—'}</td>
+                                                    <td className="px-4 py-3 text-slate-700">{ticket.advisor?.name ?? '-'}</td>
+                                                    <td className="px-4 py-3 text-slate-700">{ticket.client?.name ?? '-'}</td>
+                                                    <td className="px-4 py-3 text-slate-700">{ticket.project?.name ?? '-'}</td>
                                                     <td className="px-4 py-3 text-slate-700">
-                                                        {t.lot?.block}-{t.lot?.number} {t.lot?.project?.name ? ` · ${t.lot.project.name}` : ''}
+                                                        {ticket.lot ? `${ticket.lot.block}-${ticket.lot.number}` : '-'}
                                                     </td>
-                                                    <td className="px-4 py-3 text-slate-700">{t.lot?.client?.name ?? t.lot?.client ?? '—'}</td>
                                                     <td className="px-4 py-3 text-right">
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                                            <Link href={`/inmopro/attention-tickets/${t.id}`}>
+                                                            <Link href={`/inmopro/attention-tickets/${ticket.id}`}>
                                                                 <Eye className="h-4 w-4" />
                                                             </Link>
                                                         </Button>

@@ -15,7 +15,7 @@ type CalendarEvent = {
     title: string;
     start: string;
     url?: string;
-    extendedProps?: { status?: string; advisor?: string; lot?: string; client?: string };
+    extendedProps?: { status?: string; advisor?: string; project?: string; client?: string };
 };
 
 export default function AttentionTicketsCalendar({
@@ -46,7 +46,7 @@ export default function AttentionTicketsCalendar({
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Calendario de tickets</h1>
-                        <p className="mt-1 text-sm text-slate-500">Vista de entregas y actas agendadas por fecha y hora.</p>
+                        <p className="mt-1 text-sm text-slate-500">Vista de atenciones ya agendadas por proyecto.</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" asChild>
@@ -67,27 +67,21 @@ export default function AttentionTicketsCalendar({
                 <Card>
                     <CardHeader>
                         <CardTitle>Filtrar por estado</CardTitle>
-                        <CardDescription>Opcional. Recargará el calendario.</CardDescription>
+                        <CardDescription>Opcional. Recarga el calendario.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant={!filters.status ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => router.get('/inmopro/attention-tickets/calendar')}
-                            >
+                            <Button variant={!filters.status ? 'secondary' : 'outline'} size="sm" onClick={() => router.get('/inmopro/attention-tickets/calendar')}>
                                 Todos
                             </Button>
-                            {['pendiente', 'agendado', 'realizado', 'cancelado'].map((s) => (
+                            {['pendiente', 'agendado', 'realizado', 'cancelado'].map((status) => (
                                 <Button
-                                    key={s}
-                                    variant={filters.status === s ? 'secondary' : 'outline'}
+                                    key={status}
+                                    variant={filters.status === status ? 'secondary' : 'outline'}
                                     size="sm"
-                                    onClick={() =>
-                                        router.get('/inmopro/attention-tickets/calendar', { status: s }, { preserveState: false })
-                                    }
+                                    onClick={() => router.get('/inmopro/attention-tickets/calendar', { status }, { preserveState: false })}
                                 >
-                                    {statusLabels[s] ?? s}
+                                    {statusLabels[status] ?? status}
                                 </Button>
                             ))}
                         </div>

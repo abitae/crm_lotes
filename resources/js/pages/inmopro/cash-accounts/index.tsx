@@ -1,5 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { formatDate, todayIsoDate } from '@/lib/date';
 import type { BreadcrumbItem } from '@/types';
 
 type Entry = {
@@ -98,7 +99,7 @@ function CashAccountCard({ account }: { account: Account }) {
         type: 'EGRESO',
         concept: '',
         amount: '',
-        entry_date: '',
+        entry_date: todayIsoDate(),
         reference: '',
         notes: '',
     });
@@ -126,7 +127,10 @@ function CashAccountCard({ account }: { account: Account }) {
                         event.preventDefault();
                         entryForm.post(`/inmopro/cash-accounts/${account.id}/entries`, {
                             preserveScroll: true,
-                            onSuccess: () => entryForm.reset('concept', 'amount', 'reference', 'notes'),
+                            onSuccess: () => {
+                                entryForm.reset('concept', 'amount', 'reference', 'notes');
+                                entryForm.setData('entry_date', todayIsoDate());
+                            },
                         });
                     }}
                     className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4"
@@ -175,7 +179,7 @@ function CashAccountCard({ account }: { account: Account }) {
                             account.entries.map((entry) => (
                                 <div key={entry.id} className="flex items-center justify-between text-sm">
                                     <span>
-                                        {entry.entry_date} · {entry.concept}
+                                        {formatDate(entry.entry_date)} · {entry.concept}
                                     </span>
                                     <span className={entry.type === 'EGRESO' ? 'font-bold text-rose-600' : 'font-bold text-emerald-600'}>
                                         {entry.type === 'EGRESO' ? '-' : '+'}

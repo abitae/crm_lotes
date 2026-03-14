@@ -8,6 +8,7 @@ use App\Http\Requests\Inmopro\UpdateAdvisorRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
 use App\Models\Inmopro\AdvisorMembership;
+use App\Models\Inmopro\Team;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +36,7 @@ class AdvisorController extends Controller
 
     public function index(Request $request): Response
     {
-        $query = Advisor::with(['level', 'superior', 'memberships.payments'])->withCount('lots');
+        $query = Advisor::with(['level', 'superior', 'team', 'memberships.payments'])->withCount('lots');
 
         if ($request->filled('search')) {
             $term = $request->input('search');
@@ -48,6 +49,7 @@ class AdvisorController extends Controller
         $advisors = $query->orderBy('name')->paginate(20)->withQueryString();
         $advisorLevels = AdvisorLevel::orderBy('sort_order')->get();
         $advisorsList = Advisor::orderBy('name')->get(['id', 'name']);
+        $teams = Team::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color']);
 
         $membershipDetail = null;
         if ($request->filled('membership_id')) {
@@ -71,6 +73,7 @@ class AdvisorController extends Controller
             'advisors' => $advisors,
             'advisorLevels' => $advisorLevels,
             'advisorsList' => $advisorsList,
+            'teams' => $teams,
             'membershipDetail' => $membershipDetail,
             'advisorForModal' => $advisorForModal,
             'openModal' => $request->input('modal'),
@@ -85,7 +88,12 @@ class AdvisorController extends Controller
 
     public function store(StoreAdvisorRequest $request): RedirectResponse
     {
-        Advisor::create($request->validated());
+        $payload = $request->validated();
+        $payload['username'] = $payload['username'] ?? str((string) $payload['email'])->before('@')->slug('_')->value();
+        $payload['pin'] = $payload['pin'] ?? '123456';
+        $payload['is_active'] = $payload['is_active'] ?? true;
+
+        Advisor::create($payload);
 
         return redirect()->route('inmopro.advisors.index')->with('success', 'Vendedor registrado correctamente.');
     }
@@ -102,7 +110,15 @@ class AdvisorController extends Controller
 
     public function update(UpdateAdvisorRequest $request, Advisor $advisor): RedirectResponse
     {
-        $advisor->update($request->validated());
+        $payload = $request->validated();
+        $payload['username'] = $payload['username'] ?? $advisor->username ?? str((string) ($payload['email'] ?? $advisor->email))->before('@')->slug('_')->value();
+        $payload['is_active'] = $payload['is_active'] ?? $advisor->is_active ?? true;
+
+        if (empty($payload['pin'])) {
+            unset($payload['pin']);
+        }
+
+        $advisor->update($payload);
 
         return redirect()->route('inmopro.advisors.index');
     }

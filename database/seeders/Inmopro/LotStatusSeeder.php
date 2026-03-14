@@ -14,9 +14,10 @@ class LotStatusSeeder extends Seeder
     {
         $statuses = [
             ['name' => 'Libre', 'code' => 'LIBRE', 'color' => '#10b981', 'sort_order' => 1],
-            ['name' => 'Reservado', 'code' => 'RESERVADO', 'color' => '#f59e0b', 'sort_order' => 2],
-            ['name' => 'Transferido', 'code' => 'TRANSFERIDO', 'color' => '#64748b', 'sort_order' => 3],
-            ['name' => 'Cuotas', 'code' => 'CUOTAS', 'color' => '#6366f1', 'sort_order' => 4],
+            ['name' => 'Pre-reserva', 'code' => 'PRERESERVA', 'color' => '#0ea5e9', 'sort_order' => 2],
+            ['name' => 'Reservado', 'code' => 'RESERVADO', 'color' => '#f59e0b', 'sort_order' => 3],
+            ['name' => 'Transferido', 'code' => 'TRANSFERIDO', 'color' => '#64748b', 'sort_order' => 4],
+            ['name' => 'Cuotas', 'code' => 'CUOTAS', 'color' => '#6366f1', 'sort_order' => 5],
         ];
 
         foreach ($statuses as $status) {

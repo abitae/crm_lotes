@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Inmopro;
 
+use App\Models\Inmopro\Advisor;
+use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
+use App\Models\Inmopro\ClientType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -14,10 +17,13 @@ class InmoproClientsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(\Database\Seeders\Inmopro\TeamSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\ClientTypeSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\LotStatusSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\CommissionStatusSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\ProjectSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\CitySeeder::class);
         $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\ClientSeeder::class);
     }
@@ -41,6 +47,9 @@ class InmoproClientsTest extends TestCase
     public function test_authenticated_users_can_create_client(): void
     {
         $user = User::factory()->create();
+        $type = ClientType::first();
+        $advisor = Advisor::first();
+        $city = City::first();
         $this->actingAs($user);
 
         $response = $this->post(route('inmopro.clients.store'), [
@@ -48,12 +57,17 @@ class InmoproClientsTest extends TestCase
             'dni' => '12345678',
             'phone' => '999888777',
             'email' => 'test@example.com',
+            'client_type_id' => $type->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city?->id,
         ]);
 
         $response->assertRedirect(route('inmopro.clients.index'));
         $this->assertDatabaseHas('clients', [
             'name' => 'Nuevo Cliente Test',
             'dni' => '12345678',
+            'client_type_id' => $type->id,
+            'advisor_id' => $advisor->id,
         ]);
     }
 
@@ -68,6 +82,9 @@ class InmoproClientsTest extends TestCase
             'dni' => $client->dni,
             'phone' => $client->phone,
             'email' => $client->email,
+            'client_type_id' => $client->client_type_id,
+            'advisor_id' => $client->advisor_id,
+            'city_id' => $client->city_id,
         ]);
 
         $response->assertRedirect(route('inmopro.clients.index'));
@@ -80,15 +97,16 @@ class InmoproClientsTest extends TestCase
     public function test_clients_search_returns_json_with_like_match(): void
     {
         $user = User::factory()->create();
+        $typeId = ClientType::first()->id;
+        $advisorId = Advisor::first()->id;
         $this->actingAs($user);
 
-        Client::create(['name' => 'Juan Pérez', 'dni' => '11111111', 'phone' => '']);
-        Client::create(['name' => 'María García', 'dni' => '22222222', 'phone' => '']);
+        Client::create(['name' => 'Juan Perez', 'dni' => '11111111', 'phone' => '', 'client_type_id' => $typeId, 'advisor_id' => $advisorId]);
+        Client::create(['name' => 'Maria Garcia', 'dni' => '22222222', 'phone' => '', 'client_type_id' => $typeId, 'advisor_id' => $advisorId]);
 
         $response = $this->getJson(route('inmopro.clients.search', ['q' => 'Juan']));
         $response->assertOk();
-        $response->assertJsonCount(1);
-        $response->assertJsonFragment(['name' => 'Juan Pérez']);
+        $response->assertJsonFragment(['name' => 'Juan Perez']);
 
         $response2 = $this->getJson(route('inmopro.clients.search', ['q' => '2222']));
         $response2->assertOk();

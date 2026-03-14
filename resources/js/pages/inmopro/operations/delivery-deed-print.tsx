@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/date';
 
 type Project = { id: number; name: string; location?: string };
 type Client = { id: number; name: string; dni?: string; phone?: string };
@@ -65,7 +66,7 @@ export default function DeliveryDeedPrint({
 
                         <div>
                             <h2 className="font-semibold text-slate-700">Fecha y hora de entrega</h2>
-                            <p>{new Date(ticket.scheduled_at).toLocaleString('es-PE', { dateStyle: 'long', timeStyle: 'short' })}</p>
+                            <p>{formatDateTime(ticket.scheduled_at)}</p>
                         </div>
 
                         <div>
@@ -77,7 +78,7 @@ export default function DeliveryDeedPrint({
                             <p className="font-semibold text-slate-700">Firma del cliente</p>
                             <p className="mt-2 text-slate-500">
                                 {deed?.signed_at
-                                    ? `Firma registrada el ${new Date(deed.signed_at).toLocaleString('es-PE')}`
+                                    ? `Firma registrada el ${formatDateTime(deed.signed_at)}`
                                     : '_________________________'}
                             </p>
                         </div>

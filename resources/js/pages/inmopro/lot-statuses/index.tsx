@@ -7,8 +7,9 @@ import type { BreadcrumbItem } from '@/types';
 
 type LotStatus = { id: number; name: string; code: string; color?: string; sort_order?: number };
 
-export default function LotStatusesIndex({ lotStatuses }: { lotStatuses: { data: LotStatus[]; links: PaginationLink[] } }) {
+export default function LotStatusesIndex({ lotStatuses }: { lotStatuses: { data: LotStatus[]; links: PaginationLink[]; total?: number } }) {
     const items = lotStatuses.data;
+    const totalStatuses = lotStatuses.total ?? items.length;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Estados de lote', href: '/inmopro/lot-statuses' },
@@ -32,6 +33,11 @@ export default function LotStatusesIndex({ lotStatuses }: { lotStatuses: { data:
                     <Link href="/inmopro/lot-statuses/create" className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-bold text-white hover:bg-emerald-700">
                         <Plus className="h-5 w-5" /> Nuevo
                     </Link>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                    <AdminMetric label="Estados" value={String(totalStatuses)} />
+                    <AdminMetric label="Codigos activos" value={items.map((status) => status.code).join(' / ')} tone="blue" />
+                    <AdminMetric label="Uso" value="Inventario" tone="emerald" />
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
                     <table className="w-full">
@@ -75,5 +81,28 @@ export default function LotStatusesIndex({ lotStatuses }: { lotStatuses: { data:
                 </div>
             </div>
         </AppLayout>
+    );
+}
+
+function AdminMetric({
+    label,
+    value,
+    tone = 'slate',
+}: {
+    label: string;
+    value: string;
+    tone?: 'slate' | 'blue' | 'emerald';
+}) {
+    const tones = {
+        slate: 'text-slate-900',
+        blue: 'text-blue-600',
+        emerald: 'text-emerald-600',
+    };
+
+    return (
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+            <p className={`mt-3 text-xl font-black ${tones[tone]}`}>{value}</p>
+        </div>
     );
 }

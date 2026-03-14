@@ -7,23 +7,22 @@ import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
 import type { BreadcrumbItem } from '@/types';
 
+type ProjectCreateForm = {
+    name: string;
+    location: string;
+    total_lots: string | number;
+    blocks: string[];
+};
+
 export default function ProjectsCreate() {
     const [blockInput, setBlockInput] = useState('');
     const [blocks, setBlocks] = useState<string[]>([]);
-    const { data, setData, post, processing, errors } = useForm(
-        {
+    const { data, setData, post, processing, errors, transform } = useForm<ProjectCreateForm>({
             name: '',
             location: '',
             total_lots: '' as string | number,
             blocks: [] as string[],
-        },
-        {
-            transform: (formData) => ({
-                ...formData,
-                total_lots: formData.total_lots === '' ? null : Number(formData.total_lots),
-            }),
-        }
-    );
+        });
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -49,6 +48,10 @@ export default function ProjectsCreate() {
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        transform((formData) => ({
+            ...formData,
+            total_lots: formData.total_lots === '' ? null : Number(formData.total_lots),
+        }));
         post('/inmopro/projects');
     };
 

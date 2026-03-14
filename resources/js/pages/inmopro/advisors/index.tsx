@@ -19,15 +19,18 @@ import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
 type AdvisorLevel = { id: number; name: string };
+type Team = { id: number; name: string; color?: string };
 type Advisor = {
     id: number;
     name: string;
     email: string;
     phone: string;
     personal_quota: string;
+    team_id?: number;
     advisor_level_id?: number;
     superior_id?: number | null;
     lots_count?: number;
+    team?: Team;
     level?: { name: string; color?: string };
     superior?: { name: string };
     memberships?: Membership[];
@@ -53,6 +56,7 @@ type PageProps = {
     advisors: Paginated<Advisor>;
     advisorLevels: AdvisorLevel[];
     advisorsList: { id: number; name: string }[];
+    teams: Team[];
     membershipDetail: MembershipDetail | null;
     advisorForModal: Advisor | null;
     openModal: string | null;
@@ -72,6 +76,7 @@ export default function AdvisorsIndex({
     advisors,
     advisorLevels,
     advisorsList,
+    teams,
     membershipDetail,
     advisorForModal,
     openModal,
@@ -93,6 +98,11 @@ export default function AdvisorsIndex({
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Vendedores', href: '/inmopro/advisors' },
     ];
+    const totalAdvisors = advisors.data.length;
+    const totalQuota = advisors.data.reduce((sum, advisor) => sum + Number(advisor.personal_quota), 0);
+    const membershipsPending = advisors.data.reduce((sum, advisor) => {
+        return sum + (advisor.memberships ?? []).filter((membership) => !isPaid(membership)).length;
+    }, 0);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -134,6 +144,12 @@ export default function AdvisorsIndex({
                     </div>
                 </div>
 
+                <div className="grid gap-4 md:grid-cols-3">
+                    <AdvisorMetric label="Vendedores visibles" value={String(totalAdvisors)} />
+                    <AdvisorMetric label="Meta acumulada" value={`S/ ${totalQuota.toLocaleString()}`} tone="emerald" />
+                    <AdvisorMetric label="Membresias pendientes" value={String(membershipsPending)} tone="amber" />
+                </div>
+
                 <form onSubmit={handleSearch} className="flex gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                             <div className="relative w-full sm:w-80">
                                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -154,6 +170,7 @@ export default function AdvisorsIndex({
                             <thead>
                                 <tr className="border-b border-slate-100 bg-slate-50/50">
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Nivel / Vendedor</th>
+                                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Team</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Superior</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Cuota</th>
                                     {MEMBERSHIP_YEARS.map((y) => (
@@ -175,6 +192,14 @@ export default function AdvisorsIndex({
                                                     <p className="text-[10px] text-slate-400">{adv.email}</p>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span
+                                                className="inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white"
+                                                style={{ backgroundColor: adv.team?.color ?? '#0f172a' }}
+                                            >
+                                                {adv.team?.name ?? 'Sin team'}
+                                            </span>
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{adv.superior?.name ?? 'Alta Gerencia'}</td>
                                         <td className="px-4 py-3 font-medium text-slate-700">S/ {Number(adv.personal_quota).toLocaleString()}</td>
@@ -242,6 +267,7 @@ export default function AdvisorsIndex({
                     onOpenChange={setModalCreateAdvisor}
                     advisorLevels={advisorLevels}
                     advisorsList={advisorsList}
+                    teams={teams}
                 />
 
                 {/* Modal: Editar vendedor */}
@@ -252,6 +278,7 @@ export default function AdvisorsIndex({
                         advisor={modalEditAdvisor}
                         advisorLevels={advisorLevels}
                         advisorsList={advisorsList.filter((a) => a.id !== modalEditAdvisor.id)}
+                        teams={teams}
                     />
                 )}
 
@@ -276,21 +303,47 @@ export default function AdvisorsIndex({
     );
 }
 
+function AdvisorMetric({
+    label,
+    value,
+    tone = 'slate',
+}: {
+    label: string;
+    value: string;
+    tone?: 'slate' | 'emerald' | 'amber';
+}) {
+    const tones = {
+        slate: 'text-slate-900',
+        emerald: 'text-emerald-600',
+        amber: 'text-amber-600',
+    };
+
+    return (
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+            <p className={`mt-3 text-3xl font-black ${tones[tone]}`}>{value}</p>
+        </div>
+    );
+}
+
 function CreateAdvisorModal({
     open,
     onOpenChange,
     advisorLevels,
     advisorsList,
+    teams,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     advisorLevels: AdvisorLevel[];
     advisorsList: { id: number; name: string }[];
+    teams: Team[];
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
         phone: '',
         email: '',
+        team_id: teams[0]?.id ?? 0,
         advisor_level_id: advisorLevels[0]?.id ?? 0,
         superior_id: null as number | null,
         personal_quota: 0,
@@ -323,6 +376,20 @@ function CreateAdvisorModal({
                         <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
                         <InputError message={errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="team_id">Team</Label>
+                        <select
+                            id="team_id"
+                            value={data.team_id}
+                            onChange={(e) => setData('team_id', Number(e.target.value))}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                            {teams.map((team) => (
+                                <option key={team.id} value={team.id}>{team.name}</option>
+                            ))}
+                        </select>
+                        <InputError message={errors.team_id} />
                     </div>
                     <div>
                         <Label htmlFor="advisor_level_id">Nivel</Label>
@@ -380,17 +447,20 @@ function EditAdvisorModal({
     advisor,
     advisorLevels,
     advisorsList,
+    teams,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     advisor: Advisor;
     advisorLevels: AdvisorLevel[];
     advisorsList: { id: number; name: string }[];
+    teams: Team[];
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: advisor.name,
         phone: advisor.phone,
         email: advisor.email,
+        team_id: advisor.team_id ?? teams[0]?.id ?? 0,
         advisor_level_id: advisor.advisor_level_id ?? advisorLevels[0]?.id ?? 0,
         superior_id: advisor.superior_id ?? (null as number | null),
         personal_quota: Number(advisor.personal_quota),
@@ -423,6 +493,20 @@ function EditAdvisorModal({
                         <Label htmlFor="edit-email">Email</Label>
                         <Input id="edit-email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
                         <InputError message={errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-team">Team</Label>
+                        <select
+                            id="edit-team"
+                            value={data.team_id}
+                            onChange={(e) => setData('team_id', Number(e.target.value))}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                            {teams.map((team) => (
+                                <option key={team.id} value={team.id}>{team.name}</option>
+                            ))}
+                        </select>
+                        <InputError message={errors.team_id} />
                     </div>
                     <div>
                         <Label htmlFor="edit-level">Nivel</Label>

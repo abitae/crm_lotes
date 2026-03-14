@@ -57,6 +57,9 @@ export default function Inventory({
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
     const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const freeCount = lots.filter((lot) => lot.status.code === 'LIBRE').length;
+    const reservedCount = lots.filter((lot) => lot.status.code === 'RESERVADO').length;
+    const transferredCount = lots.filter((lot) => lot.status.code === 'TRANSFERIDO').length;
 
     const formatDate = (d: string | undefined) => (d ? new Date(d).toLocaleDateString('es') : '—');
     const formatMoney = (v: string | undefined) => (v != null && v !== '' ? Number(v).toLocaleString('es') : '—');
@@ -118,6 +121,12 @@ export default function Inventory({
                     )}
                     {project && (
                         <>
+                            <div className="mb-6 grid gap-4 md:grid-cols-4">
+                                <InventoryMetric label="Lotes" value={String(lots.length)} />
+                                <InventoryMetric label="Libres" value={String(freeCount)} tone="emerald" />
+                                <InventoryMetric label="Reservados" value={String(reservedCount)} tone="amber" />
+                                <InventoryMetric label="Transferidos" value={String(transferredCount)} tone="slate" />
+                            </div>
                             <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-tight text-slate-400">
                                     {lotStatuses.slice(0, 3).map((s) => (
@@ -468,5 +477,29 @@ export default function Inventory({
                 </DialogContent>
             </Dialog>
         </AppLayout>
+    );
+}
+
+function InventoryMetric({
+    label,
+    value,
+    tone = 'blue',
+}: {
+    label: string;
+    value: string;
+    tone?: 'blue' | 'emerald' | 'amber' | 'slate';
+}) {
+    const tones = {
+        blue: 'text-blue-600',
+        emerald: 'text-emerald-600',
+        amber: 'text-amber-600',
+        slate: 'text-slate-700',
+    };
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+            <p className={`mt-2 text-2xl font-black ${tones[tone]}`}>{value}</p>
+        </div>
     );
 }

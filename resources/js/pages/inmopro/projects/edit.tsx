@@ -8,25 +8,23 @@ import InputError from '@/components/input-error';
 import type { BreadcrumbItem } from '@/types';
 
 type Project = { id: number; name: string; location?: string; total_lots?: number; blocks?: string[] };
+type ProjectEditForm = {
+    name: string;
+    location: string;
+    total_lots: number | '';
+    blocks: string[];
+};
 
 export default function ProjectsEdit({ project }: { project: Project }) {
     const blocks = project.blocks ?? [];
     const [blockInput, setBlockInput] = useState('');
     const [blocksList, setBlocksList] = useState<string[]>(blocks);
-    const { data, setData, put, processing, errors } = useForm(
-        {
+    const { data, setData, put, processing, errors, transform } = useForm<ProjectEditForm>({
             name: project.name,
             location: project.location ?? '',
             total_lots: project.total_lots ?? ('' as number | ''),
             blocks: blocksList,
-        },
-        {
-            transform: (formData) => ({
-                ...formData,
-                total_lots: formData.total_lots === '' ? null : Number(formData.total_lots),
-            }),
-        }
-    );
+        });
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -52,6 +50,10 @@ export default function ProjectsEdit({ project }: { project: Project }) {
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        transform((formData) => ({
+            ...formData,
+            total_lots: formData.total_lots === '' ? null : Number(formData.total_lots),
+        }));
         put('/inmopro/projects/' + project.id);
     };
 
@@ -78,7 +80,7 @@ export default function ProjectsEdit({ project }: { project: Project }) {
                             type="number"
                             min={0}
                             value={data.total_lots}
-                            onChange={(e) => setData('total_lots', e.target.value === '' ? '' : e.target.value)}
+                            onChange={(e) => setData('total_lots', e.target.value === '' ? '' : Number(e.target.value))}
                             className="mt-1"
                         />
                         <InputError message={errors.total_lots} />

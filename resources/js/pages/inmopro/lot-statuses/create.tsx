@@ -8,7 +8,7 @@ import InputError from '@/components/input-error';
 import type { BreadcrumbItem } from '@/types';
 
 export default function LotStatusesCreate() {
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, transform } = useForm({
         name: '',
         code: '',
         color: '#10b981',
@@ -23,7 +23,8 @@ export default function LotStatusesCreate() {
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        post('/inmopro/lot-statuses', { data: { ...data, sort_order: data.sort_order ? Number(data.sort_order) : 0 } });
+        transform((formData) => ({ ...formData, sort_order: formData.sort_order ? Number(formData.sort_order) : 0 }));
+        post('/inmopro/lot-statuses');
     };
 
     return (

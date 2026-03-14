@@ -13,6 +13,8 @@ class AttentionTicket extends Model
      */
     protected $fillable = [
         'advisor_id',
+        'client_id',
+        'project_id',
         'lot_id',
         'scheduled_at',
         'status',
@@ -35,6 +37,22 @@ class AttentionTicket extends Model
     public function advisor(): BelongsTo
     {
         return $this->belongsTo(Advisor::class, 'advisor_id');
+    }
+
+    /**
+     * @return BelongsTo<Client, $this>
+     */
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'client_id');
+    }
+
+    /**
+     * @return BelongsTo<Project, $this>
+     */
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class, 'project_id');
     }
 
     /**

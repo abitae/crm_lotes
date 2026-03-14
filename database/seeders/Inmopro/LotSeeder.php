@@ -52,24 +52,28 @@ class LotSeeder extends Seeder
                         $contractNumber = 'CT-'.now()->format('Ymd').'-'.$num;
                     }
 
-                    Lot::create([
-                        'project_id' => $project->id,
-                        'block' => $block,
-                        'number' => $num,
-                        'area' => 105.00,
-                        'price' => $price,
-                        'lot_status_id' => $status->id,
-                        'client_id' => $clientId,
-                        'advisor_id' => $advisorId,
-                        'client_name' => $clientName,
-                        'client_dni' => $clientDni,
-                        'advance' => $advance,
-                        'remaining_balance' => $remainingBalance,
-                        'payment_limit_date' => $paymentLimitDate,
-                        'operation_number' => $operationNumber,
-                        'contract_date' => $contractDate,
-                        'contract_number' => $contractNumber,
-                    ]);
+                    Lot::updateOrCreate(
+                        [
+                            'project_id' => $project->id,
+                            'block' => $block,
+                            'number' => $num,
+                        ],
+                        [
+                            'area' => 105.00,
+                            'price' => $price,
+                            'lot_status_id' => $status->id,
+                            'client_id' => $clientId,
+                            'advisor_id' => $advisorId,
+                            'client_name' => $clientName,
+                            'client_dni' => $clientDni,
+                            'advance' => $advance,
+                            'remaining_balance' => $remainingBalance,
+                            'payment_limit_date' => $paymentLimitDate,
+                            'operation_number' => $operationNumber,
+                            'contract_date' => $contractDate,
+                            'contract_number' => $contractNumber,
+                        ]
+                    );
                 }
             }
         });

@@ -53,7 +53,12 @@ class AccountsReceivableController extends Controller
             });
         }
 
-        $lots = $query->orderByDesc('contract_date')->paginate(15)->withQueryString();
+        $lots = $query
+            ->orderByRaw('contract_date IS NULL')
+            ->orderByDesc('contract_date')
+            ->orderByDesc('updated_at')
+            ->paginate(15)
+            ->withQueryString();
         $lots->through(function (Lot $lot): array {
             $totalScheduled = (float) $lot->installments->sum('amount');
             $totalPaid = (float) $lot->payments->sum('amount');

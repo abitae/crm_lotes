@@ -2,9 +2,11 @@
 
 namespace App\Models\Inmopro;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Hash;
 
 class Advisor extends Model
 {
@@ -15,6 +17,11 @@ class Advisor extends Model
         'name',
         'phone',
         'email',
+        'username',
+        'pin',
+        'is_active',
+        'last_login_at',
+        'team_id',
         'advisor_level_id',
         'superior_id',
         'personal_quota',
@@ -27,7 +34,25 @@ class Advisor extends Model
     {
         return [
             'personal_quota' => 'decimal:2',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return Attribute<string|null, string|null>
+     */
+    protected function pin(): Attribute
+    {
+        return Attribute::make(
+            set: static function (?string $value): ?string {
+                if ($value === null || $value === '') {
+                    return null;
+                }
+
+                return Hash::needsRehash($value) ? Hash::make($value) : $value;
+            },
+        );
     }
 
     /**
@@ -36,6 +61,14 @@ class Advisor extends Model
     public function level(): BelongsTo
     {
         return $this->belongsTo(AdvisorLevel::class, 'advisor_level_id');
+    }
+
+    /**
+     * @return BelongsTo<Team, $this>
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
     }
 
     /**
@@ -63,6 +96,14 @@ class Advisor extends Model
     }
 
     /**
+     * @return HasMany<Client, $this>
+     */
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class, 'advisor_id');
+    }
+
+    /**
      * @return HasMany<Commission, $this>
      */
     public function commissions(): HasMany
@@ -76,5 +117,29 @@ class Advisor extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(AdvisorMembership::class);
+    }
+
+    /**
+     * @return HasMany<AdvisorApiToken, $this>
+     */
+    public function apiTokens(): HasMany
+    {
+        return $this->hasMany(AdvisorApiToken::class);
+    }
+
+    /**
+     * @return HasMany<LotPreReservation, $this>
+     */
+    public function preReservations(): HasMany
+    {
+        return $this->hasMany(LotPreReservation::class);
+    }
+
+    /**
+     * @return HasMany<AttentionTicket, $this>
+     */
+    public function attentionTickets(): HasMany
+    {
+        return $this->hasMany(AttentionTicket::class, 'advisor_id');
     }
 }

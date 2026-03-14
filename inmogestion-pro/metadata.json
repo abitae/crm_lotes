@@ -1,7 +1,0 @@
-{
-  "name": "InmoGestion Pro - Real Estate Management",
-  "description": "A comprehensive real estate management system for tracking multiple projects, lots, clients, and sales performance with integrated financial controls and reporting.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}

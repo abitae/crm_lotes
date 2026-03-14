@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Inmopro;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inmopro\StoreClientRequest;
 use App\Http\Requests\Inmopro\UpdateClientRequest;
+use App\Models\Inmopro\Advisor;
+use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
+use App\Models\Inmopro\ClientType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,20 +26,21 @@ class ClientController extends Controller
         }
         $like = '%'.$term.'%';
         $clients = Client::query()
+            ->with(['advisor'])
             ->where(function ($query) use ($like) {
                 $query->where('name', 'like', $like)
                     ->orWhere('dni', 'like', $like);
             })
             ->orderBy('name')
             ->limit(15)
-            ->get(['id', 'name', 'dni', 'phone']);
+            ->get(['id', 'name', 'dni', 'phone', 'advisor_id']);
 
         return response()->json($clients);
     }
 
     public function index(Request $request): Response
     {
-        $query = Client::query()->withCount('lots');
+        $query = Client::query()->with(['type', 'city', 'advisor.team'])->withCount('lots');
 
         if ($request->filled('search')) {
             $term = $request->input('search');
@@ -57,7 +61,11 @@ class ClientController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('inmopro/clients/create');
+        return Inertia::render('inmopro/clients/create', [
+            'clientTypes' => ClientType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color']),
+            'cities' => City::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'department']),
+            'advisors' => Advisor::query()->with('team')->orderBy('name')->get(['id', 'name', 'team_id']),
+        ]);
     }
 
     public function store(StoreClientRequest $request): RedirectResponse
@@ -69,7 +77,7 @@ class ClientController extends Controller
 
     public function show(Client $client): Response
     {
-        $client->load(['lots.project', 'lots.status']);
+        $client->load(['type', 'city', 'advisor.team', 'lots.project', 'lots.status']);
 
         return Inertia::render('inmopro/clients/show', [
             'client' => $client,
@@ -80,6 +88,9 @@ class ClientController extends Controller
     {
         return Inertia::render('inmopro/clients/edit', [
             'client' => $client,
+            'clientTypes' => ClientType::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color']),
+            'cities' => City::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'department']),
+            'advisors' => Advisor::query()->with('team')->orderBy('name')->get(['id', 'name', 'team_id']),
         ]);
     }
 

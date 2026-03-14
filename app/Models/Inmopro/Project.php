@@ -35,4 +35,12 @@ class Project extends Model
     {
         return $this->hasMany(Lot::class, 'project_id');
     }
+
+    /**
+     * @return HasMany<AttentionTicket, $this>
+     */
+    public function attentionTickets(): HasMany
+    {
+        return $this->hasMany(AttentionTicket::class, 'project_id');
+    }
 }

@@ -3,19 +3,41 @@ import { FormEvent } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
+import { formatDateTime } from '@/lib/date';
 import type { BreadcrumbItem } from '@/types';
 
 type Ticket = {
     id: number;
     status: string;
     notes: string | null;
+    scheduled_at: string | null;
+    client?: { name: string } | null;
+    project?: { name: string } | null;
 };
+
+function toDateTimeLocal(value?: string | null): string {
+    if (!value) {
+        return '';
+    }
+
+    const parsed = new Date(value);
+
+    if (Number.isNaN(parsed.getTime())) {
+        return '';
+    }
+
+    parsed.setMinutes(parsed.getMinutes() - parsed.getTimezoneOffset());
+
+    return parsed.toISOString().slice(0, 16);
+}
 
 export default function AttentionTicketsEdit({ ticket }: { ticket: Ticket }) {
     const { data, setData, put, processing, errors } = useForm({
         status: ticket.status,
+        scheduled_at: toDateTimeLocal(ticket.scheduled_at),
         notes: ticket.notes ?? '',
     });
 
@@ -27,8 +49,8 @@ export default function AttentionTicketsEdit({ ticket }: { ticket: Ticket }) {
         { title: 'Editar', href: `/inmopro/attention-tickets/${ticket.id}/edit` },
     ];
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    const submit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         put(`/inmopro/attention-tickets/${ticket.id}`);
     };
 
@@ -38,12 +60,16 @@ export default function AttentionTicketsEdit({ ticket }: { ticket: Ticket }) {
             <div className="p-4 md:p-6">
                 <div className="mb-6">
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900">Editar ticket #{ticket.id}</h1>
-                    <p className="mt-1 text-sm text-slate-500">Actualice estado u observaciones.</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                        Agenda la atención y actualiza el seguimiento de la solicitud.
+                    </p>
                 </div>
-                <Card className="max-w-lg">
+                <Card className="max-w-xl">
                     <CardHeader>
-                        <CardTitle>Datos del ticket</CardTitle>
-                        <CardDescription>Estado y observaciones.</CardDescription>
+                        <CardTitle>Gestión del ticket</CardTitle>
+                        <CardDescription>
+                            Cliente: {ticket.client?.name ?? '-'} · Proyecto: {ticket.project?.name ?? '-'} · Agendado: {formatDateTime(ticket.scheduled_at)}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={submit} className="space-y-4">
@@ -52,7 +78,7 @@ export default function AttentionTicketsEdit({ ticket }: { ticket: Ticket }) {
                                 <select
                                     id="status"
                                     value={data.status}
-                                    onChange={(e) => setData('status', e.target.value)}
+                                    onChange={(event) => setData('status', event.target.value)}
                                     className="mt-1 flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm"
                                 >
                                     <option value="pendiente">Pendiente</option>
@@ -63,13 +89,24 @@ export default function AttentionTicketsEdit({ ticket }: { ticket: Ticket }) {
                                 <InputError message={errors.status} />
                             </div>
                             <div>
+                                <Label htmlFor="scheduled_at">Fecha y hora programada</Label>
+                                <Input
+                                    id="scheduled_at"
+                                    type="datetime-local"
+                                    value={data.scheduled_at}
+                                    onChange={(event) => setData('scheduled_at', event.target.value)}
+                                    className="mt-1"
+                                />
+                                <InputError message={errors.scheduled_at} />
+                            </div>
+                            <div>
                                 <Label htmlFor="notes">Observaciones</Label>
                                 <textarea
                                     id="notes"
                                     value={data.notes}
-                                    onChange={(e) => setData('notes', e.target.value)}
-                                    className="mt-1 flex min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                                    rows={3}
+                                    onChange={(event) => setData('notes', event.target.value)}
+                                    className="mt-1 flex min-h-[100px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    rows={4}
                                 />
                                 <InputError message={errors.notes} />
                             </div>

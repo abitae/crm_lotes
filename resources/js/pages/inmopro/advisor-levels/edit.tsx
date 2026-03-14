@@ -8,9 +8,17 @@ import InputError from '@/components/input-error';
 import type { BreadcrumbItem } from '@/types';
 
 type AdvisorLevel = { id: number; name: string; code?: string; direct_rate?: string; pyramid_rate?: string; color?: string; sort_order?: number };
+type AdvisorLevelForm = {
+    name: string;
+    code: string;
+    direct_rate: string;
+    pyramid_rate: string;
+    color: string;
+    sort_order: string;
+};
 
 export default function AdvisorLevelsEdit({ advisorLevel }: { advisorLevel: AdvisorLevel }) {
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors, transform } = useForm<AdvisorLevelForm>({
         name: advisorLevel.name,
         code: advisorLevel.code ?? '',
         direct_rate: advisorLevel.direct_rate ?? '',
@@ -27,14 +35,13 @@ export default function AdvisorLevelsEdit({ advisorLevel }: { advisorLevel: Advi
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put('/inmopro/advisor-levels/' + advisorLevel.id, {
-            data: {
-                ...data,
-                direct_rate: data.direct_rate ? Number(data.direct_rate) : null,
-                pyramid_rate: data.pyramid_rate ? Number(data.pyramid_rate) : null,
-                sort_order: Number(data.sort_order) || 0,
-            },
-        });
+        transform((formData) => ({
+            ...formData,
+            direct_rate: formData.direct_rate ? Number(formData.direct_rate) : null,
+            pyramid_rate: formData.pyramid_rate ? Number(formData.pyramid_rate) : null,
+            sort_order: Number(formData.sort_order) || 0,
+        }));
+        put('/inmopro/advisor-levels/' + advisorLevel.id);
     };
 
     return (

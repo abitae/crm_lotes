@@ -7,8 +7,9 @@ import type { BreadcrumbItem } from '@/types';
 
 type CommissionStatus = { id: number; name: string; code: string; color?: string };
 
-export default function CommissionStatusesIndex({ commissionStatuses }: { commissionStatuses: { data: CommissionStatus[]; links: PaginationLink[] } }) {
+export default function CommissionStatusesIndex({ commissionStatuses }: { commissionStatuses: { data: CommissionStatus[]; links: PaginationLink[]; total?: number } }) {
     const items = commissionStatuses.data;
+    const totalStatuses = commissionStatuses.total ?? items.length;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Estados de comision', href: '/inmopro/commission-statuses' },
@@ -31,6 +32,11 @@ export default function CommissionStatusesIndex({ commissionStatuses }: { commis
                     <Link href="/inmopro/commission-statuses/create" className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-bold text-white hover:bg-emerald-700">
                         <Plus className="h-5 w-5" /> Nuevo
                     </Link>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                    <CommissionMetric label="Estados" value={String(totalStatuses)} />
+                    <CommissionMetric label="Ciclo" value="Pendiente / Pagado" tone="emerald" />
+                    <CommissionMetric label="Uso" value="Liquidacion" tone="blue" />
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
                     <table className="w-full">
@@ -65,5 +71,28 @@ export default function CommissionStatusesIndex({ commissionStatuses }: { commis
                 </div>
             </div>
         </AppLayout>
+    );
+}
+
+function CommissionMetric({
+    label,
+    value,
+    tone = 'slate',
+}: {
+    label: string;
+    value: string;
+    tone?: 'slate' | 'emerald' | 'blue';
+}) {
+    const tones = {
+        slate: 'text-slate-900',
+        emerald: 'text-emerald-600',
+        blue: 'text-blue-600',
+    };
+
+    return (
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+            <p className={`mt-3 text-xl font-black ${tones[tone]}`}>{value}</p>
+        </div>
     );
 }
