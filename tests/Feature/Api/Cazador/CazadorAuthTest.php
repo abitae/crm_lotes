@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\Cazador;
 
 use App\Models\Inmopro\Advisor;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -60,5 +61,22 @@ class CazadorAuthTest extends TestCase
             'name' => 'Asesor API',
             'phone' => '999111222',
         ]);
+    }
+
+    public function test_advisor_can_login_with_reset_pin_from_admin(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $advisor->update(['pin' => '654321']);
+        $advisor->refresh();
+
+        $this->actingAs(User::factory()->create());
+        $this->post(route('inmopro.advisors.reset-pin', $advisor))
+            ->assertRedirect(route('inmopro.advisors.index'));
+
+        $this->postJson(route('api.v1.cazador.auth.login'), [
+            'username' => $advisor->fresh()->username,
+            'pin' => '123456',
+        ])->assertOk()
+            ->assertJsonStructure(['token', 'advisor' => ['id', 'name', 'username']]);
     }
 }

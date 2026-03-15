@@ -46,17 +46,42 @@ type LotItem = {
     payments: Payment[];
 };
 
+type MembershipReceivableItem = {
+    id: number;
+    advisor: { id: number; name: string; username: string | null } | null;
+    membership_type: { id: number; name: string } | null;
+    start_date: string | null;
+    end_date: string | null;
+    amount: number;
+    total_paid: number;
+    balance_due: number;
+    installments: Installment[];
+    payments: Payment[];
+    overdue_installments: number;
+};
+
 export default function AccountsReceivable({
     lots,
     projects,
     cashAccounts,
+    membershipReceivables = [],
     summary,
     filters,
 }: {
     lots: { data: LotItem[]; links: PaginationLink[] };
     projects: Project[];
     cashAccounts: CashAccount[];
-    summary: { portfolio: number; collected: number; pending: number; overdueInstallments: number };
+    membershipReceivables?: MembershipReceivableItem[];
+    summary: {
+        portfolio: number;
+        collected: number;
+        pending: number;
+        overdueInstallments: number;
+        membershipScheduled?: number;
+        membershipCollected?: number;
+        membershipPending?: number;
+        membershipOverdueInstallments?: number;
+    };
     filters: { project_id?: string; status?: string; search?: string };
 }) {
     const breadcrumbs: BreadcrumbItem[] = [
@@ -68,6 +93,8 @@ export default function AccountsReceivable({
     const [detailOpen, setDetailOpen] = useState(false);
     const [installmentOpen, setInstallmentOpen] = useState(false);
     const [paymentOpen, setPaymentOpen] = useState(false);
+    const [selectedMembership, setSelectedMembership] = useState<MembershipReceivableItem | null>(null);
+    const [membershipPaymentOpen, setMembershipPaymentOpen] = useState(false);
 
     const handleFilter = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -89,6 +116,14 @@ export default function AccountsReceivable({
                     <Metric label="Pendiente" value={summary.pending} tone="amber" />
                     <Metric label="Cuotas vencidas" value={summary.overdueInstallments} raw />
                 </div>
+                {((summary.membershipScheduled ?? 0) > 0 || (summary.membershipPending ?? 0) > 0) && (
+                    <div className="grid gap-4 md:grid-cols-4">
+                        <Metric label="Membresías programado" value={summary.membershipScheduled ?? 0} />
+                        <Metric label="Membresías cobrado" value={summary.membershipCollected ?? 0} tone="emerald" />
+                        <Metric label="Membresías pendiente" value={summary.membershipPending ?? 0} tone="amber" />
+                        <Metric label="Membresías cuotas vencidas" value={summary.membershipOverdueInstallments ?? 0} raw />
+                    </div>
+                )}
 
                 <form
                     onSubmit={handleFilter}
@@ -229,6 +264,75 @@ export default function AccountsReceivable({
                         <Pagination links={lots.links} />
                     </div>
                 </div>
+
+                {membershipReceivables.length > 0 && (
+                    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                        <div className="border-b border-slate-100 px-6 py-4">
+                            <h2 className="text-lg font-black text-slate-900">Membresías por cobrar</h2>
+                            <p className="mt-1 text-sm text-slate-500">
+                                Membresías de vendedores con saldo pendiente. Registrar pago aplica a la membresía y opcionalmente a caja.
+                            </p>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[800px] text-left text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="px-6 py-3 font-bold text-slate-500">Vendedor</th>
+                                        <th className="px-6 py-3 font-bold text-slate-500">Tipo</th>
+                                        <th className="px-6 py-3 font-bold text-slate-500">Inicio / Vence</th>
+                                        <th className="px-6 py-3 font-bold text-slate-500">Monto</th>
+                                        <th className="px-6 py-3 font-bold text-slate-500">Cobrado</th>
+                                        <th className="px-6 py-3 font-bold text-slate-500">Pendiente</th>
+                                        <th className="px-6 py-3 font-bold text-slate-500">Cuotas</th>
+                                        <th className="px-6 py-3 text-right font-bold text-slate-500">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {membershipReceivables.map((mem) => (
+                                        <tr key={mem.id} className="hover:bg-slate-50/70">
+                                            <td className="px-6 py-4">
+                                                <p className="font-semibold text-slate-900">{mem.advisor?.name ?? '—'}</p>
+                                                {mem.advisor?.username && (
+                                                    <p className="text-xs font-semibold text-slate-500">@{mem.advisor.username}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-600">{mem.membership_type?.name ?? '—'}</td>
+                                            <td className="px-6 py-4 text-slate-600">
+                                                {mem.start_date ? formatDate(mem.start_date) : '—'} / {mem.end_date ? formatDate(mem.end_date) : '—'}
+                                            </td>
+                                            <td className="px-6 py-4 font-semibold text-slate-800">S/ {mem.amount.toLocaleString()}</td>
+                                            <td className="px-6 py-4 font-semibold text-emerald-600">S/ {mem.total_paid.toLocaleString()}</td>
+                                            <td className="px-6 py-4 font-semibold text-amber-600">S/ {mem.balance_due.toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-slate-600">
+                                                {mem.installments.length > 0
+                                                    ? `${mem.installments.filter((i) => i.status === 'PAGADA').length}/${mem.installments.length}`
+                                                    : '—'}
+                                                {mem.overdue_installments > 0 && (
+                                                    <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+                                                        {mem.overdue_installments} venc.
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedMembership(mem);
+                                                        setMembershipPaymentOpen(true);
+                                                    }}
+                                                >
+                                                    <HandCoins className="mr-1 h-4 w-4" />
+                                                    Registrar pago
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <LotDetailDialog lot={selectedLot} open={detailOpen} onOpenChange={setDetailOpen} />
@@ -238,6 +342,15 @@ export default function AccountsReceivable({
                 cashAccounts={cashAccounts}
                 open={paymentOpen}
                 onOpenChange={setPaymentOpen}
+            />
+            <MembershipPaymentDialog
+                membership={selectedMembership}
+                cashAccounts={cashAccounts}
+                open={membershipPaymentOpen}
+                onOpenChange={(open) => {
+                    if (!open) setSelectedMembership(null);
+                    setMembershipPaymentOpen(open);
+                }}
             />
         </AppLayout>
     );
@@ -540,6 +653,129 @@ function PaymentDialog({
                         </Button>
                     </DialogFooter>
                 </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function MembershipPaymentDialog({
+    membership,
+    cashAccounts,
+    open,
+    onOpenChange,
+}: {
+    membership: MembershipReceivableItem | null;
+    cashAccounts: CashAccount[];
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const form = useForm({
+        membership_id: '',
+        advisor_membership_installment_id: '',
+        cash_account_id: '',
+        amount: '',
+        paid_at: todayIsoDate(),
+        notes: '',
+    });
+
+    const pendingInstallments = membership?.installments?.filter((i) => i.status === 'PENDIENTE' || i.status === 'PARCIAL') ?? [];
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>
+                        {membership ? `Registrar pago – ${membership.advisor?.name ?? 'Membresía'}` : 'Registrar pago membresía'}
+                    </DialogTitle>
+                    <DialogDescription>
+                        El pago se aplica a la membresía. Opcionalmente asocie a una cuota y/o a una cuenta de caja.
+                    </DialogDescription>
+                </DialogHeader>
+
+                {membership && (
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            form.transform(() => ({
+                                membership_id: membership.id,
+                                advisor_membership_installment_id: form.data.advisor_membership_installment_id === '' ? null : Number(form.data.advisor_membership_installment_id),
+                                cash_account_id: form.data.cash_account_id === '' ? null : Number(form.data.cash_account_id),
+                                amount: form.data.amount,
+                                paid_at: form.data.paid_at,
+                                notes: form.data.notes,
+                            })).post('/inmopro/accounts-receivable/membership-payments', {
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    form.reset('advisor_membership_installment_id', 'cash_account_id', 'amount', 'notes');
+                                    form.setData('paid_at', todayIsoDate());
+                                    onOpenChange(false);
+                                },
+                            });
+                        }}
+                        className="space-y-4"
+                    >
+                        <input type="hidden" name="membership_id" value={membership.id} />
+
+                        {pendingInstallments.length > 0 && (
+                            <select
+                                value={form.data.advisor_membership_installment_id}
+                                onChange={(event) => form.setData('advisor_membership_installment_id', event.target.value)}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none"
+                            >
+                                <option value="">A cuenta (sin cuota específica)</option>
+                                {pendingInstallments.map((i) => (
+                                    <option key={i.id} value={i.id}>
+                                        Cuota {i.sequence} · S/ {Number(i.amount).toLocaleString()}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+
+                        <select
+                            value={form.data.cash_account_id}
+                            onChange={(event) => form.setData('cash_account_id', event.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none"
+                        >
+                            <option value="">Sin cuenta de caja</option>
+                            {cashAccounts.map((account) => (
+                                <option key={account.id} value={account.id}>
+                                    {account.name}
+                                </option>
+                            ))}
+                        </select>
+
+                        <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="Monto (S/)"
+                            value={form.data.amount}
+                            onChange={(event) => form.setData('amount', event.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none"
+                            required
+                        />
+                        <input
+                            type="date"
+                            value={form.data.paid_at}
+                            onChange={(event) => form.setData('paid_at', event.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none"
+                            required
+                        />
+                        <input
+                            type="text"
+                            placeholder="Notas"
+                            value={form.data.notes}
+                            onChange={(event) => form.setData('notes', event.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none"
+                        />
+
+                        <DialogFooter>
+                            <Button type="submit" disabled={form.processing}>
+                                Registrar pago
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                )}
             </DialogContent>
         </Dialog>
     );

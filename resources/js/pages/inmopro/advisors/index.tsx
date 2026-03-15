@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { FormEvent, useEffect, useState } from 'react';
-import { Search, UserPlus, ChevronRight, Phone, Calendar, Eye, Plus, Pencil, Trash2, Receipt } from 'lucide-react';
+import { Search, UserPlus, ChevronRight, Plus, Pencil, Receipt, Wallet, KeyRound } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ type Advisor = {
     name: string;
     email: string;
     phone: string;
+    username: string;
     personal_quota: string;
     team_id?: number;
     advisor_level_id?: number;
@@ -35,15 +36,36 @@ type Advisor = {
     superior?: { name: string };
     memberships?: Membership[];
 };
-type Payment = { id: number; amount: string; paid_at: string; notes?: string | null };
+type Payment = {
+    id: number;
+    amount: string;
+    paid_at: string;
+    notes?: string | null;
+    advisor_membership_installment_id?: number | null;
+    cash_account_id?: number | null;
+};
+type Installment = {
+    id: number;
+    sequence: number;
+    due_date?: string | null;
+    amount: string;
+    paid_amount: string;
+    status: string;
+    notes?: string | null;
+};
 type Membership = {
     id: number;
     advisor_id: number;
     year: number;
     amount: string;
+    start_date?: string | null;
+    end_date?: string | null;
     advisor?: { id: number; name: string };
     payments?: Payment[];
+    installments?: Installment[];
 };
+type MembershipType = { id: number; name: string; months: number; amount: string };
+type CashAccount = { id: number; name: string };
 type MembershipDetail = {
     membership: Membership;
     totalPaid: number;
@@ -57,13 +79,22 @@ type PageProps = {
     advisorLevels: AdvisorLevel[];
     advisorsList: { id: number; name: string }[];
     teams: Team[];
+    membershipTypes: MembershipType[];
+    cashAccounts: CashAccount[];
     membershipDetail: MembershipDetail | null;
     advisorForModal: Advisor | null;
     openModal: string | null;
     filters: { search?: string };
 };
 
-const MEMBERSHIP_YEARS = [2026, 2025, 2024, 2023];
+function advisorOwesMembership(advisor: Advisor): boolean {
+    const memberships = advisor.memberships ?? [];
+    if (memberships.length === 0) return false;
+    return memberships.some((m) => {
+        const totalPaid = (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+        return Number(m.amount) - totalPaid > 0;
+    });
+}
 
 function membershipToDetail(m: Membership, advisor?: { id: number; name: string }): MembershipDetail {
     const totalPaid = (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
@@ -77,6 +108,8 @@ export default function AdvisorsIndex({
     advisorLevels,
     advisorsList,
     teams,
+    membershipTypes,
+    cashAccounts,
     membershipDetail,
     advisorForModal,
     openModal,
@@ -85,6 +118,8 @@ export default function AdvisorsIndex({
     const [modalCreateAdvisor, setModalCreateAdvisor] = useState(false);
     const [modalEditAdvisor, setModalEditAdvisor] = useState<Advisor | null>(null);
     const [modalCreateMembership, setModalCreateMembership] = useState(false);
+    const [modalAdvisorMemberships, setModalAdvisorMemberships] = useState<Advisor | null>(null);
+    const [modalAssignMembership, setModalAssignMembership] = useState<Advisor | null>(null);
     const [modalMembershipDetail, setModalMembershipDetail] = useState<MembershipDetail | null>(null);
 
     useEffect(() => {
@@ -93,6 +128,10 @@ export default function AdvisorsIndex({
         if (openModal === 'create_membership') setModalCreateMembership(true);
         if (membershipDetail) setModalMembershipDetail(membershipDetail);
     }, [openModal, advisorForModal, membershipDetail]);
+
+    const totalPaid = (m: Membership) => (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+    const balanceDue = (m: Membership) => Math.max(0, Number(m.amount) - totalPaid(m));
+    const isPaid = (m: Membership) => balanceDue(m) <= 0;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -109,14 +148,6 @@ export default function AdvisorsIndex({
         const form = e.target as HTMLFormElement;
         const q = new FormData(form).get('search') as string;
         router.get('/inmopro/advisors', { ...filters, search: q || undefined }, { preserveState: true });
-    };
-
-    const totalPaid = (m: Membership) => (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
-    const balanceDue = (m: Membership) => Math.max(0, Number(m.amount) - totalPaid(m));
-    const isPaid = (m: Membership) => balanceDue(m) <= 0;
-
-    const openMembershipDetailFromRow = (m: Membership, advisor?: { id: number; name: string }) => {
-        setModalMembershipDetail(membershipToDetail(m, advisor));
     };
 
     return (
@@ -173,9 +204,7 @@ export default function AdvisorsIndex({
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Team</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Superior</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Cuota</th>
-                                    {MEMBERSHIP_YEARS.map((y) => (
-                                        <th key={y} className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">{y}</th>
-                                    ))}
+                                    <th className="px-4 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Membresía</th>
                                     <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Acciones</th>
                                 </tr>
                             </thead>
@@ -190,6 +219,7 @@ export default function AdvisorsIndex({
                                                 <div>
                                                     <p className="font-bold leading-none text-slate-800">{adv.name}</p>
                                                     <p className="text-[10px] text-slate-400">{adv.email}</p>
+                                                    <p className="text-[10px] font-semibold text-slate-500">@{adv.username}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -203,32 +233,27 @@ export default function AdvisorsIndex({
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{adv.superior?.name ?? 'Alta Gerencia'}</td>
                                         <td className="px-4 py-3 font-medium text-slate-700">S/ {Number(adv.personal_quota).toLocaleString()}</td>
-                                        {MEMBERSHIP_YEARS.map((year) => {
-                                            const mem = (adv.memberships ?? []).find((m) => m.year === year);
-                                            if (!mem) {
-                                                return (
-                                                    <td key={year} className="px-2 py-2 text-center text-slate-300">—</td>
-                                                );
-                                            }
-                                            const paid = isPaid(mem);
-                                            return (
-                                                <td key={year} className="px-2 py-2 text-center">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openMembershipDetailFromRow(mem, { id: adv.id, name: adv.name })}
-                                                        className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
-                                                            paid
-                                                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                                                                : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                                                        }`}
-                                                        title={paid ? 'Al día · Ver detalle' : `Pendiente S/ ${balanceDue(mem).toLocaleString('es-PE')}`}
-                                                    >
-                                                        {paid ? 'Al día' : 'Pend.'}
-                                                    </button>
-                                                </td>
-                                            );
-                                        })}
+                                        <td className="px-4 py-3 text-center">
+                                            <span
+                                                className={`inline-block rounded px-2.5 py-0.5 text-[10px] font-bold ${
+                                                    advisorOwesMembership(adv)
+                                                        ? 'bg-amber-100 text-amber-800'
+                                                        : 'bg-emerald-100 text-emerald-800'
+                                                }`}
+                                            >
+                                                {advisorOwesMembership(adv) ? 'Debe' : 'Al día'}
+                                            </span>
+                                        </td>
                                         <td className="px-4 py-3 text-right">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-slate-400 hover:text-slate-900"
+                                                onClick={() => setModalAdvisorMemberships(adv)}
+                                                title="Ver membresías y pagos"
+                                            >
+                                                <Wallet className="h-4 w-4" />
+                                            </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -285,6 +310,42 @@ export default function AdvisorsIndex({
                 {/* Modal: Nueva membresía */}
                 <CreateMembershipModal open={modalCreateMembership} onOpenChange={setModalCreateMembership} advisorsList={advisorsList} />
 
+                {/* Modal: Membresías del asesor (montos por año + pagar) */}
+                {modalAdvisorMemberships && (
+                    <AdvisorMembershipsModal
+                        open={!!modalAdvisorMemberships}
+                        onOpenChange={(open) => !open && setModalAdvisorMemberships(null)}
+                        advisor={modalAdvisorMemberships}
+                        membershipTypes={membershipTypes}
+                        onAssignMembership={() => {
+                            setModalAssignMembership(modalAdvisorMemberships);
+                            setModalAdvisorMemberships(null);
+                        }}
+                        onPayMembership={(detail) => {
+                            setModalAdvisorMemberships(null);
+                            setModalMembershipDetail(detail);
+                        }}
+                        isPaid={isPaid}
+                        balanceDue={balanceDue}
+                        totalPaid={totalPaid}
+                        membershipToDetail={membershipToDetail}
+                    />
+                )}
+
+                {/* Modal: Asignar membresía a un vendedor */}
+                {modalAssignMembership && (
+                    <AssignMembershipModal
+                        open={!!modalAssignMembership}
+                        onOpenChange={(open) => !open && setModalAssignMembership(null)}
+                        advisor={modalAssignMembership}
+                        membershipTypes={membershipTypes}
+                        onSuccess={() => {
+                            setModalAssignMembership(null);
+                            router.reload();
+                        }}
+                    />
+                )}
+
                 {/* Modal: Detalle membresía + abonos */}
                 {modalMembershipDetail && (
                     <MembershipDetailModal
@@ -296,6 +357,7 @@ export default function AdvisorsIndex({
                             }
                         }}
                         detail={modalMembershipDetail}
+                        cashAccounts={cashAccounts}
                     />
                 )}
             </div>
@@ -343,6 +405,8 @@ function CreateAdvisorModal({
         name: '',
         phone: '',
         email: '',
+        username: '',
+        pin: '',
         team_id: teams[0]?.id ?? 0,
         advisor_level_id: advisorLevels[0]?.id ?? 0,
         superior_id: null as number | null,
@@ -376,6 +440,24 @@ function CreateAdvisorModal({
                         <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
                         <InputError message={errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="username">Usuario</Label>
+                        <Input id="username" value={data.username} onChange={(e) => setData('username', e.target.value)} className="mt-1" />
+                        <InputError message={errors.username} />
+                    </div>
+                    <div>
+                        <Label htmlFor="pin">PIN</Label>
+                        <Input
+                            id="pin"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={data.pin}
+                            onChange={(e) => setData('pin', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="mt-1"
+                        />
+                        <p className="mt-1 text-xs text-slate-500">Debe contener 6 dígitos numéricos.</p>
+                        <InputError message={errors.pin} />
                     </div>
                     <div>
                         <Label htmlFor="team_id">Team</Label>
@@ -460,6 +542,7 @@ function EditAdvisorModal({
         name: advisor.name,
         phone: advisor.phone,
         email: advisor.email,
+        username: advisor.username,
         team_id: advisor.team_id ?? teams[0]?.id ?? 0,
         advisor_level_id: advisor.advisor_level_id ?? advisorLevels[0]?.id ?? 0,
         superior_id: advisor.superior_id ?? (null as number | null),
@@ -471,12 +554,20 @@ function EditAdvisorModal({
         put(`/inmopro/advisors/${advisor.id}`, { onSuccess: () => onOpenChange(false) });
     };
 
+    const handleResetPin = () => {
+        if (!window.confirm(`Se restablecerá el PIN de ${advisor.name} a 123456.`)) {
+            return;
+        }
+
+        router.post(`/inmopro/advisors/${advisor.id}/reset-pin`, {}, { preserveScroll: true });
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Editar vendedor</DialogTitle>
-                    <DialogDescription>Modifique los datos del asesor.</DialogDescription>
+                    <DialogDescription>Modifique los datos del asesor y su usuario de acceso.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div>
@@ -493,6 +584,11 @@ function EditAdvisorModal({
                         <Label htmlFor="edit-email">Email</Label>
                         <Input id="edit-email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
                         <InputError message={errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-username">Usuario</Label>
+                        <Input id="edit-username" value={data.username} onChange={(e) => setData('username', e.target.value)} className="mt-1" />
+                        <InputError message={errors.username} />
                     </div>
                     <div>
                         <Label htmlFor="edit-team">Team</Label>
@@ -548,9 +644,119 @@ function EditAdvisorModal({
                         />
                         <InputError message={errors.personal_quota} />
                     </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">Reset PIN</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Restablece el PIN del vendedor a <span className="font-bold text-slate-700">123456</span>.
+                                </p>
+                            </div>
+                            <Button type="button" variant="outline" onClick={handleResetPin} className="shrink-0">
+                                <KeyRound className="mr-2 h-4 w-4" />
+                                Reset PIN
+                            </Button>
+                        </div>
+                    </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
                         <Button type="submit" disabled={processing}>Actualizar</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function AssignMembershipModal({
+    open,
+    onOpenChange,
+    advisor,
+    membershipTypes,
+    onSuccess,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    advisor: Advisor;
+    membershipTypes: MembershipType[];
+    onSuccess: () => void;
+}) {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, setData, post, processing, errors, reset } = useForm({
+        membership_type_id: '',
+        start_date: today,
+        installments_count: '1',
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        post(`/inmopro/advisors/${advisor.id}/memberships`, {
+            onSuccess: () => {
+                reset();
+                onOpenChange(false);
+                onSuccess();
+            },
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Asignar membresía</DialogTitle>
+                    <DialogDescription>
+                        Asignar una membresía a {advisor.name}. Opcionalmente defina un plan de cuotas.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="assign-type">Tipo de membresía</Label>
+                        <select
+                            id="assign-type"
+                            value={data.membership_type_id}
+                            onChange={(e) => setData('membership_type_id', e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                            required
+                        >
+                            <option value="">— Seleccione —</option>
+                            {membershipTypes.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    {t.name} – {t.months} meses, S/ {Number(t.amount).toLocaleString('es-PE')}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.membership_type_id} />
+                    </div>
+                    <div>
+                        <Label htmlFor="assign-start">Fecha de inicio</Label>
+                        <Input
+                            id="assign-start"
+                            type="date"
+                            value={data.start_date}
+                            onChange={(e) => setData('start_date', e.target.value)}
+                            className="mt-1"
+                            required
+                        />
+                        <InputError message={errors.start_date} />
+                    </div>
+                    <div>
+                        <Label htmlFor="assign-installments">Pagar en cuotas (número)</Label>
+                        <Input
+                            id="assign-installments"
+                            type="number"
+                            min={1}
+                            max={60}
+                            value={data.installments_count}
+                            onChange={(e) => setData('installments_count', e.target.value)}
+                            className="mt-1"
+                            placeholder="1 = pago único"
+                        />
+                        <p className="mt-1 text-xs text-slate-500">Deje 1 para pago único; mayor a 1 crea un plan de cuotas.</p>
+                        <InputError message={errors.installments_count} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={processing}>Asignar membresía</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -641,18 +847,151 @@ function CreateMembershipModal({
     );
 }
 
+function formatMembershipDate(d: string | null | undefined): string {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function isMembershipExpired(m: Membership): boolean {
+    if (!m.end_date) return false;
+    return new Date(m.end_date) < new Date();
+}
+
+function AdvisorMembershipsModal({
+    open,
+    onOpenChange,
+    advisor,
+    membershipTypes,
+    onAssignMembership,
+    onPayMembership,
+    isPaid,
+    balanceDue,
+    totalPaid,
+    membershipToDetail,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    advisor: Advisor;
+    membershipTypes: MembershipType[];
+    onAssignMembership: () => void;
+    onPayMembership: (detail: MembershipDetail) => void;
+    isPaid: (m: Membership) => boolean;
+    balanceDue: (m: Membership) => number;
+    totalPaid: (m: Membership) => number;
+    membershipToDetail: (m: Membership, advisor?: { id: number; name: string }) => MembershipDetail;
+}) {
+    const memberships = (advisor.memberships ?? []).slice().sort((a, b) => {
+        const endA = a.end_date ? new Date(a.end_date).getTime() : a.year * 1000;
+        const endB = b.end_date ? new Date(b.end_date).getTime() : b.year * 1000;
+        return endB - endA;
+    });
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Membresías – {advisor.name}</DialogTitle>
+                    <DialogDescription>
+                        Control de vencimiento y pago. Use &quot;Pagar membresía&quot; para registrar abonos.
+                    </DialogDescription>
+                </DialogHeader>
+                {membershipTypes.length > 0 && (
+                    <div className="flex justify-end">
+                        <Button type="button" size="sm" onClick={onAssignMembership}>
+                            Asignar membresía
+                        </Button>
+                    </div>
+                )}
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    {memberships.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-slate-500">
+                            No tiene membresías registradas.
+                        </div>
+                    ) : (
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50/50">
+                                    <th className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Inicio</th>
+                                    <th className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Vence</th>
+                                    <th className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Monto</th>
+                                    <th className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Cuotas</th>
+                                    <th className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Abonado</th>
+                                    <th className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Pendiente</th>
+                                    <th className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Estado</th>
+                                    <th className="px-4 py-2 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {memberships.map((mem) => {
+                                    const paid = isPaid(mem);
+                                    const paidSum = totalPaid(mem);
+                                    const due = balanceDue(mem);
+                                    const expired = isMembershipExpired(mem);
+                                    const installments = mem.installments ?? [];
+                                    const paidInstallments = installments.filter((i) => i.status === 'PAGADA').length;
+                                    const cuotasLabel = installments.length > 0 ? `${paidInstallments}/${installments.length} pagadas` : '—';
+                                    return (
+                                        <tr key={mem.id} className="hover:bg-slate-50">
+                                            <td className="px-4 py-2 text-slate-600">{formatMembershipDate(mem.start_date)}</td>
+                                            <td className="px-4 py-2 text-slate-600">{formatMembershipDate(mem.end_date)}</td>
+                                            <td className="px-4 py-2">S/ {Number(mem.amount).toLocaleString('es-PE')}</td>
+                                            <td className="px-4 py-2 text-slate-600">{cuotasLabel}</td>
+                                            <td className="px-4 py-2 text-emerald-700">S/ {paidSum.toLocaleString('es-PE')}</td>
+                                            <td className="px-4 py-2 text-amber-600">S/ {due.toLocaleString('es-PE')}</td>
+                                            <td className="px-4 py-2">
+                                                {expired && (
+                                                    <span className="mr-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold bg-red-100 text-red-800">
+                                                        Vencida
+                                                    </span>
+                                                )}
+                                                <span
+                                                    className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
+                                                        paid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                                    }`}
+                                                >
+                                                    {paid ? 'Al día' : 'Debe'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2 text-right">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => onPayMembership(membershipToDetail(mem, { id: advisor.id, name: advisor.name }))}
+                                                >
+                                                    Pagar membresía
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button type="button" onClick={() => onOpenChange(false)}>Cerrar</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function MembershipDetailModal({
     open,
     onOpenChange,
     detail,
+    cashAccounts = [],
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     detail: MembershipDetail;
+    cashAccounts?: CashAccount[];
 }) {
     const { membership, totalPaid, balanceDue, isPaid } = detail;
     const defaultDate = () => new Date().toISOString().slice(0, 10);
     const paymentForm = useForm({
+        advisor_membership_installment_id: '' as number | '',
+        cash_account_id: '' as number | '',
         amount: '',
         paid_at: defaultDate(),
         notes: '',
@@ -660,10 +999,18 @@ function MembershipDetailModal({
 
     const submitPayment = (e: FormEvent) => {
         e.preventDefault();
-        paymentForm.post(`/inmopro/advisor-memberships/${membership.id}/payments`, {
-            onSuccess: () => paymentForm.reset('amount', 'paid_at', 'notes'),
+        const payload = {
+            ...paymentForm.data,
+            advisor_membership_installment_id: paymentForm.data.advisor_membership_installment_id === '' ? null : paymentForm.data.advisor_membership_installment_id,
+            cash_account_id: paymentForm.data.cash_account_id === '' ? null : paymentForm.data.cash_account_id,
+        };
+        paymentForm.transform(() => payload).post(`/inmopro/advisor-memberships/${membership.id}/payments`, {
+            onSuccess: () => paymentForm.reset('amount', 'paid_at', 'notes', 'advisor_membership_installment_id', 'cash_account_id'),
         });
     };
+
+    const installments = membership.installments ?? [];
+    const pendingInstallments = installments.filter((i) => i.status === 'PENDIENTE' || i.status === 'PARCIAL');
 
     const handleDestroy = async () => {
         if (await confirmDelete(`¿Eliminar la membresía de ${membership.advisor?.name ?? 'este vendedor'} (${membership.year})? Se eliminarán también todos los abonos.`)) {
@@ -676,20 +1023,33 @@ function MembershipDetailModal({
     const payments = membership.payments ?? [];
     const sortedPayments = [...payments].sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
 
+    const expired = membership.end_date ? new Date(membership.end_date) < new Date() : false;
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Membresía {membership.year} – {membership.advisor?.name ?? 'Vendedor'}</DialogTitle>
                     <DialogDescription>
-                        Monto anual S/ {Number(membership.amount).toLocaleString('es-PE')}
+                        {membership.start_date && membership.end_date && (
+                            <span className="block text-slate-600">
+                                Inicio: {formatMembershipDate(membership.start_date)} · Vence: {formatMembershipDate(membership.end_date)}
+                                {expired && <span className="ml-2 font-bold text-red-600">(Vencida)</span>}
+                            </span>
+                        )}
+                        Monto S/ {Number(membership.amount).toLocaleString('es-PE')}
                         {isPaid ? ' · Al día' : ` · Pendiente S/ ${balanceDue.toLocaleString('es-PE')}`}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+                    {expired && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+                            Esta membresía está vencida. El vendedor puede seguir registrando abonos.
+                        </div>
+                    )}
                     <div className="grid grid-cols-3 gap-2 text-sm">
                         <div className="rounded-lg bg-slate-50 p-3">
-                            <p className="text-slate-500">Monto anual</p>
+                            <p className="text-slate-500">Monto</p>
                             <p className="font-bold">S/ {Number(membership.amount).toLocaleString('es-PE')}</p>
                         </div>
                         <div className="rounded-lg bg-slate-50 p-3">
@@ -702,41 +1062,98 @@ function MembershipDetailModal({
                         </div>
                     </div>
 
+                    {installments.length > 0 && (
+                        <div>
+                            <h4 className="mb-2 text-sm font-semibold text-slate-700">Cuotas</h4>
+                            <ul className="max-h-32 space-y-1 overflow-y-auto rounded border border-slate-100 p-2 text-sm">
+                                {installments.map((i) => (
+                                    <li key={i.id} className="flex justify-between gap-2">
+                                        <span>Cuota {i.sequence} {i.due_date ? ` · Vence ${formatMembershipDate(i.due_date)}` : ''}</span>
+                                        <span className="shrink-0">
+                                            S/ {Number(i.paid_amount).toLocaleString('es-PE')} / S/ {Number(i.amount).toLocaleString('es-PE')}
+                                            <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                                i.status === 'PAGADA' ? 'bg-emerald-100 text-emerald-800' :
+                                                i.status === 'VENCIDA' ? 'bg-red-100 text-red-800' :
+                                                i.status === 'PARCIAL' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                                            }`}>
+                                                {i.status}
+                                            </span>
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     <div>
                         <h4 className="mb-2 text-sm font-semibold text-slate-700">Registrar abono</h4>
-                        <form onSubmit={submitPayment} className="flex flex-wrap items-end gap-2">
-                            <div className="min-w-24">
-                                <Label className="text-xs">Monto (S/)</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    value={paymentForm.data.amount}
-                                    onChange={(e) => paymentForm.setData('amount', e.target.value)}
-                                    className="mt-1 h-9"
-                                    required
-                                />
-                                <InputError message={paymentForm.errors.amount} />
+                        <form onSubmit={submitPayment} className="space-y-2">
+                            <div className="flex flex-wrap items-end gap-2">
+                                <div className="min-w-24">
+                                    <Label className="text-xs">Monto (S/)</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0.01"
+                                        value={paymentForm.data.amount}
+                                        onChange={(e) => paymentForm.setData('amount', e.target.value)}
+                                        className="mt-1 h-9"
+                                        required
+                                    />
+                                    <InputError message={paymentForm.errors.amount} />
+                                </div>
+                                <div className="min-w-32">
+                                    <Label className="text-xs">Fecha</Label>
+                                    <Input
+                                        type="date"
+                                        value={paymentForm.data.paid_at}
+                                        onChange={(e) => paymentForm.setData('paid_at', e.target.value)}
+                                        className="mt-1 h-9"
+                                        required
+                                    />
+                                </div>
+                                {pendingInstallments.length > 0 && (
+                                    <div className="min-w-40">
+                                        <Label className="text-xs">Cuota</Label>
+                                        <select
+                                            value={paymentForm.data.advisor_membership_installment_id === '' ? '' : String(paymentForm.data.advisor_membership_installment_id)}
+                                            onChange={(e) => paymentForm.setData('advisor_membership_installment_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                            className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2 text-sm"
+                                        >
+                                            <option value="">A cuenta</option>
+                                            {pendingInstallments.map((i) => (
+                                                <option key={i.id} value={i.id}>Cuota {i.sequence} – S/ {Number(i.amount).toLocaleString('es-PE')}</option>
+                                            ))}
+                                        </select>
+                                        <InputError message={paymentForm.errors.advisor_membership_installment_id} />
+                                    </div>
+                                )}
+                                {cashAccounts.length > 0 && (
+                                    <div className="min-w-40">
+                                        <Label className="text-xs">Caja</Label>
+                                        <select
+                                            value={paymentForm.data.cash_account_id === '' ? '' : String(paymentForm.data.cash_account_id)}
+                                            onChange={(e) => paymentForm.setData('cash_account_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                            className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2 text-sm"
+                                        >
+                                            <option value="">Sin caja</option>
+                                            {cashAccounts.map((c) => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                        <InputError message={paymentForm.errors.cash_account_id} />
+                                    </div>
+                                )}
+                                <div className="min-w-28 flex-1">
+                                    <Label className="text-xs">Observ.</Label>
+                                    <Input
+                                        value={paymentForm.data.notes}
+                                        onChange={(e) => paymentForm.setData('notes', e.target.value)}
+                                        className="mt-1 h-9"
+                                    />
+                                </div>
+                                <Button type="submit" size="sm" disabled={paymentForm.processing}>Agregar</Button>
                             </div>
-                            <div className="min-w-32">
-                                <Label className="text-xs">Fecha</Label>
-                                <Input
-                                    type="date"
-                                    value={paymentForm.data.paid_at}
-                                    onChange={(e) => paymentForm.setData('paid_at', e.target.value)}
-                                    className="mt-1 h-9"
-                                    required
-                                />
-                            </div>
-                            <div className="min-w-28 flex-1">
-                                <Label className="text-xs">Observ.</Label>
-                                <Input
-                                    value={paymentForm.data.notes}
-                                    onChange={(e) => paymentForm.setData('notes', e.target.value)}
-                                    className="mt-1 h-9"
-                                />
-                            </div>
-                            <Button type="submit" size="sm" disabled={paymentForm.processing}>Agregar</Button>
                         </form>
                     </div>
 

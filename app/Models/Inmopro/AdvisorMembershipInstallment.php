@@ -4,18 +4,20 @@ namespace App\Models\Inmopro;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class AdvisorMembershipPayment extends Model
+class AdvisorMembershipInstallment extends Model
 {
     /**
      * @var list<string>
      */
     protected $fillable = [
         'advisor_membership_id',
-        'advisor_membership_installment_id',
-        'cash_account_id',
+        'sequence',
+        'due_date',
         'amount',
-        'paid_at',
+        'paid_amount',
+        'status',
         'notes',
     ];
 
@@ -25,8 +27,9 @@ class AdvisorMembershipPayment extends Model
     protected function casts(): array
     {
         return [
+            'due_date' => 'date',
             'amount' => 'decimal:2',
-            'paid_at' => 'date',
+            'paid_amount' => 'decimal:2',
         ];
     }
 
@@ -39,18 +42,10 @@ class AdvisorMembershipPayment extends Model
     }
 
     /**
-     * @return BelongsTo<AdvisorMembershipInstallment, $this>
+     * @return HasMany<AdvisorMembershipPayment, $this>
      */
-    public function installment(): BelongsTo
+    public function payments(): HasMany
     {
-        return $this->belongsTo(AdvisorMembershipInstallment::class, 'advisor_membership_installment_id');
-    }
-
-    /**
-     * @return BelongsTo<CashAccount, $this>
-     */
-    public function cashAccount(): BelongsTo
-    {
-        return $this->belongsTo(CashAccount::class);
+        return $this->hasMany(AdvisorMembershipPayment::class, 'advisor_membership_installment_id');
     }
 }

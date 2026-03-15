@@ -4,6 +4,8 @@ namespace Tests\Feature\Inmopro;
 
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorMembership;
+use App\Models\Inmopro\CashAccount;
+use App\Models\Inmopro\MembershipType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -98,5 +100,64 @@ class InmoproAdvisorMembershipsTest extends TestCase
             'amount' => 200,
             'notes' => 'Primer abono',
         ]);
+    }
+
+    public function test_authenticated_users_can_record_membership_payment_with_installment_and_cash_account(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::first();
+        $type = MembershipType::create(['name' => 'Anual', 'months' => 12, 'amount' => 900]);
+        $membership = AdvisorMembership::create([
+            'advisor_id' => $advisor->id,
+            'membership_type_id' => $type->id,
+            'year' => (int) now()->format('Y'),
+            'start_date' => now()->startOfYear(),
+            'end_date' => now()->endOfYear(),
+            'amount' => 900,
+        ]);
+        $installment = $membership->installments()->create([
+            'sequence' => 1,
+            'due_date' => now()->addMonth(),
+            'amount' => 300,
+            'paid_amount' => 0,
+            'status' => 'PENDIENTE',
+        ]);
+        $cashAccount = CashAccount::create([
+            'name' => 'Caja Test',
+            'type' => 'CAJA',
+            'currency' => 'PEN',
+            'initial_balance' => 0,
+            'current_balance' => 0,
+            'is_active' => true,
+        ]);
+        $this->actingAs($user);
+
+        $response = $this->post(route('inmopro.advisor-memberships.payments.store', $membership), [
+            'advisor_membership_installment_id' => $installment->id,
+            'cash_account_id' => $cashAccount->id,
+            'amount' => 300,
+            'paid_at' => now()->toDateString(),
+            'notes' => 'Cuota 1',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('advisor_membership_payments', [
+            'advisor_membership_id' => $membership->id,
+            'advisor_membership_installment_id' => $installment->id,
+            'cash_account_id' => $cashAccount->id,
+            'amount' => 300,
+        ]);
+        $this->assertDatabaseHas('advisor_membership_installments', [
+            'id' => $installment->id,
+            'paid_amount' => 300,
+            'status' => 'PAGADA',
+        ]);
+        $this->assertDatabaseHas('cash_entries', [
+            'cash_account_id' => $cashAccount->id,
+            'type' => 'INGRESO',
+            'amount' => 300,
+        ]);
+        $cashAccount->refresh();
+        $this->assertSame(300.0, (float) $cashAccount->current_balance);
     }
 }

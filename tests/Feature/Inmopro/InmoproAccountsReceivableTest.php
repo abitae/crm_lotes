@@ -2,8 +2,11 @@
 
 namespace Tests\Feature\Inmopro;
 
+use App\Models\Inmopro\Advisor;
+use App\Models\Inmopro\AdvisorMembership;
 use App\Models\Inmopro\CashAccount;
 use App\Models\Inmopro\Lot;
+use App\Models\Inmopro\MembershipType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -23,6 +26,7 @@ class InmoproAccountsReceivableTest extends TestCase
         $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\ClientSeeder::class);
         $this->seed(\Database\Seeders\Inmopro\LotSeeder::class);
+        $this->seed(\Database\Seeders\Inmopro\TeamSeeder::class);
     }
 
     public function test_authenticated_users_can_visit_accounts_receivable_index(): void
@@ -103,5 +107,63 @@ class InmoproAccountsReceivableTest extends TestCase
             ->component('inmopro/accounts-receivable')
             ->where('filters.project_id', (string) $lot->project_id)
             ->where('filters.search', $lot->client?->name));
+    }
+
+    public function test_accounts_receivable_includes_memberships_with_balance_due_and_summary(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::first();
+        $type = MembershipType::create(['name' => 'Anual', 'months' => 12, 'amount' => 600]);
+        $membership = AdvisorMembership::create([
+            'advisor_id' => $advisor->id,
+            'membership_type_id' => $type->id,
+            'year' => (int) now()->format('Y'),
+            'start_date' => now()->startOfYear(),
+            'end_date' => now()->endOfYear(),
+            'amount' => 600,
+        ]);
+        $this->actingAs($user);
+
+        $response = $this->get(route('inmopro.accounts-receivable.index'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('inmopro/accounts-receivable')
+            ->has('membershipReceivables')
+            ->has('summary')
+            ->where('summary.membershipScheduled', 600)
+            ->where('summary.membershipPending', 600)
+            ->where('membershipReceivables.0.id', $membership->id)
+            ->where('membershipReceivables.0.advisor.username', $advisor->username)
+            ->where('membershipReceivables.0.balance_due', 600));
+    }
+
+    public function test_authenticated_users_can_store_membership_payment_from_accounts_receivable(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::first();
+        $type = MembershipType::create(['name' => 'Anual', 'months' => 12, 'amount' => 500]);
+        $membership = AdvisorMembership::create([
+            'advisor_id' => $advisor->id,
+            'membership_type_id' => $type->id,
+            'year' => (int) now()->format('Y'),
+            'start_date' => now()->startOfYear(),
+            'end_date' => now()->endOfYear(),
+            'amount' => 500,
+        ]);
+        $this->actingAs($user);
+
+        $response = $this->post(route('inmopro.accounts-receivable.membership-payments.store'), [
+            'membership_id' => $membership->id,
+            'amount' => 200,
+            'paid_at' => now()->toDateString(),
+            'notes' => 'Abono desde cxc',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('advisor_membership_payments', [
+            'advisor_membership_id' => $membership->id,
+            'amount' => 200,
+        ]);
     }
 }

@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Inmopro;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Inmopro\StoreAdvisorMembershipPaymentRequest;
 use App\Http\Requests\Inmopro\StoreLotInstallmentRequest;
 use App\Http\Requests\Inmopro\StoreLotPaymentRequest;
+use App\Models\Inmopro\AdvisorMembership;
 use App\Models\Inmopro\CashAccount;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotInstallment;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
+use App\Services\Inmopro\MembershipReceivableService;
 use App\Services\Inmopro\ReceivableService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -89,16 +92,51 @@ class AccountsReceivableController extends Controller
         $totalScheduled = (float) $lotsCollection->sum(fn (Lot $lot) => $lot->installments->sum('amount'));
         $totalCollected = (float) $lotsCollection->sum(fn (Lot $lot) => $lot->payments->sum('amount'));
 
+        $membershipReceivables = AdvisorMembership::query()
+            ->with(['advisor', 'membershipType', 'installments', 'payments'])
+            ->whereRaw('amount > COALESCE((SELECT SUM(amount) FROM advisor_membership_payments WHERE advisor_membership_id = advisor_memberships.id), 0)')
+            ->orderBy('start_date')
+            ->get()
+            ->map(function (AdvisorMembership $m): array {
+                $totalPaid = (float) $m->payments->sum('amount');
+                $balanceDue = max(0, (float) $m->amount - $totalPaid);
+                $overdue = $m->installments->where('status', 'VENCIDA')->count();
+
+                return [
+                    'id' => $m->id,
+                    'advisor' => $m->advisor ? ['id' => $m->advisor->id, 'name' => $m->advisor->name, 'username' => $m->advisor->username] : null,
+                    'membership_type' => $m->membershipType ? ['id' => $m->membershipType->id, 'name' => $m->membershipType->name] : null,
+                    'start_date' => $m->start_date?->toISOString(),
+                    'end_date' => $m->end_date?->toISOString(),
+                    'amount' => (float) $m->amount,
+                    'total_paid' => $totalPaid,
+                    'balance_due' => $balanceDue,
+                    'installments' => $m->installments->toArray(),
+                    'payments' => $m->payments->toArray(),
+                    'overdue_installments' => $overdue,
+                ];
+            });
+
+        $membershipScheduled = $membershipReceivables->sum('amount');
+        $membershipCollected = $membershipReceivables->sum('total_paid');
+        $membershipPending = $membershipReceivables->sum('balance_due');
+        $membershipOverdue = $membershipReceivables->sum('overdue_installments');
+
         return Inertia::render('inmopro/accounts-receivable', [
             'lots' => $lots,
             'projects' => Project::orderBy('name')->get(),
             'cashAccounts' => CashAccount::where('is_active', true)->orderBy('name')->get(),
+            'membershipReceivables' => $membershipReceivables->values()->all(),
             'summary' => [
                 'portfolio' => (float) $lotsCollection->sum('price'),
                 'scheduled' => $totalScheduled,
                 'collected' => $totalCollected,
                 'pending' => max(0, $totalScheduled - $totalCollected),
                 'overdueInstallments' => $overdueInstallments,
+                'membershipScheduled' => $membershipScheduled,
+                'membershipCollected' => $membershipCollected,
+                'membershipPending' => $membershipPending,
+                'membershipOverdueInstallments' => $membershipOverdue,
             ],
             'filters' => $request->only('project_id', 'status', 'search'),
         ]);
@@ -116,5 +154,26 @@ class AccountsReceivableController extends Controller
         $this->receivableService->recordPayment($lot, $request->validated());
 
         return back()->with('success', 'Pago registrado correctamente.');
+    }
+
+    public function storeMembershipPayment(StoreAdvisorMembershipPaymentRequest $request): RedirectResponse
+    {
+        $request->validate(['membership_id' => ['required', 'integer', 'exists:advisor_memberships,id']]);
+        $membership = AdvisorMembership::with('installments')->findOrFail($request->input('membership_id'));
+
+        if ($request->filled('advisor_membership_installment_id')) {
+            $installment = $membership->installments->firstWhere('id', $request->input('advisor_membership_installment_id'));
+            if (! $installment) {
+                return back()->with('error', 'La cuota no pertenece a esta membresía.');
+            }
+        }
+
+        $validated = $request->validated();
+        unset($validated['membership_id']);
+        $validated['paid_at'] = \Carbon\Carbon::parse($validated['paid_at']);
+
+        app(MembershipReceivableService::class)->recordPayment($membership, $validated);
+
+        return back()->with('success', 'Pago de membresía registrado correctamente.');
     }
 }

@@ -13,6 +13,7 @@ class CashEntry extends Model
     protected $fillable = [
         'cash_account_id',
         'lot_payment_id',
+        'advisor_membership_payment_id',
         'type',
         'concept',
         'amount',
@@ -46,5 +47,13 @@ class CashEntry extends Model
     public function lotPayment(): BelongsTo
     {
         return $this->belongsTo(LotPayment::class, 'lot_payment_id');
+    }
+
+    /**
+     * @return BelongsTo<AdvisorMembershipPayment, $this>
+     */
+    public function advisorMembershipPayment(): BelongsTo
+    {
+        return $this->belongsTo(AdvisorMembershipPayment::class);
     }
 }

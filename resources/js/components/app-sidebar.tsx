@@ -77,6 +77,7 @@ const managementSections: NavSection[] = [
             { title: 'Vendedores', href: '/inmopro/advisors', icon: UserCheck },
             { title: 'Teams comerciales', href: '/inmopro/teams', icon: ShieldCheck },
             { title: 'Niveles de asesor', href: '/inmopro/advisor-levels', icon: Layers },
+            { title: 'Tipos de membresía', href: '/inmopro/membership-types', icon: Receipt },
         ],
     },
     {
