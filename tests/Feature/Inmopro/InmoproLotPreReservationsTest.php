@@ -78,4 +78,76 @@ class InmoproLotPreReservationsTest extends TestCase
             'lot_status_id' => $reservedStatus->id,
         ]);
     }
+
+    public function test_authenticated_users_can_reject_pre_reservation(): void
+    {
+        $user = User::factory()->create();
+        $lot = Lot::whereHas('status', fn ($query) => $query->where('code', 'LIBRE'))->firstOrFail();
+        $client = Client::firstOrFail();
+        $advisor = Advisor::firstOrFail();
+        $preReservationStatus = LotStatus::where('code', 'PRERESERVA')->firstOrFail();
+        $freeStatus = LotStatus::where('code', 'LIBRE')->firstOrFail();
+
+        $lot->update([
+            'lot_status_id' => $preReservationStatus->id,
+            'client_id' => $client->id,
+            'advisor_id' => $advisor->id,
+        ]);
+
+        $preReservation = LotPreReservation::create([
+            'lot_id' => $lot->id,
+            'client_id' => $client->id,
+            'advisor_id' => $advisor->id,
+            'status' => 'PENDIENTE',
+            'amount' => 1800,
+            'voucher_path' => 'cazador/pre-reservations/test.png',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('inmopro.lot-pre-reservations.reject', $preReservation), [
+                'rejection_reason' => 'Voucher ilegible',
+            ])
+            ->assertRedirect(route('inmopro.lot-pre-reservations.index'));
+
+        $this->assertDatabaseHas('lot_pre_reservations', [
+            'id' => $preReservation->id,
+            'status' => 'RECHAZADA',
+            'reviewed_by' => $user->id,
+            'rejection_reason' => 'Voucher ilegible',
+        ]);
+        $this->assertDatabaseHas('lots', [
+            'id' => $lot->id,
+            'lot_status_id' => $freeStatus->id,
+            'client_id' => null,
+            'advisor_id' => null,
+        ]);
+    }
+
+    public function test_cannot_approve_pre_reservation_that_is_not_pending(): void
+    {
+        $user = User::factory()->create();
+        $lot = Lot::whereHas('status', fn ($query) => $query->where('code', 'LIBRE'))->firstOrFail();
+        $client = Client::firstOrFail();
+        $advisor = Advisor::firstOrFail();
+        $preReservationStatus = LotStatus::where('code', 'PRERESERVA')->firstOrFail();
+
+        $lot->update([
+            'lot_status_id' => $preReservationStatus->id,
+            'client_id' => $client->id,
+            'advisor_id' => $advisor->id,
+        ]);
+
+        $preReservation = LotPreReservation::create([
+            'lot_id' => $lot->id,
+            'client_id' => $client->id,
+            'advisor_id' => $advisor->id,
+            'status' => 'RECHAZADA',
+            'amount' => 1800,
+            'voucher_path' => 'cazador/pre-reservations/test.png',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('inmopro.lot-pre-reservations.approve', $preReservation))
+            ->assertSessionHas('error', 'Solo se pueden aprobar pre-reservas pendientes.');
+    }
 }

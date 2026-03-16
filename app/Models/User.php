@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -48,5 +49,34 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return BelongsToMany<Role, $this>
+     */
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class)->withTimestamps();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function permissionCodes(): array
+    {
+        return $this->roles()
+            ->with('permissions:id,code')
+            ->get()
+            ->pluck('permissions')
+            ->flatten()
+            ->pluck('code')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function hasPermission(string $permissionCode): bool
+    {
+        return in_array($permissionCode, $this->permissionCodes(), true);
     }
 }

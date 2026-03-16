@@ -11,13 +11,13 @@ import {
     Pie,
     Cell,
 } from 'recharts';
-import { TrendingUp, Users, CheckCircle2, Clock, LayoutGrid } from 'lucide-react';
+import { TrendingUp, Users, CheckCircle2, Clock, LayoutGrid, ArrowRightLeft, Landmark } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { BreadcrumbItem } from '@/types';
 
-const COLORS = ['#10b981', '#f59e0b', '#64748b'];
+const COLORS = ['#10b981', '#0ea5e9', '#f59e0b', '#64748b', '#6366f1'];
 
 export default function InmoproDashboard({
     stats,
@@ -25,8 +25,8 @@ export default function InmoproDashboard({
     pieData,
     recentReservations,
 }: {
-    stats: { total: number; libre: number; reservado: number; transferido: number };
-    chartData: Array<{ name: string; Libre: number; Reservado: number; Vendido: number }>;
+    stats: { total: number; libre: number; prereserva: number; reservado: number; transferido: number; cuotas: number };
+    chartData: Array<{ name: string; Libre: number; PreReserva: number; Reservado: number; Transferido: number; Cuotas: number }>;
     pieData: Array<{ name: string; value: number }>;
     recentReservations: Array<{
         id: number;
@@ -46,8 +46,10 @@ export default function InmoproDashboard({
     const statCards = [
         { label: 'Lotes Totales', value: stats.total, icon: TrendingUp, className: 'bg-sky-500/10 text-sky-600' },
         { label: 'Disponibles', value: stats.libre, icon: CheckCircle2, className: 'bg-emerald-500/10 text-emerald-600' },
+        { label: 'Pre-reserva', value: stats.prereserva, icon: ArrowRightLeft, className: 'bg-sky-500/10 text-sky-600' },
         { label: 'Reservados', value: stats.reservado, icon: Clock, className: 'bg-amber-500/10 text-amber-600' },
         { label: 'Transferidos', value: stats.transferido, icon: Users, className: 'bg-slate-500/10 text-slate-600' },
+        { label: 'Cuotas', value: stats.cuotas, icon: Landmark, className: 'bg-violet-500/10 text-violet-600' },
     ];
 
     return (
@@ -59,7 +61,7 @@ export default function InmoproDashboard({
                     <p className="mt-1 text-sm text-slate-500">Resumen del inventario y reservas recientes.</p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
                     {statCards.map((stat) => (
                         <Card key={stat.label} className="overflow-hidden">
                             <CardContent className="pt-6">
@@ -81,7 +83,7 @@ export default function InmoproDashboard({
                     <Card className="lg:col-span-2">
                         <CardHeader>
                             <CardTitle>Estado por proyecto</CardTitle>
-                            <CardDescription>Lotes libres, reservados y vendidos por proyecto.</CardDescription>
+                            <CardDescription>Lotes por estado comercial y operativo por proyecto.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="h-[300px]">
@@ -98,8 +100,10 @@ export default function InmoproDashboard({
                                                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                                             }}
                                         />
-                                        <Bar dataKey="Vendido" stackId="a" fill="#64748b" radius={[0, 0, 0, 0]} />
+                                        <Bar dataKey="Transferido" stackId="a" fill="#64748b" radius={[0, 0, 0, 0]} />
+                                        <Bar dataKey="Cuotas" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
                                         <Bar dataKey="Reservado" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
+                                        <Bar dataKey="PreReserva" stackId="a" fill="#0ea5e9" radius={[0, 0, 0, 0]} />
                                         <Bar dataKey="Libre" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>

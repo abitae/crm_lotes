@@ -15,8 +15,10 @@ class FinancialController extends Controller
     public function index(Request $request): Response
     {
         $statusLibre = LotStatus::where('code', 'LIBRE')->first();
+        $statusPreReserva = LotStatus::where('code', 'PRERESERVA')->first();
         $query = Lot::with(['project', 'client', 'status'])
-            ->when($statusLibre, fn ($q) => $q->where('lot_status_id', '!=', $statusLibre->id));
+            ->when($statusLibre, fn ($q) => $q->where('lot_status_id', '!=', $statusLibre->id))
+            ->when($statusPreReserva, fn ($q) => $q->where('lot_status_id', '!=', $statusPreReserva->id));
 
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->input('project_id'));

@@ -60,6 +60,16 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
             contract_number: '',
             observations: '',
         });
+    const calculateRemainingBalance = (): string => {
+        const price = Number(data.price);
+        const advance = Number(data.advance);
+
+        if (Number.isNaN(price)) {
+            return '';
+        }
+
+        return (price - (Number.isNaN(advance) ? 0 : advance)).toFixed(2);
+    };
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -108,6 +118,9 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
                                 {lotStatuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>
                             <InputError message={errors.lot_status_id} />
+                            <p className="mt-1 text-xs text-slate-500">
+                                El estado TRANSFERIDO se confirma desde un flujo especial con evidencia.
+                            </p>
                         </div>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -173,7 +186,7 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
                                 </div>
                                 <div>
                                     <Label htmlFor="remaining_balance">Monto restante</Label>
-                                    <Input id="remaining_balance" type="number" min={0} value={data.remaining_balance} onChange={(e) => setData('remaining_balance', e.target.value)} className="mt-1" />
+                                    <Input id="remaining_balance" type="number" min={0} value={calculateRemainingBalance()} readOnly className="mt-1 bg-slate-50" />
                                     <InputError message={errors.remaining_balance} />
                                 </div>
                             </div>

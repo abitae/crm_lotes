@@ -16,6 +16,8 @@ use App\Http\Controllers\Inmopro\FinancialController;
 use App\Http\Controllers\Inmopro\LotController;
 use App\Http\Controllers\Inmopro\LotPreReservationController;
 use App\Http\Controllers\Inmopro\LotStatusController;
+use App\Http\Controllers\Inmopro\LotTransferConfirmationController;
+use App\Http\Controllers\Inmopro\ProcessDiagramsController;
 use App\Http\Controllers\Inmopro\ProjectController;
 use App\Http\Controllers\Inmopro\ReportController;
 use App\Http\Controllers\Inmopro\TeamController;
@@ -27,6 +29,9 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::post('projects/import-from-excel', [ProjectController::class, 'importFromExcel'])->name('projects.import-from-excel');
     Route::resource('projects', ProjectController::class);
     Route::get('lots/export-pdf', [LotController::class, 'exportPdf'])->name('lots.export-pdf');
+    Route::get('lot-transfer-confirmations', [LotTransferConfirmationController::class, 'index'])->name('lot-transfer-confirmations.index');
+    Route::get('lots/{lot}/transfer-confirmation', [LotTransferConfirmationController::class, 'create'])->name('lots.transfer-confirmation.create');
+    Route::post('lots/{lot}/transfer-confirmation', [LotTransferConfirmationController::class, 'store'])->name('lots.transfer-confirmation.store');
     Route::resource('lots', LotController::class);
     Route::get('clients/search', [ClientController::class, 'search'])->name('clients.search');
     Route::resource('clients', ClientController::class);
@@ -58,4 +63,5 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::get('lot-pre-reservations', [LotPreReservationController::class, 'index'])->name('lot-pre-reservations.index');
     Route::post('lot-pre-reservations/{lot_pre_reservation}/approve', [LotPreReservationController::class, 'approve'])->name('lot-pre-reservations.approve');
     Route::post('lot-pre-reservations/{lot_pre_reservation}/reject', [LotPreReservationController::class, 'reject'])->name('lot-pre-reservations.reject');
+    Route::get('process-diagrams', ProcessDiagramsController::class)->name('process-diagrams.index');
 });

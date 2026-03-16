@@ -8,12 +8,16 @@ use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotPreReservation;
-use App\Models\Inmopro\LotStatus;
+use App\Services\Inmopro\LotStateTransitionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 class PreReservationController extends Controller
 {
+    public function __construct(
+        private LotStateTransitionService $lotStateTransitionService
+    ) {}
+
     public function store(StorePreReservationRequest $request, Lot $lot): JsonResponse
     {
         /** @var Advisor $advisor */
@@ -62,38 +66,30 @@ class PreReservationController extends Controller
             ], 422);
         }
 
-        $preReservationStatusId = LotStatus::query()->where('code', 'PRERESERVA')->value('id');
-
-        if (! $preReservationStatusId) {
-            return response()->json([
-                'message' => 'No existe el estado de pre-reserva configurado.',
-            ], 500);
-        }
-
         $storedPath = $request->file('voucher_image')->store('cazador/pre-reservations', 'public');
 
-        $preReservation = DB::transaction(function () use ($advisor, $client, $lot, $request, $storedPath, $preReservationStatusId) {
-            $preReservation = LotPreReservation::create([
-                'lot_id' => $lot->id,
-                'client_id' => $client->id,
-                'advisor_id' => $advisor->id,
-                'status' => 'PENDIENTE',
-                'amount' => $request->input('amount'),
-                'voucher_path' => $storedPath,
-                'payment_reference' => $request->input('payment_reference'),
-                'notes' => $request->input('notes'),
-            ]);
+        try {
+            $preReservation = DB::transaction(function () use ($advisor, $client, $lot, $request, $storedPath) {
+                $preReservation = LotPreReservation::create([
+                    'lot_id' => $lot->id,
+                    'client_id' => $client->id,
+                    'advisor_id' => $advisor->id,
+                    'status' => 'PENDIENTE',
+                    'amount' => $request->input('amount'),
+                    'voucher_path' => $storedPath,
+                    'payment_reference' => $request->input('payment_reference'),
+                    'notes' => $request->input('notes'),
+                ]);
 
-            $lot->update([
-                'lot_status_id' => $preReservationStatusId,
-                'client_id' => $client->id,
-                'advisor_id' => $advisor->id,
-                'client_name' => $client->name,
-                'client_dni' => $client->dni,
-            ]);
+                $this->lotStateTransitionService->markAsPreReserved($lot, $client, $advisor);
 
-            return $preReservation;
-        });
+                return $preReservation;
+            });
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+            ], 500);
+        }
 
         return response()->json([
             'message' => 'Pre-reserva registrada y pendiente de aprobación.',

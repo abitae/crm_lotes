@@ -26,6 +26,7 @@ class ProjectController extends Controller
             ->withCount('lots')
             ->withCount([
                 'lots as free_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'LIBRE')),
+                'lots as pre_reserved_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'PRERESERVA')),
                 'lots as reserved_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'RESERVADO')),
                 'lots as transferred_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'TRANSFERIDO')),
                 'lots as installments_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'CUOTAS')),
@@ -76,6 +77,7 @@ class ProjectController extends Controller
                 'blocks' => $project->blocks,
                 'lots_count' => $actualLots,
                 'free_lots_count' => $project->free_lots_count ?? 0,
+                'pre_reserved_lots_count' => $project->pre_reserved_lots_count ?? 0,
                 'reserved_lots_count' => $project->reserved_lots_count ?? 0,
                 'transferred_lots_count' => $project->transferred_lots_count ?? 0,
                 'installments_lots_count' => $project->installments_lots_count ?? 0,

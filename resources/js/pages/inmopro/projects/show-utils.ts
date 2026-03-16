@@ -1,15 +1,7 @@
+import { toIsoDate } from '@/lib/date';
+
 export function toDateStr(value: string | undefined | null): string {
-    if (value == null || value === '') {
-        return '';
-    }
-
-    const normalized = String(value);
-
-    if (normalized.includes('T')) {
-        return normalized.slice(0, 10);
-    }
-
-    return normalized.slice(0, 10);
+    return toIsoDate(value);
 }
 
 export function toNum(value: string | number | undefined | null): number | null {

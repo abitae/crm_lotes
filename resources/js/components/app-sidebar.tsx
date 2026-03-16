@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     Building2,
@@ -6,6 +6,7 @@ import {
     DollarSign,
     FileCheck,
     Folder,
+    GitBranch,
     Landmark,
     Layers,
     LayoutGrid,
@@ -53,7 +54,7 @@ const managementSections: NavSection[] = [
         label: 'Inventario',
         icon: MapPin,
         items: [
-            { title: 'Inventario de lotes', href: '/inmopro/lots', icon: MapPin },
+            { title: 'Lotes y transferencias', href: '/inmopro/lots', icon: MapPin },
             { title: 'Proyectos', href: '/inmopro/projects', icon: Building2 },
         ],
     },
@@ -85,9 +86,17 @@ const managementSections: NavSection[] = [
         items: [
             { title: 'Tickets de atención', href: '/inmopro/attention-tickets', icon: FileCheck },
             { title: 'Pre-reservas', href: '/inmopro/lot-pre-reservations', icon: FileCheck },
+            { title: 'Transferencias', href: '/inmopro/lot-transfer-confirmations', icon: FileCheck },
             { title: 'Caja y bancos', href: '/inmopro/cash-accounts', icon: Landmark },
             { title: 'Estados de lote', href: '/inmopro/lot-statuses', icon: Tag },
             { title: 'Estados de comisión', href: '/inmopro/commission-statuses', icon: Receipt },
+        ],
+    },
+    {
+        label: 'Documentación',
+        icon: GitBranch,
+        items: [
+            { title: 'Procesos del sistema', href: '/inmopro/process-diagrams', icon: GitBranch },
         ],
     },
 ];
@@ -148,6 +157,12 @@ function NavSectionGroup({
 
 export function AppSidebar() {
     const { isCurrentUrl } = useCurrentUrl();
+    const { auth } = usePage<{ auth?: { user?: { permissions?: string[] } | null } }>().props;
+    const canConfirmTransfer = auth?.user?.permissions?.includes('confirm-lot-transfer') ?? false;
+    const sections = managementSections.map((section) => ({
+        ...section,
+        items: section.items.filter((item) => item.href !== '/inmopro/lot-transfer-confirmations' || canConfirmTransfer),
+    })).filter((section) => section.items.length > 0);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -184,7 +199,7 @@ export function AppSidebar() {
                     <SidebarGroupLabel>Módulos</SidebarGroupLabel>
                 </SidebarGroup>
 
-                {managementSections.map((section) => (
+                {sections.map((section) => (
                     <NavSectionGroup key={section.label} section={section} isCurrentUrl={isCurrentUrl} />
                 ))}
             </SidebarContent>

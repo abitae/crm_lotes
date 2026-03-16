@@ -96,6 +96,27 @@ class CazadorPreReservationsTest extends TestCase
             ->assertJsonFragment(['message' => 'El lote enviado no coincide con la ruta.']);
     }
 
+    public function test_advisor_cannot_create_pre_reservation_for_non_available_lot(): void
+    {
+        Storage::fake('public');
+
+        $ownType = ClientType::where('code', 'PROPIO')->firstOrFail();
+        $client = Client::where('client_type_id', $ownType->id)->firstOrFail();
+        $advisor = Advisor::findOrFail($client->advisor_id);
+        $lot = Lot::whereHas('status', fn ($query) => $query->where('code', 'RESERVADO'))->firstOrFail();
+
+        $this->withHeader('Authorization', 'Bearer '.$this->loginToken($advisor))
+            ->withHeader('Accept', 'application/json')
+            ->post(route('api.v1.cazador.lots.pre-reservations.store', $lot), [
+                'client_id' => $client->id,
+                'project_id' => $lot->project_id,
+                'lot_id' => $lot->id,
+                'amount' => 1500,
+                'voucher_image' => UploadedFile::fake()->image('voucher.png'),
+            ])->assertStatus(422)
+            ->assertJsonFragment(['message' => 'La unidad no está disponible para pre-reserva.']);
+    }
+
     private function loginToken(Advisor $advisor): string
     {
         return $this->postJson(route('api.v1.cazador.auth.login'), [

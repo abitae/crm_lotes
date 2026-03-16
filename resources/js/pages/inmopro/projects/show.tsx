@@ -33,6 +33,17 @@ export default function ProjectsShow({ project, lotStatuses }: PageProps) {
         cacheMax: SEARCH_CACHE_MAX,
     });
 
+    const calculateRemainingBalance = (price: string | number | null | undefined, advance: string | number | null | undefined): number | null => {
+        const normalizedPrice = toNum(price);
+        const normalizedAdvance = toNum(advance) ?? 0;
+
+        if (normalizedPrice === null) {
+            return null;
+        }
+
+        return Number((normalizedPrice - normalizedAdvance).toFixed(2));
+    };
+
     const buildPayload = (lot: Lot, overrides: Partial<LotPayload>): LotPayload => ({
         lot_status_id: lot.status?.id ?? lotStatuses[0]?.id ?? 0,
         client_id: overrides.client_id !== undefined ? overrides.client_id : (lot.client?.id ?? null),
@@ -41,7 +52,7 @@ export default function ProjectsShow({ project, lotStatuses }: PageProps) {
         client_dni: lot.client_dni ?? lot.client?.dni ?? null,
         client_phone: lot.client_phone ?? lot.client?.phone ?? null,
         advance: toNum(lot.advance),
-        remaining_balance: toNum(lot.remaining_balance),
+        remaining_balance: calculateRemainingBalance(lot.price, lot.advance),
         payment_limit_date: lot.payment_limit_date ? toDateStr(lot.payment_limit_date) : null,
         operation_number: lot.operation_number ?? null,
         contract_date: lot.contract_date ? toDateStr(lot.contract_date) : null,
@@ -105,7 +116,10 @@ export default function ProjectsShow({ project, lotStatuses }: PageProps) {
             area: toNum(getCellValue(lot, 'area')) ?? toNum(lot.area),
             price: toNum(getCellValue(lot, 'price')) ?? toNum(lot.price),
             advance: toNum(getCellValue(lot, 'advance')) ?? toNum(lot.advance),
-            remaining_balance: toNum(getCellValue(lot, 'remaining_balance')) ?? toNum(lot.remaining_balance),
+            remaining_balance: calculateRemainingBalance(
+                toNum(getCellValue(lot, 'price')) ?? toNum(lot.price),
+                toNum(getCellValue(lot, 'advance')) ?? toNum(lot.advance)
+            ),
             payment_limit_date: getCellValue(lot, 'payment_limit_date')
                 ? toDateStr(getCellValue(lot, 'payment_limit_date'))
                 : (lot.payment_limit_date ? toDateStr(lot.payment_limit_date) : null),

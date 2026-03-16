@@ -71,6 +71,7 @@ class ReportController extends Controller
             ->get(['id', 'name', 'team_id', 'personal_quota']);
 
         $statusLibre = LotStatus::query()->where('code', 'LIBRE')->first();
+        $statusPreReserva = LotStatus::query()->where('code', 'PRERESERVA')->first();
 
         $lots = Lot::query()
             ->with([
@@ -80,6 +81,7 @@ class ReportController extends Controller
                 'payments:id,lot_id,amount,paid_at',
             ])
             ->when($statusLibre, fn (Builder $builder) => $builder->where('lot_status_id', '!=', $statusLibre->id))
+            ->when($statusPreReserva, fn (Builder $builder) => $builder->where('lot_status_id', '!=', $statusPreReserva->id))
             ->when($filters['project_id'], fn (Builder $builder, int $projectId) => $builder->where('project_id', $projectId))
             ->when($filters['advisor_id'], fn (Builder $builder, int $advisorId) => $builder->where('advisor_id', $advisorId))
             ->when($filters['team_id'], fn (Builder $builder, int $teamId) => $builder->whereHas('advisor', fn (Builder $advisorQuery) => $advisorQuery->where('team_id', $teamId)))

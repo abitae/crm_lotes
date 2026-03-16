@@ -25,6 +25,10 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call([
+            AuthorizationSeeder::class,
+        ]);
+
+        $this->call([
             Inmopro\AdvisorLevelSeeder::class,
             Inmopro\LotStatusSeeder::class,
             Inmopro\CommissionStatusSeeder::class,

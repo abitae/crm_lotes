@@ -23,9 +23,16 @@ type Lot = {
     status?: { id: number; name: string; code: string; color?: string };
     client?: { id: number; name: string } | null;
     advisor?: { id: number; name: string } | null;
+    transfer_confirmations?: Array<{
+        id: number;
+        evidence_path: string;
+        observations?: string | null;
+        confirmed_at: string;
+        confirmer?: { id: number; name: string } | null;
+    }>;
 };
 
-export default function LotsShow({ lot }: { lot: Lot }) {
+export default function LotsShow({ lot, canConfirmTransfer }: { lot: Lot; canConfirmTransfer: boolean }) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Inventario', href: '/inmopro/lots' },
@@ -34,6 +41,7 @@ export default function LotsShow({ lot }: { lot: Lot }) {
 
     const formatDate = (d: string | undefined) => (d ? new Date(d).toLocaleDateString('es') : '—');
     const formatMoney = (v: string | undefined) => (v != null && v !== '' ? Number(v).toLocaleString('es') : '—');
+    const latestTransferConfirmation = lot.transfer_confirmations?.[0] ?? null;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -51,13 +59,23 @@ export default function LotsShow({ lot }: { lot: Lot }) {
                             </p>
                         )}
                     </div>
-                    <Link
-                        href={`/inmopro/lots/${lot.id}/edit`}
-                        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-bold text-white shadow-lg shadow-emerald-100 transition-all hover:bg-emerald-700"
-                    >
-                        <Pencil className="h-4 w-4" />
-                        Editar
-                    </Link>
+                    <div className="flex flex-wrap gap-3">
+                        {canConfirmTransfer && lot.status?.code === 'RESERVADO' && !latestTransferConfirmation && (
+                            <Link
+                                href={`/inmopro/lots/${lot.id}/transfer-confirmation`}
+                                className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 font-bold text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800"
+                            >
+                                Confirmar transferencia
+                            </Link>
+                        )}
+                        <Link
+                            href={`/inmopro/lots/${lot.id}/edit`}
+                            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-bold text-white shadow-lg shadow-emerald-100 transition-all hover:bg-emerald-700"
+                        >
+                            <Pencil className="h-4 w-4" />
+                            Editar
+                        </Link>
+                    </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -155,6 +173,40 @@ export default function LotsShow({ lot }: { lot: Lot }) {
                         <div className="mt-6 border-t border-slate-200 pt-6">
                             <h3 className="mb-2 font-bold text-slate-700">Observaciones</h3>
                             <p className="text-slate-600 whitespace-pre-wrap">{lot.observations}</p>
+                        </div>
+                    )}
+                    {latestTransferConfirmation && (
+                        <div className="mt-6 border-t border-slate-200 pt-6">
+                            <h3 className="mb-3 font-bold text-slate-700">Confirmación de transferencia</h3>
+                            <dl className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <dt className="text-sm text-slate-500">Confirmado por</dt>
+                                    <dd className="font-medium">{latestTransferConfirmation.confirmer?.name ?? '—'}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-500">Fecha de confirmación</dt>
+                                    <dd className="font-medium">{formatDate(latestTransferConfirmation.confirmed_at)}</dd>
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <dt className="text-sm text-slate-500">Evidencia</dt>
+                                    <dd className="font-medium">
+                                        <a
+                                            href={`/storage/${latestTransferConfirmation.evidence_path}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-emerald-600 hover:underline"
+                                        >
+                                            Ver imagen de sustento
+                                        </a>
+                                    </dd>
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <dt className="text-sm text-slate-500">Observaciones</dt>
+                                    <dd className="font-medium whitespace-pre-wrap">
+                                        {latestTransferConfirmation.observations || '—'}
+                                    </dd>
+                                </div>
+                            </dl>
                         </div>
                     )}
                 </div>

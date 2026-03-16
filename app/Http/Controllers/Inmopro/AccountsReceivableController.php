@@ -25,13 +25,16 @@ class AccountsReceivableController extends Controller
     public function index(Request $request): Response
     {
         $statusLibre = LotStatus::where('code', 'LIBRE')->first();
+        $statusPreReserva = LotStatus::where('code', 'PRERESERVA')->first();
         $query = Lot::with([
             'project',
             'client',
             'status',
             'installments',
             'payments.cashAccount',
-        ])->when($statusLibre, fn ($builder) => $builder->where('lot_status_id', '!=', $statusLibre->id));
+        ])
+            ->when($statusLibre, fn ($builder) => $builder->where('lot_status_id', '!=', $statusLibre->id))
+            ->when($statusPreReserva, fn ($builder) => $builder->where('lot_status_id', '!=', $statusPreReserva->id));
 
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->integer('project_id'));

@@ -18,27 +18,35 @@ class DashboardController extends Controller
         $projects = Project::with('lots')->get();
 
         $statusLibre = LotStatus::where('code', 'LIBRE')->first();
+        $statusPreReserva = LotStatus::where('code', 'PRERESERVA')->first();
         $statusReservado = LotStatus::where('code', 'RESERVADO')->first();
         $statusTransferido = LotStatus::where('code', 'TRANSFERIDO')->first();
+        $statusCuotas = LotStatus::where('code', 'CUOTAS')->first();
 
         $stats = [
             'total' => $lots->count(),
             'libre' => $statusLibre ? $lots->where('lot_status_id', $statusLibre->id)->count() : 0,
+            'prereserva' => $statusPreReserva ? $lots->where('lot_status_id', $statusPreReserva->id)->count() : 0,
             'reservado' => $statusReservado ? $lots->where('lot_status_id', $statusReservado->id)->count() : 0,
             'transferido' => $statusTransferido ? $lots->where('lot_status_id', $statusTransferido->id)->count() : 0,
+            'cuotas' => $statusCuotas ? $lots->where('lot_status_id', $statusCuotas->id)->count() : 0,
         ];
 
         $chartData = $projects->map(fn (Project $p) => [
             'name' => $p->name,
             'Libre' => $p->lots->where('lot_status_id', $statusLibre?->id)->count(),
+            'PreReserva' => $p->lots->where('lot_status_id', $statusPreReserva?->id)->count(),
             'Reservado' => $p->lots->where('lot_status_id', $statusReservado?->id)->count(),
-            'Vendido' => $p->lots->where('lot_status_id', $statusTransferido?->id)->count(),
+            'Transferido' => $p->lots->where('lot_status_id', $statusTransferido?->id)->count(),
+            'Cuotas' => $p->lots->where('lot_status_id', $statusCuotas?->id)->count(),
         ]);
 
         $pieData = [
             ['name' => 'Libre', 'value' => $stats['libre']],
+            ['name' => 'Pre-reserva', 'value' => $stats['prereserva']],
             ['name' => 'Reservado', 'value' => $stats['reservado']],
             ['name' => 'Transferido', 'value' => $stats['transferido']],
+            ['name' => 'Cuotas', 'value' => $stats['cuotas']],
         ];
 
         $recentReservations = Lot::with(['project', 'status', 'client', 'advisor'])

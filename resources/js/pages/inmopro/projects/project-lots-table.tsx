@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Eye, Save } from 'lucide-react';
 import { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -52,6 +52,21 @@ export function ProjectLotsTable({
     buildRowPayloadForSave: (lot: Lot) => LotPayload;
     updateLot: (lot: Lot, payload: LotPayload) => void;
 }) {
+    const { auth } = usePage<{ auth: { user?: { permissions?: string[] } | null } }>().props;
+    const canConfirmTransfer = auth.user?.permissions?.includes('confirm-lot-transfer') ?? false;
+    const getCalculatedRemainingBalance = (lot: Lot): string => {
+        const priceValue = Number(getCellValue(lot, 'price'));
+        const advanceValue = Number(getCellValue(lot, 'advance'));
+
+        if (Number.isNaN(priceValue)) {
+            return '';
+        }
+
+        const remainingBalance = priceValue - (Number.isNaN(advanceValue) ? 0 : advanceValue);
+
+        return remainingBalance.toFixed(2);
+    };
+
     if (!project.lots || project.lots.length === 0) {
         return null;
     }
@@ -93,8 +108,12 @@ export function ProjectLotsTable({
                                         ? 'bg-amber-100'
                                         : statusCode === 'LIBRE'
                                           ? 'bg-emerald-50'
+                                          : statusCode === 'PRERESERVA'
+                                            ? 'bg-sky-50'
                                           : statusCode === 'RESERVADO'
                                             ? 'bg-amber-50'
+                                            : statusCode === 'CUOTAS'
+                                              ? 'bg-violet-50'
                                             : 'bg-slate-100';
 
                                 return (
@@ -108,8 +127,10 @@ export function ProjectLotsTable({
                                             <input type="number" min={0} step={0.01} value={getCellValue(lot, 'price')} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'price', e.target.value ? Number(e.target.value) : null)} className={inputClass} style={{ minWidth: '5rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
-                                            <select value={lot.status?.id ?? ''} disabled={isSaving} onChange={(e) => updateLot(lot, buildPayload(lot, { lot_status_id: Number(e.target.value) }))} className={selectClass}>
-                                                {lotStatuses.map((status) => (
+                                            <select value={lot.status?.id ?? ''} disabled={isSaving || statusCode === 'TRANSFERIDO'} onChange={(e) => updateLot(lot, buildPayload(lot, { lot_status_id: Number(e.target.value) }))} className={selectClass}>
+                                                {lotStatuses
+                                                    .filter((status) => status.code !== 'TRANSFERIDO' || status.id === lot.status?.id)
+                                                    .map((status) => (
                                                     <option key={status.id} value={status.id}>{status.name}</option>
                                                 ))}
                                             </select>
@@ -160,7 +181,7 @@ export function ProjectLotsTable({
                                             <input type="number" min={0} step={0.01} value={getCellValue(lot, 'advance')} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'advance', e.target.value ? Number(e.target.value) : null)} className={inputClass} style={{ minWidth: '5rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
-                                            <input type="number" min={0} step={0.01} value={getCellValue(lot, 'remaining_balance')} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'remaining_balance', e.target.value ? Number(e.target.value) : null)} className={inputClass} style={{ minWidth: '5rem' }} />
+                                            <input type="number" min={0} step={0.01} value={getCalculatedRemainingBalance(lot)} readOnly disabled={isSaving || !canEdit} className={inputClass} style={{ minWidth: '5rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
                                             <input type="date" value={toDateStr(lot.payment_limit_date)} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'payment_limit_date', e.target.value || null)} className={inputClass} style={{ minWidth: '7rem' }} />
@@ -185,6 +206,13 @@ export function ProjectLotsTable({
                                                 {canEdit && (
                                                     <Button variant="ghost" size="icon" className="h-6 w-6" disabled={isSaving} onClick={() => updateLot(lot, buildRowPayloadForSave(lot))} title="Guardar cambios">
                                                         <Save className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
+                                                {canConfirmTransfer && statusCode === 'RESERVADO' && (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                                                        <Link href={`/inmopro/lots/${lot.id}/transfer-confirmation`} title="Confirmar transferencia">
+                                                            T
+                                                        </Link>
                                                     </Button>
                                                 )}
                                                 <Button variant="ghost" size="icon" className="h-6 w-6" asChild>

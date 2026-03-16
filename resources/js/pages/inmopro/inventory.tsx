@@ -58,8 +58,10 @@ export default function Inventory({
     const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const freeCount = lots.filter((lot) => lot.status.code === 'LIBRE').length;
+    const preReservedCount = lots.filter((lot) => lot.status.code === 'PRERESERVA').length;
     const reservedCount = lots.filter((lot) => lot.status.code === 'RESERVADO').length;
     const transferredCount = lots.filter((lot) => lot.status.code === 'TRANSFERIDO').length;
+    const installmentsCount = lots.filter((lot) => lot.status.code === 'CUOTAS').length;
 
     const formatDate = (d: string | undefined) => (d ? new Date(d).toLocaleDateString('es') : '—');
     const formatMoney = (v: string | undefined) => (v != null && v !== '' ? Number(v).toLocaleString('es') : '—');
@@ -71,10 +73,9 @@ export default function Inventory({
 
     const getStatusColor = (statusId: number) => {
         const status = lotStatuses.find((s) => s.id === statusId);
-        if (status?.code === 'LIBRE') return 'bg-emerald-500 hover:bg-emerald-600';
-        if (status?.code === 'RESERVADO') return 'bg-amber-500 hover:bg-amber-600';
-        if (status?.code === 'TRANSFERIDO') return 'bg-slate-400 hover:bg-slate-500';
-        return 'bg-slate-200';
+        if (!status) return 'bg-slate-200';
+
+        return 'hover:brightness-95';
     };
 
     const filteredLots = lots.filter(
@@ -121,15 +122,17 @@ export default function Inventory({
                     )}
                     {project && (
                         <>
-                            <div className="mb-6 grid gap-4 md:grid-cols-4">
+                            <div className="mb-6 grid gap-4 md:grid-cols-5 xl:grid-cols-6">
                                 <InventoryMetric label="Lotes" value={String(lots.length)} />
                                 <InventoryMetric label="Libres" value={String(freeCount)} tone="emerald" />
+                                <InventoryMetric label="Pre-reserva" value={String(preReservedCount)} tone="sky" />
                                 <InventoryMetric label="Reservados" value={String(reservedCount)} tone="amber" />
                                 <InventoryMetric label="Transferidos" value={String(transferredCount)} tone="slate" />
+                                <InventoryMetric label="Cuotas" value={String(installmentsCount)} tone="violet" />
                             </div>
                             <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
                                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-tight text-slate-400">
-                                    {lotStatuses.slice(0, 3).map((s) => (
+                                    {lotStatuses.map((s) => (
                                         <div key={s.id} className="flex items-center gap-1.5">
                                             <div
                                                 className="h-3 w-3 rounded"
@@ -161,7 +164,7 @@ export default function Inventory({
                                     />
                                 </div>
                                 <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-tight text-slate-400">
-                                    {lotStatuses.slice(0, 3).map((s) => (
+                                    {lotStatuses.map((s) => (
                                         <div key={s.id} className="flex items-center gap-1.5">
                                             <div
                                                 className="h-3 w-3 rounded"
@@ -191,7 +194,8 @@ export default function Inventory({
                                                             key={lot.id}
                                                             type="button"
                                                             onClick={() => setSelectedLot(lot)}
-                                                            className={`aspect-square flex flex-col items-center justify-center rounded-md p-0.5 text-white shadow-sm transition-all hover:scale-105 active:scale-95 ${getStatusColor(lot.lot_status_id)} ${selectedLot?.id === lot.id ? 'ring-2 ring-emerald-400 ring-offset-1 z-10' : ''}`}
+                                                            className={`aspect-square flex flex-col items-center justify-center rounded-md p-0.5 text-white shadow-sm transition-all hover:scale-105 active:scale-95 ${getStatusColor(lot.lot_status_id)} ${selectedLot?.id === lot.id ? 'z-10 ring-2 ring-emerald-400 ring-offset-1' : ''}`}
+                                                            style={{ backgroundColor: lot.status.color || '#cbd5e1' }}
                                                         >
                                                             <span className="text-[10px] font-black leading-none">
                                                                 {lot.number}
@@ -487,13 +491,15 @@ function InventoryMetric({
 }: {
     label: string;
     value: string;
-    tone?: 'blue' | 'emerald' | 'amber' | 'slate';
+    tone?: 'blue' | 'emerald' | 'amber' | 'slate' | 'sky' | 'violet';
 }) {
     const tones = {
         blue: 'text-blue-600',
         emerald: 'text-emerald-600',
+        sky: 'text-sky-600',
         amber: 'text-amber-600',
         slate: 'text-slate-700',
+        violet: 'text-violet-600',
     };
 
     return (
