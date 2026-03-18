@@ -26,7 +26,6 @@ type Lot = {
     contract_date?: string;
     contract_number?: string;
     observations?: string;
-    status?: { code: string; name: string } | null;
 };
 type LotStatus = { id: number; name: string };
 type Client = { id: number; name: string };
@@ -68,16 +67,6 @@ export default function LotsEdit({ lot, lotStatuses, clients, advisors, projects
             contract_number: lot.contract_number ?? '',
             observations: lot.observations ?? '',
         });
-    const calculateRemainingBalance = (): string => {
-        const price = Number(lot.price);
-        const advance = Number(data.advance);
-
-        if (Number.isNaN(price)) {
-            return '';
-        }
-
-        return (price - (Number.isNaN(advance) ? 0 : advance)).toFixed(2);
-    };
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -109,15 +98,10 @@ export default function LotsEdit({ lot, lotStatuses, clients, advisors, projects
                 <form onSubmit={submit} className="max-w-2xl space-y-4">
                     <div>
                         <Label htmlFor="lot_status_id">Estado (Estados de lote)</Label>
-                        <select id="lot_status_id" value={data.lot_status_id} onChange={(e) => setData('lot_status_id', e.target.value)} disabled={lot.status?.code === 'TRANSFERIDO'} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 disabled:bg-slate-100">
+                        <select id="lot_status_id" value={data.lot_status_id} onChange={(e) => setData('lot_status_id', e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2">
                             {lotStatuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                         <InputError message={errors.lot_status_id} />
-                        {lot.status?.code === 'TRANSFERIDO' && (
-                            <p className="mt-1 text-xs text-slate-500">
-                                Los lotes transferidos no pueden volver a cambiar de estado manualmente.
-                            </p>
-                        )}
                     </div>
                     <div className="border-t border-slate-200 pt-4">
                         <h3 className="mb-3 text-sm font-bold uppercase text-slate-500">Solo si se reserva</h3>
@@ -158,7 +142,7 @@ export default function LotsEdit({ lot, lotStatuses, clients, advisors, projects
                                 </div>
                                 <div>
                                     <Label htmlFor="remaining_balance">Monto restante</Label>
-                                    <Input id="remaining_balance" type="number" min={0} value={calculateRemainingBalance()} readOnly className="mt-1 bg-slate-50" />
+                                    <Input id="remaining_balance" type="number" min={0} value={data.remaining_balance} onChange={(e) => setData('remaining_balance', e.target.value)} className="mt-1" />
                                     <InputError message={errors.remaining_balance} />
                                 </div>
                             </div>

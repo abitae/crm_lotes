@@ -7,19 +7,16 @@ use App\Http\Requests\Inmopro\ApproveLotPreReservationRequest;
 use App\Http\Requests\Inmopro\RejectLotPreReservationRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\LotPreReservation;
+use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
-use App\Services\Inmopro\LotStateTransitionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class LotPreReservationController extends Controller
 {
-    public function __construct(
-        private LotStateTransitionService $lotStateTransitionService
-    ) {}
-
     public function index(Request $request): Response
     {
         $preReservations = LotPreReservation::query()
@@ -43,26 +40,48 @@ class LotPreReservationController extends Controller
 
     public function approve(ApproveLotPreReservationRequest $request, LotPreReservation $lot_pre_reservation): RedirectResponse
     {
-        try {
-            $this->lotStateTransitionService->approvePreReservation($lot_pre_reservation, $request->user());
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        $reservedStatusId = LotStatus::query()->where('code', 'RESERVADO')->value('id');
+
+        DB::transaction(function () use ($lot_pre_reservation, $request, $reservedStatusId) {
+            $lot_pre_reservation->update([
+                'status' => 'APROBADA',
+                'reviewed_by' => $request->user()?->id,
+                'reviewed_at' => now(),
+                'rejection_reason' => null,
+            ]);
+
+            $lot_pre_reservation->lot()->update([
+                'lot_status_id' => $reservedStatusId,
+                'client_id' => $lot_pre_reservation->client_id,
+                'advisor_id' => $lot_pre_reservation->advisor_id,
+                'client_name' => $lot_pre_reservation->client?->name,
+                'client_dni' => $lot_pre_reservation->client?->dni,
+            ]);
+        });
 
         return redirect()->route('inmopro.lot-pre-reservations.index');
     }
 
     public function reject(RejectLotPreReservationRequest $request, LotPreReservation $lot_pre_reservation): RedirectResponse
     {
-        try {
-            $this->lotStateTransitionService->rejectPreReservation(
-                $lot_pre_reservation,
-                $request->user(),
-                (string) $request->input('rejection_reason')
-            );
-        } catch (\RuntimeException $exception) {
-            return back()->with('error', $exception->getMessage());
-        }
+        $freeStatusId = LotStatus::query()->where('code', 'LIBRE')->value('id');
+
+        DB::transaction(function () use ($lot_pre_reservation, $request, $freeStatusId) {
+            $lot_pre_reservation->update([
+                'status' => 'RECHAZADA',
+                'reviewed_by' => $request->user()?->id,
+                'reviewed_at' => now(),
+                'rejection_reason' => $request->input('rejection_reason'),
+            ]);
+
+            $lot_pre_reservation->lot()->update([
+                'lot_status_id' => $freeStatusId,
+                'client_id' => null,
+                'client_name' => null,
+                'client_dni' => null,
+                'advisor_id' => null,
+            ]);
+        });
 
         return redirect()->route('inmopro.lot-pre-reservations.index');
     }

@@ -52,10 +52,6 @@ class LotStatusController extends Controller
 
     public function update(UpdateLotStatusRequest $request, LotStatus $lot_status): RedirectResponse
     {
-        if ($lot_status->isSystemStatus()) {
-            return back()->with('error', 'Los estados de sistema no pueden editarse manualmente.');
-        }
-
         $lot_status->update($request->validated());
 
         return redirect()->route('inmopro.lot-statuses.index');
@@ -63,10 +59,6 @@ class LotStatusController extends Controller
 
     public function destroy(LotStatus $lot_status): RedirectResponse
     {
-        if ($lot_status->isSystemStatus()) {
-            return back()->with('error', 'Los estados de sistema no pueden eliminarse.');
-        }
-
         $lot_status->delete();
 
         return redirect()->route('inmopro.lot-statuses.index');

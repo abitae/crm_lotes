@@ -119,12 +119,4 @@ class Lot extends Model
     {
         return $this->hasMany(LotPreReservation::class, 'lot_id')->latest();
     }
-
-    /**
-     * @return HasMany<LotTransferConfirmation, $this>
-     */
-    public function transferConfirmations(): HasMany
-    {
-        return $this->hasMany(LotTransferConfirmation::class, 'lot_id')->latest('confirmed_at');
-    }
 }
