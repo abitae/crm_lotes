@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Search, UserPlus, Eye, Mail, Phone, Users } from 'lucide-react';
+import { Download, Eye, FileSpreadsheet, Mail, Phone, Search, UserPlus, Users } from 'lucide-react';
+import { useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,17 +19,29 @@ type Client = {
     city?: { name: string; department?: string | null };
     advisor?: { name: string; team?: { name: string } | null };
 };
+type Option = {
+    id: number;
+    name: string;
+};
 
 export default function ClientsIndex({
     clients,
     filters,
+    clientTypes,
+    cities,
+    advisors,
 }: {
     clients: { data: Client[]; links: PaginationLink[]; total?: number };
-    filters: { search?: string };
+    filters: { search?: string; client_type_id?: string | number; city_id?: string | number; advisor_id?: string | number };
+    clientTypes: Option[];
+    cities: Option[];
+    advisors: Option[];
 }) {
     const totalClients = clients.total ?? clients.data.length;
     const clientsWithLots = clients.data.filter((client) => (client.lots_count ?? 0) > 0).length;
     const clientsWithEmail = clients.data.filter((client) => Boolean(client.email)).length;
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [importing, setImporting] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -37,10 +50,55 @@ export default function ClientsIndex({
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        const form = e.target as HTMLFormElement;
+        const form = e.currentTarget as HTMLFormElement;
         const q = new FormData(form).get('search') as string;
-        router.get('/inmopro/clients', { search: q || undefined }, { preserveState: true });
+        const formData = new FormData(form);
+
+        router.get('/inmopro/clients', {
+            search: q || undefined,
+            client_type_id: (formData.get('client_type_id') as string) || undefined,
+            city_id: (formData.get('city_id') as string) || undefined,
+            advisor_id: (formData.get('advisor_id') as string) || undefined,
+        }, { preserveState: true });
     };
+
+    const handleImportSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const input = fileInputRef.current;
+
+        if (!input?.files?.length) {
+            return;
+        }
+
+        setImporting(true);
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        router.post('/inmopro/clients/import-from-excel', formData, {
+            forceFormData: true,
+            onFinish: () => {
+                setImporting(false);
+                input.value = '';
+            },
+        });
+    };
+
+    const exportQuery = new URLSearchParams();
+
+    if (filters.search) {
+        exportQuery.set('search', String(filters.search));
+    }
+    if (filters.client_type_id) {
+        exportQuery.set('client_type_id', String(filters.client_type_id));
+    }
+    if (filters.city_id) {
+        exportQuery.set('city_id', String(filters.city_id));
+    }
+    if (filters.advisor_id) {
+        exportQuery.set('advisor_id', String(filters.advisor_id));
+    }
+
+    const exportHref = `/inmopro/clients/export-excel${exportQuery.toString() ? `?${exportQuery.toString()}` : ''}`;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -51,12 +109,44 @@ export default function ClientsIndex({
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Clientes</h1>
                         <p className="mt-1 text-sm text-slate-500">Base de datos de compradores e interesados.</p>
                     </div>
-                    <Button size="sm" asChild>
-                        <Link href="/inmopro/clients/create">
-                            <UserPlus className="h-4 w-4" />
-                            Nuevo cliente
-                        </Link>
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <a href={exportHref}>
+                                <Download className="h-4 w-4" />
+                                Exportar Excel
+                            </a>
+                        </Button>
+                        <form onSubmit={handleImportSubmit}>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".xlsx,.xls"
+                                className="hidden"
+                                onChange={(e) => {
+                                    if (e.target.files?.length) {
+                                        (e.target.form as HTMLFormElement).requestSubmit();
+                                    }
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={importing}
+                            >
+                                <FileSpreadsheet className="h-4 w-4" />
+                                {importing ? 'Importando...' : 'Importar Excel'}
+                            </Button>
+                        </form>
+                        <Button size="sm" asChild>
+                            <Link href="/inmopro/clients/create">
+                                <UserPlus className="h-4 w-4" />
+                                Nuevo cliente
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
@@ -67,16 +157,48 @@ export default function ClientsIndex({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Buscar</CardTitle>
-                        <CardDescription>Por nombre, DNI o telefono.</CardDescription>
+                        <CardTitle>Filtros</CardTitle>
+                        <CardDescription>Busque por nombre, DNI o telefono y filtre por tipo, ciudad o asesor.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={handleSearch} className="flex gap-2">
-                            <div className="relative flex-1">
+                        <form onSubmit={handleSearch} className="grid gap-3 lg:grid-cols-5">
+                            <div className="relative lg:col-span-2">
                                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 <Input name="search" type="text" placeholder="Nombre, DNI o celular..." className="pl-9" defaultValue={filters.search} />
                             </div>
-                            <Button type="submit" variant="secondary">Buscar</Button>
+                            <select
+                                name="client_type_id"
+                                defaultValue={filters.client_type_id ? String(filters.client_type_id) : ''}
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                            >
+                                <option value="">Todos los tipos</option>
+                                {clientTypes.map((clientType) => (
+                                    <option key={clientType.id} value={clientType.id}>{clientType.name}</option>
+                                ))}
+                            </select>
+                            <select
+                                name="city_id"
+                                defaultValue={filters.city_id ? String(filters.city_id) : ''}
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                            >
+                                <option value="">Todas las ciudades</option>
+                                {cities.map((city) => (
+                                    <option key={city.id} value={city.id}>{city.name}</option>
+                                ))}
+                            </select>
+                            <div className="flex gap-2">
+                                <select
+                                    name="advisor_id"
+                                    defaultValue={filters.advisor_id ? String(filters.advisor_id) : ''}
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                                >
+                                    <option value="">Todos los asesores</option>
+                                    {advisors.map((advisor) => (
+                                        <option key={advisor.id} value={advisor.id}>{advisor.name}</option>
+                                    ))}
+                                </select>
+                                <Button type="submit" variant="secondary">Buscar</Button>
+                            </div>
                         </form>
                     </CardContent>
                 </Card>

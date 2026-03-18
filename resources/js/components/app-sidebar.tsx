@@ -86,6 +86,7 @@ const managementSections: NavSection[] = [
         items: [
             { title: 'Tickets de atención', href: '/inmopro/attention-tickets', icon: FileCheck },
             { title: 'Pre-reservas', href: '/inmopro/lot-pre-reservations', icon: FileCheck },
+            { title: 'Transferencias', href: '/inmopro/lot-transfer-confirmations', icon: FileCheck },
             { title: 'Caja y bancos', href: '/inmopro/cash-accounts', icon: Landmark },
             { title: 'Estados de lote', href: '/inmopro/lot-statuses', icon: Tag },
             { title: 'Estados de comisión', href: '/inmopro/commission-statuses', icon: Receipt },

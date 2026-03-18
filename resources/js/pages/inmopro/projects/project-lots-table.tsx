@@ -87,6 +87,7 @@ export function ProjectLotsTable({
                             {project.lots.map((lot) => {
                                 const isSaving = savingLotId === lot.id;
                                 const statusCode = lot.status?.code ?? 'LIBRE';
+                                const availableStatuses = lotStatuses.filter((status) => status.code !== 'TRANSFERIDO' || status.id === lot.status?.id);
                                 const canEdit = statusCode === 'RESERVADO' || statusCode === 'TRANSFERIDO';
                                 const rowBg =
                                     isSaving
@@ -109,7 +110,7 @@ export function ProjectLotsTable({
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
                                             <select value={lot.status?.id ?? ''} disabled={isSaving} onChange={(e) => updateLot(lot, buildPayload(lot, { lot_status_id: Number(e.target.value) }))} className={selectClass}>
-                                                {lotStatuses.map((status) => (
+                                                {availableStatuses.map((status) => (
                                                     <option key={status.id} value={status.id}>{status.name}</option>
                                                 ))}
                                             </select>
@@ -160,22 +161,22 @@ export function ProjectLotsTable({
                                             <input type="number" min={0} step={0.01} value={getCellValue(lot, 'advance')} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'advance', e.target.value ? Number(e.target.value) : null)} className={inputClass} style={{ minWidth: '5rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
-                                            <input type="number" min={0} step={0.01} value={getCellValue(lot, 'remaining_balance')} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'remaining_balance', e.target.value ? Number(e.target.value) : null)} className={inputClass} style={{ minWidth: '5rem' }} />
+                                            <input type="number" min={0} step={0.01} value={getCellValue(lot, 'remaining_balance')} disabled className={inputClass} style={{ minWidth: '5rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
-                                            <input type="date" value={toDateStr(lot.payment_limit_date)} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'payment_limit_date', e.target.value || null)} className={inputClass} style={{ minWidth: '7rem' }} />
+                                            <input type="date" value={getCellValue(lot, 'payment_limit_date') ? toDateStr(getCellValue(lot, 'payment_limit_date')) : ''} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'payment_limit_date', e.target.value || null)} className={inputClass} style={{ minWidth: '7rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
                                             <input type="text" value={getCellValue(lot, 'operation_number')} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'operation_number', e.target.value)} className={inputClass} style={{ minWidth: '5rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
-                                            <input type="date" value={toDateStr(lot.contract_date)} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'contract_date', e.target.value || null)} className={inputClass} style={{ minWidth: '7rem' }} />
+                                            <input type="date" value={getCellValue(lot, 'contract_date') ? toDateStr(getCellValue(lot, 'contract_date')) : ''} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'contract_date', e.target.value || null)} className={inputClass} style={{ minWidth: '7rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
                                             <input type="text" value={getCellValue(lot, 'contract_number')} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'contract_number', e.target.value)} className={inputClass} style={{ minWidth: '6rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
-                                            <input type="date" value={toDateStr(lot.notarial_transfer_date)} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'notarial_transfer_date', e.target.value || null)} className={inputClass} style={{ minWidth: '7rem' }} />
+                                            <input type="date" value={getCellValue(lot, 'notarial_transfer_date') ? toDateStr(getCellValue(lot, 'notarial_transfer_date')) : ''} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'notarial_transfer_date', e.target.value || null)} className={inputClass} style={{ minWidth: '7rem' }} />
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 align-middle">
                                             <input type="text" value={getCellValue(lot, 'observations')} disabled={isSaving || !canEdit} onChange={(e) => setCellEdit(lot, 'observations', e.target.value)} className={inputClass} style={{ minWidth: '8rem' }} title={lot.observations ?? ''} />

@@ -5,6 +5,7 @@ namespace App\Models\Inmopro;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Lot extends Model
 {
@@ -118,5 +119,21 @@ class Lot extends Model
     public function preReservations(): HasMany
     {
         return $this->hasMany(LotPreReservation::class, 'lot_id')->latest();
+    }
+
+    /**
+     * @return HasMany<LotTransferConfirmation, $this>
+     */
+    public function transferConfirmations(): HasMany
+    {
+        return $this->hasMany(LotTransferConfirmation::class, 'lot_id')->latest();
+    }
+
+    /**
+     * @return HasOne<LotTransferConfirmation, $this>
+     */
+    public function latestTransferConfirmation(): HasOne
+    {
+        return $this->hasOne(LotTransferConfirmation::class, 'lot_id')->latestOfMany();
     }
 }

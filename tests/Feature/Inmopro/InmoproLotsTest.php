@@ -60,7 +60,7 @@ class InmoproLotsTest extends TestCase
         $this->assertSame((int) $statusReservado->id, (int) $lot->lot_status_id);
     }
 
-    public function test_updating_lot_to_transferred_creates_commissions(): void
+    public function test_updating_lot_to_transferred_is_blocked_outside_transfer_flow(): void
     {
         $user = User::factory()->create();
         $lot = Lot::whereNotNull('advisor_id')->where('lot_status_id', '!=', LotStatus::where('code', 'TRANSFERIDO')->first()?->id)->first();
@@ -75,9 +75,11 @@ class InmoproLotsTest extends TestCase
             'advisor_id' => $lot->advisor_id,
         ]);
 
-        $response->assertRedirect();
+        $response->assertSessionHasErrors('lot_status_id');
+        $lot->refresh();
         $countAfter = Commission::where('lot_id', $lot->id)->count();
-        $this->assertGreaterThan($countBefore, $countAfter, 'Commissions should be created when lot is marked as transferred');
+        $this->assertNotSame((int) $transferidoId, (int) $lot->lot_status_id);
+        $this->assertSame($countBefore, $countAfter, 'No deben crearse comisiones fuera del flujo de transferencia.');
     }
 
     public function test_updating_lot_with_new_client_name_only_creates_client(): void
@@ -103,5 +105,33 @@ class InmoproLotsTest extends TestCase
         $this->assertNull($newClient->phone);
         $lot->refresh();
         $this->assertSame($newClient->id, $lot->client_id);
+    }
+
+    public function test_updating_lot_recalculates_remaining_balance_and_normalizes_dates(): void
+    {
+        $user = User::factory()->create();
+        $lot = Lot::firstOrFail();
+        $statusReservado = LotStatus::where('code', 'RESERVADO')->firstOrFail();
+        $this->actingAs($user);
+
+        $response = $this->patch(route('inmopro.lots.update', $lot), [
+            'lot_status_id' => $statusReservado->id,
+            'client_id' => $lot->client_id,
+            'advisor_id' => $lot->advisor_id,
+            'price' => 10000,
+            'advance' => 2500,
+            'remaining_balance' => 999999,
+            'payment_limit_date' => '2026-03-21T14:30:00-05:00',
+            'contract_date' => '2026-03-22T09:15:00-05:00',
+            'notarial_transfer_date' => '2026-03-23T18:45:00-05:00',
+        ]);
+
+        $response->assertRedirect();
+        $lot->refresh();
+
+        $this->assertSame('7500.00', (string) $lot->remaining_balance);
+        $this->assertSame('2026-03-21', $lot->payment_limit_date?->toDateString());
+        $this->assertSame('2026-03-22', $lot->contract_date?->toDateString());
+        $this->assertSame('2026-03-23', $lot->notarial_transfer_date?->toDateString());
     }
 }

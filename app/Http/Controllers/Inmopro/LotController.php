@@ -11,7 +11,7 @@ use App\Models\Inmopro\ClientType;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
-use App\Services\Inmopro\CommissionService;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -22,10 +22,6 @@ use Mpdf\Mpdf;
 
 class LotController extends Controller
 {
-    public function __construct(
-        private CommissionService $commissionService
-    ) {}
-
     public function index(Request $request): Response
     {
         $projectId = $request->query('project_id');
@@ -65,10 +61,8 @@ class LotController extends Controller
 
     public function update(UpdateLotRequest $request, Lot $lot): RedirectResponse
     {
-        $transferidoCode = LotStatus::where('code', 'TRANSFERIDO')->first()?->id;
-        $previousStatusId = $lot->lot_status_id;
-
-        $validated = $request->validated();
+        $validated = $this->normalizeLotFields($request->validated());
+        $this->guardManualTransferStatusChange($validated, $lot);
         $clientName = isset($validated['client_name']) ? trim((string) $validated['client_name']) : null;
         $clientDni = isset($validated['client_dni']) ? trim((string) $validated['client_dni']) : null;
         $clientPhone = isset($validated['client_phone']) ? trim((string) $validated['client_phone']) : null;
@@ -117,10 +111,6 @@ class LotController extends Controller
         $lot->fill($validated);
         $lot->save();
 
-        if ($transferidoCode && (int) $request->input('lot_status_id') === (int) $transferidoCode && (int) $previousStatusId !== (int) $transferidoCode) {
-            $this->commissionService->createCommissionsForTransferredLot($lot->fresh());
-        }
-
         return back();
     }
 
@@ -144,7 +134,9 @@ class LotController extends Controller
 
     public function store(StoreLotRequest $request): RedirectResponse
     {
-        $lot = Lot::create($request->validated());
+        $validated = $this->normalizeLotFields($request->validated());
+        $this->guardManualTransferStatusChange($validated);
+        $lot = Lot::create($validated);
 
         return redirect()->route('inmopro.lots.index', ['project_id' => $lot->project_id]);
     }
@@ -191,10 +183,19 @@ class LotController extends Controller
 
     public function show(Lot $lot): Response
     {
-        $lot->load(['project', 'status', 'client', 'advisor', 'commissions']);
+        $lot->load([
+            'project',
+            'status',
+            'client',
+            'advisor',
+            'commissions',
+            'latestTransferConfirmation.requester',
+            'latestTransferConfirmation.reviewer',
+        ]);
 
         return Inertia::render('inmopro/lots/show', [
             'lot' => $lot,
+            'canConfirmTransfer' => request()->user()?->can('confirm-lot-transfer') ?? false,
         ]);
     }
 
@@ -221,5 +222,89 @@ class LotController extends Controller
         $lot->delete();
 
         return redirect()->route('inmopro.lots.index', ['project_id' => $projectId]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function normalizeLotFields(array $validated): array
+    {
+        $validated = $this->normalizeLotDateFields($validated);
+
+        $price = array_key_exists('price', $validated) && $validated['price'] !== null
+            ? (float) $validated['price']
+            : null;
+        $advance = array_key_exists('advance', $validated) && $validated['advance'] !== null
+            ? (float) $validated['advance']
+            : null;
+
+        if ($price === null) {
+            $validated['remaining_balance'] = null;
+
+            return $validated;
+        }
+
+        $remainingBalance = round($price - ($advance ?? 0), 2);
+
+        if ($remainingBalance < 0) {
+            throw new HttpResponseException(
+                back()->withErrors(['advance' => 'El adelanto no puede ser mayor al precio del lote.'])
+            );
+        }
+
+        $validated['remaining_balance'] = $remainingBalance;
+
+        return $validated;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function normalizeLotDateFields(array $validated): array
+    {
+        foreach (['payment_limit_date', 'contract_date', 'notarial_transfer_date'] as $field) {
+            if (! array_key_exists($field, $validated) || empty($validated[$field])) {
+                $validated[$field] = null;
+
+                continue;
+            }
+
+            $validated[$field] = \Carbon\Carbon::parse((string) $validated[$field])->toDateString();
+        }
+
+        return $validated;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function guardManualTransferStatusChange(array $validated, ?Lot $lot = null): void
+    {
+        if (! array_key_exists('lot_status_id', $validated)) {
+            return;
+        }
+
+        $transferredStatusId = LotStatus::query()->where('code', LotStatus::CODE_TRANSFERIDO)->value('id');
+
+        if (! $transferredStatusId) {
+            return;
+        }
+
+        $requestedStatusId = (int) $validated['lot_status_id'];
+
+        if ($lot === null && $requestedStatusId === (int) $transferredStatusId) {
+            throw new HttpResponseException(
+                back()->withErrors(['lot_status_id' => 'Use la confirmacion de transferencia para registrar lotes transferidos.'])
+            );
+        }
+
+        if ($lot !== null && $requestedStatusId !== (int) $lot->lot_status_id
+            && ($requestedStatusId === (int) $transferredStatusId || (int) $lot->lot_status_id === (int) $transferredStatusId)) {
+            throw new HttpResponseException(
+                back()->withErrors(['lot_status_id' => 'El estado TRANSFERIDO solo puede cambiarse desde el flujo de confirmacion de transferencia.'])
+            );
+        }
     }
 }

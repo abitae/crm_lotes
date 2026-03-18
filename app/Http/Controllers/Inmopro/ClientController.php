@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Inmopro;
 
+use App\Exports\Inmopro\ClientsExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Inmopro\ImportClientsFromExcelRequest;
 use App\Http\Requests\Inmopro\StoreClientRequest;
 use App\Http\Requests\Inmopro\UpdateClientRequest;
+use App\Imports\Inmopro\ClientsImport;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
@@ -14,6 +17,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ClientController extends Controller
 {
@@ -42,21 +47,61 @@ class ClientController extends Controller
     {
         $query = Client::query()->with(['type', 'city', 'advisor.team'])->withCount('lots');
 
-        if ($request->filled('search')) {
-            $term = $request->input('search');
-            $query->where(function ($q) use ($term) {
-                $q->where('name', 'like', "%{$term}%")
-                    ->orWhere('dni', 'like', "%{$term}%")
-                    ->orWhere('phone', 'like', "%{$term}%");
-            });
-        }
+        $query
+            ->when($request->filled('search'), function ($builder) use ($request) {
+                $term = (string) $request->input('search');
+
+                $builder->where(function ($query) use ($term) {
+                    $query->where('name', 'like', "%{$term}%")
+                        ->orWhere('dni', 'like', "%{$term}%")
+                        ->orWhere('phone', 'like', "%{$term}%");
+                });
+            })
+            ->when($request->filled('client_type_id'), fn ($builder) => $builder->where('client_type_id', $request->integer('client_type_id')))
+            ->when($request->filled('city_id'), fn ($builder) => $builder->where('city_id', $request->integer('city_id')))
+            ->when($request->filled('advisor_id'), fn ($builder) => $builder->where('advisor_id', $request->integer('advisor_id')));
 
         $clients = $query->orderBy('name')->paginate(15)->withQueryString();
 
         return Inertia::render('inmopro/clients/index', [
             'clients' => $clients,
-            'filters' => $request->only('search'),
+            'filters' => $request->only('search', 'client_type_id', 'city_id', 'advisor_id'),
+            'clientTypes' => ClientType::query()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'cities' => City::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'advisors' => Advisor::query()->orderBy('name')->get(['id', 'name']),
         ]);
+    }
+
+    public function exportExcel(Request $request): BinaryFileResponse
+    {
+        $clients = Client::query()
+            ->with(['type', 'city', 'advisor'])
+            ->when($request->filled('search'), function ($builder) use ($request) {
+                $term = (string) $request->input('search');
+
+                $builder->where(function ($query) use ($term) {
+                    $query->where('name', 'like', "%{$term}%")
+                        ->orWhere('dni', 'like', "%{$term}%")
+                        ->orWhere('phone', 'like', "%{$term}%");
+                });
+            })
+            ->when($request->filled('client_type_id'), fn ($builder) => $builder->where('client_type_id', $request->integer('client_type_id')))
+            ->when($request->filled('city_id'), fn ($builder) => $builder->where('city_id', $request->integer('city_id')))
+            ->when($request->filled('advisor_id'), fn ($builder) => $builder->where('advisor_id', $request->integer('advisor_id')))
+            ->orderBy('name')
+            ->get();
+
+        return Excel::download(
+            new ClientsExport($clients),
+            'clientes.xlsx'
+        );
+    }
+
+    public function importFromExcel(ImportClientsFromExcelRequest $request): RedirectResponse
+    {
+        Excel::import(new ClientsImport, $request->file('file'));
+
+        return redirect()->route('inmopro.clients.index');
     }
 
     public function create(): Response

@@ -1,6 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
-import { MapPin, Pencil, User, UserCheck } from 'lucide-react';
+import { CheckCircle2, Image, MapPin, Pencil } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
+import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/date';
 import type { BreadcrumbItem } from '@/types';
 
 type Lot = {
@@ -23,9 +25,19 @@ type Lot = {
     status?: { id: number; name: string; code: string; color?: string };
     client?: { id: number; name: string } | null;
     advisor?: { id: number; name: string } | null;
+    latest_transfer_confirmation?: {
+        id: number;
+        status: string;
+        evidence_path: string;
+        created_at: string;
+        reviewed_at?: string | null;
+        rejection_reason?: string | null;
+        requester?: { name: string } | null;
+        reviewer?: { name: string } | null;
+    } | null;
 };
 
-export default function LotsShow({ lot }: { lot: Lot }) {
+export default function LotsShow({ lot, canConfirmTransfer }: { lot: Lot; canConfirmTransfer: boolean }) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Inventario', href: '/inmopro/lots' },
@@ -51,13 +63,23 @@ export default function LotsShow({ lot }: { lot: Lot }) {
                             </p>
                         )}
                     </div>
-                    <Link
-                        href={`/inmopro/lots/${lot.id}/edit`}
-                        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-bold text-white shadow-lg shadow-emerald-100 transition-all hover:bg-emerald-700"
-                    >
-                        <Pencil className="h-4 w-4" />
-                        Editar
-                    </Link>
+                    <div className="flex flex-wrap gap-2">
+                        {canConfirmTransfer && lot.status?.code === 'RESERVADO' ? (
+                            <Button asChild>
+                                <Link href={`/inmopro/lots/${lot.id}/transfer-confirmation`}>
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Confirmar transferencia
+                                </Link>
+                            </Button>
+                        ) : null}
+                        <Link
+                            href={`/inmopro/lots/${lot.id}/edit`}
+                            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-bold text-white shadow-lg shadow-emerald-100 transition-all hover:bg-emerald-700"
+                        >
+                            <Pencil className="h-4 w-4" />
+                            Editar
+                        </Link>
+                    </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -157,6 +179,48 @@ export default function LotsShow({ lot }: { lot: Lot }) {
                             <p className="text-slate-600 whitespace-pre-wrap">{lot.observations}</p>
                         </div>
                     )}
+                    {lot.latest_transfer_confirmation ? (
+                        <div className="mt-6 border-t border-slate-200 pt-6">
+                            <h3 className="mb-3 font-bold text-slate-700">Revision de transferencia</h3>
+                            <dl className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <dt className="text-sm text-slate-500">Estado de revision</dt>
+                                    <dd className="font-medium">{lot.latest_transfer_confirmation.status}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-500">Registrada</dt>
+                                    <dd className="font-medium">{formatDateTime(lot.latest_transfer_confirmation.created_at)}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-500">Solicitada por</dt>
+                                    <dd className="font-medium">{lot.latest_transfer_confirmation.requester?.name ?? '—'}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-500">Revisada por</dt>
+                                    <dd className="font-medium">{lot.latest_transfer_confirmation.reviewer?.name ?? '—'}</dd>
+                                </div>
+                            </dl>
+                            {lot.latest_transfer_confirmation.reviewed_at ? (
+                                <p className="mt-3 text-sm text-slate-500">
+                                    Revisada: {formatDateTime(lot.latest_transfer_confirmation.reviewed_at)}
+                                </p>
+                            ) : null}
+                            {lot.latest_transfer_confirmation.rejection_reason ? (
+                                <p className="mt-2 text-sm text-red-600">{lot.latest_transfer_confirmation.rejection_reason}</p>
+                            ) : null}
+                            <div className="mt-4">
+                                <a
+                                    href={`/storage/${lot.latest_transfer_confirmation.evidence_path}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:underline"
+                                >
+                                    <Image className="h-4 w-4" />
+                                    Ver evidencia
+                                </a>
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </div>
         </AppLayout>

@@ -27,7 +27,7 @@ type Lot = {
     contract_number?: string;
     observations?: string;
 };
-type LotStatus = { id: number; name: string };
+type LotStatus = { id: number; name: string; code: string };
 type Client = { id: number; name: string };
 type Advisor = { id: number; name: string };
 type Project = { id: number; name: string };
@@ -53,6 +53,7 @@ export default function LotsEdit({ lot, lotStatuses, clients, advisors, projects
     advisors: Advisor[];
     projects: Project[];
 }) {
+    const availableLotStatuses = lotStatuses.filter((status) => status.code !== 'TRANSFERIDO' || status.id === lot.lot_status_id);
     const { data, setData, put, processing, errors, transform } = useForm<LotEditForm>({
             lot_status_id: lot.lot_status_id,
             client_id: lot.client_id ?? ('' as number | ''),
@@ -99,7 +100,7 @@ export default function LotsEdit({ lot, lotStatuses, clients, advisors, projects
                     <div>
                         <Label htmlFor="lot_status_id">Estado (Estados de lote)</Label>
                         <select id="lot_status_id" value={data.lot_status_id} onChange={(e) => setData('lot_status_id', e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2">
-                            {lotStatuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {availableLotStatuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                         <InputError message={errors.lot_status_id} />
                     </div>

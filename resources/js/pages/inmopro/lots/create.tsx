@@ -39,8 +39,9 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
     clients: Client[];
     advisors: Advisor[];
 }) {
+    const availableLotStatuses = lotStatuses.filter((status) => status.code !== 'TRANSFERIDO');
     const defaultProject = project?.id ?? projects[0]?.id ?? '';
-    const defaultStatus = lotStatuses.find((s) => s.code === 'LIBRE')?.id ?? lotStatuses[0]?.id ?? '';
+    const defaultStatus = availableLotStatuses.find((s) => s.code === 'LIBRE')?.id ?? availableLotStatuses[0]?.id ?? '';
     const { data, setData, post, processing, errors, transform } = useForm<LotCreateForm>({
             project_id: defaultProject,
             block: '',
@@ -105,7 +106,7 @@ export default function LotsCreate({ projects, project, lotStatuses, clients, ad
                         <div>
                             <Label htmlFor="lot_status_id">Estado (Estados de lote)</Label>
                             <select id="lot_status_id" value={data.lot_status_id} onChange={(e) => setData('lot_status_id', e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                {lotStatuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {availableLotStatuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>
                             <InputError message={errors.lot_status_id} />
                         </div>

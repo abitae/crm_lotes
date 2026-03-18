@@ -16,6 +16,7 @@ use App\Http\Controllers\Inmopro\FinancialController;
 use App\Http\Controllers\Inmopro\LotController;
 use App\Http\Controllers\Inmopro\LotPreReservationController;
 use App\Http\Controllers\Inmopro\LotStatusController;
+use App\Http\Controllers\Inmopro\LotTransferConfirmationController;
 use App\Http\Controllers\Inmopro\ProcessDiagramsController;
 use App\Http\Controllers\Inmopro\ProjectController;
 use App\Http\Controllers\Inmopro\ReportController;
@@ -30,6 +31,8 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::get('lots/export-pdf', [LotController::class, 'exportPdf'])->name('lots.export-pdf');
     Route::resource('lots', LotController::class);
     Route::get('clients/search', [ClientController::class, 'search'])->name('clients.search');
+    Route::get('clients/export-excel', [ClientController::class, 'exportExcel'])->name('clients.export-excel');
+    Route::post('clients/import-from-excel', [ClientController::class, 'importFromExcel'])->name('clients.import-from-excel');
     Route::resource('clients', ClientController::class);
     Route::resource('client-types', ClientTypeController::class)->parameters(['client-types' => 'client_type']);
     Route::resource('cities', CityController::class);
@@ -59,5 +62,10 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::get('lot-pre-reservations', [LotPreReservationController::class, 'index'])->name('lot-pre-reservations.index');
     Route::post('lot-pre-reservations/{lot_pre_reservation}/approve', [LotPreReservationController::class, 'approve'])->name('lot-pre-reservations.approve');
     Route::post('lot-pre-reservations/{lot_pre_reservation}/reject', [LotPreReservationController::class, 'reject'])->name('lot-pre-reservations.reject');
+    Route::get('lot-transfer-confirmations', [LotTransferConfirmationController::class, 'index'])->name('lot-transfer-confirmations.index');
+    Route::get('lots/{lot}/transfer-confirmation', [LotTransferConfirmationController::class, 'create'])->name('lots.transfer-confirmation');
+    Route::post('lots/{lot}/transfer-confirmation', [LotTransferConfirmationController::class, 'store'])->name('lots.transfer-confirmation.store');
+    Route::post('lot-transfer-confirmations/{lot_transfer_confirmation}/approve', [LotTransferConfirmationController::class, 'approve'])->name('lot-transfer-confirmations.approve');
+    Route::post('lot-transfer-confirmations/{lot_transfer_confirmation}/reject', [LotTransferConfirmationController::class, 'reject'])->name('lot-transfer-confirmations.reject');
     Route::get('process-diagrams', ProcessDiagramsController::class)->name('process-diagrams.index');
 });

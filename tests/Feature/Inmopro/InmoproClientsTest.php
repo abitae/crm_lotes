@@ -8,6 +8,9 @@ use App\Models\Inmopro\Client;
 use App\Models\Inmopro\ClientType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 class InmoproClientsTest extends TestCase
@@ -111,5 +114,93 @@ class InmoproClientsTest extends TestCase
         $response2 = $this->getJson(route('inmopro.clients.search', ['q' => '2222']));
         $response2->assertOk();
         $response2->assertJsonFragment(['dni' => '22222222']);
+    }
+
+    public function test_clients_index_filters_by_advisor(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::query()->firstOrFail();
+        $otherAdvisor = Advisor::query()->whereKeyNot($advisor->id)->firstOrFail();
+        $this->actingAs($user);
+
+        $response = $this->get(route('inmopro.clients.index', ['advisor_id' => $advisor->id]));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('inmopro/clients/index')
+            ->where('filters.advisor_id', (string) $advisor->id)
+            ->has('clients.data')
+        );
+
+        $clientAdvisorIds = collect($response->viewData('page')['props']['clients']['data'])
+            ->pluck('advisor.id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->assertNotContains($otherAdvisor->id, $clientAdvisorIds);
+    }
+
+    public function test_authenticated_users_can_export_clients_excel(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $response = $this->get(route('inmopro.clients.export-excel'));
+
+        $response->assertOk();
+        $response->assertDownload('clientes.xlsx');
+    }
+
+    public function test_authenticated_users_can_import_clients_from_excel(): void
+    {
+        $user = User::factory()->create();
+        $type = ClientType::query()->firstOrFail();
+        $advisor = Advisor::query()->firstOrFail();
+        $city = City::query()->firstOrFail();
+        $this->actingAs($user);
+
+        $file = $this->makeClientsExcelFile([
+            ['Nombre', 'DNI', 'Telefono', 'Email', 'Referido por', 'Tipo cliente', 'Ciudad', 'Asesor'],
+            ['Cliente Excel', '44556677', '987654321', 'excel@test.com', 'Campana digital', $type->name, $city->name, $advisor->name],
+        ]);
+
+        $this->post(route('inmopro.clients.import-from-excel'), [
+            'file' => $file,
+        ])->assertRedirect(route('inmopro.clients.index'));
+
+        $this->assertDatabaseHas('clients', [
+            'dni' => '44556677',
+            'name' => 'Cliente Excel',
+            'phone' => '987654321',
+            'advisor_id' => $advisor->id,
+            'client_type_id' => $type->id,
+            'city_id' => $city->id,
+        ]);
+    }
+
+    private function makeClientsExcelFile(array $rows): UploadedFile
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+
+        foreach ($rows as $rowIndex => $row) {
+            foreach ($row as $columnIndex => $value) {
+                $sheet->setCellValueByColumnAndRow($columnIndex + 1, $rowIndex + 1, $value);
+            }
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'clients_excel_');
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($path);
+
+        return new UploadedFile(
+            $path,
+            'clientes.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true
+        );
     }
 }

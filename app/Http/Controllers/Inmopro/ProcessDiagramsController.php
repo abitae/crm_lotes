@@ -41,7 +41,7 @@ class ProcessDiagramsController extends Controller
         $path = base_path('docs/GRAFICO_PROCESOS_SISTEMA.md');
         $diagrams = $this->extractDiagramsFromMarkdown($path);
 
-        return Inertia::render('inmopro/process-diagrams/index', [
+        return Inertia::render('inmopro/process-diagrams', [
             'diagrams' => $diagrams,
         ]);
     }
