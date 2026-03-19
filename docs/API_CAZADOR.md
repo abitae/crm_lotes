@@ -269,62 +269,11 @@ Response `200`:
 }
 ```
 
-## Agenda y recordatorios
+## Recordatorios
 
-Eventos de agenda y recordatorios puntuales ligados a clientes del vendedor. El vendedor solo puede ver y gestionar los suyos.
+Recordatorios puntuales ligados a clientes del vendedor. El vendedor solo puede ver y gestionar los suyos.
 
-### GET `/agenda-events`
-Lista eventos de agenda del vendedor.
-
-Query params opcionales:
-
-- `client_id` — filtrar por cliente
-- `start` — fecha/hora inicio (ISO) para filtrar eventos desde
-- `end` — fecha/hora fin (ISO) para filtrar eventos hasta
-
-Response por evento:
-
-```json
-{
-  "id": 1,
-  "client_id": 25,
-  "client": { "id": 25, "name": "Cliente Ejemplo" },
-  "title": "Llamada de seguimiento",
-  "notes": "Recordar oferta promocional",
-  "starts_at": "2026-03-20T10:00:00-05:00",
-  "ends_at": "2026-03-20T11:00:00-05:00",
-  "created_at": "2026-03-19T12:00:00-05:00"
-}
-```
-
-### POST `/agenda-events`
-Crea un evento de agenda.
-
-Request:
-
-```json
-{
-  "client_id": 25,
-  "title": "Visita a cliente",
-  "notes": "Llevar cotización",
-  "starts_at": "2026-03-20T10:00:00",
-  "ends_at": "2026-03-20T11:00:00"
-}
-```
-
-- `ends_at` es opcional.
-- El cliente debe pertenecer al vendedor autenticado.
-
-Response `201`: mismo objeto que en listado, con `message`: "Evento de agenda creado."
-
-### GET `/agenda-events/{agendaEvent}`
-Detalle de un evento propio.
-
-### PUT `/agenda-events/{agendaEvent}`
-Actualiza un evento propio. Body igual que en POST.
-
-### DELETE `/agenda-events/{agendaEvent}`
-Elimina un evento propio.
+Los **eventos de agenda** (calendario con rango de fechas) no se exponen en esta API; se gestionan desde el panel web Inmopro (`/inmopro/agenda`).
 
 ### GET `/reminders`
 Lista recordatorios del vendedor.
@@ -380,9 +329,9 @@ Marca el recordatorio como realizado (`completed_at` = ahora).
 
 Response `200`: objeto del recordatorio actualizado, con `message`: "Recordatorio marcado como realizado."
 
-Errores tipicos (agenda y recordatorios):
+Errores tipicos (recordatorios):
 
-- `404` evento o recordatorio no encontrado o de otro vendedor
+- `404` recordatorio no encontrado o de otro vendedor
 - `422` el cliente no pertenece al vendedor autenticado
 
 ## Proyectos
