@@ -16,6 +16,7 @@ use App\Http\Controllers\Inmopro\CommissionController;
 use App\Http\Controllers\Inmopro\CommissionStatusController;
 use App\Http\Controllers\Inmopro\DashboardController;
 use App\Http\Controllers\Inmopro\FinancialController;
+use App\Http\Controllers\Inmopro\LotAiFollowUpSuggestionController;
 use App\Http\Controllers\Inmopro\LotController;
 use App\Http\Controllers\Inmopro\LotPreReservationController;
 use App\Http\Controllers\Inmopro\LotStatusController;
@@ -33,6 +34,9 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::post('projects/import-from-excel', [ProjectController::class, 'importFromExcel'])->name('projects.import-from-excel');
     Route::resource('projects', ProjectController::class);
     Route::get('lots/export-pdf', [LotController::class, 'exportPdf'])->name('lots.export-pdf');
+    Route::post('lots/{lot}/ai-follow-up-suggestion', LotAiFollowUpSuggestionController::class)
+        ->middleware('throttle:ai')
+        ->name('lots.ai-follow-up-suggestion');
     Route::resource('lots', LotController::class);
     Route::get('clients/search', [ClientController::class, 'search'])->name('clients.search');
     Route::get('clients/export-excel', [ClientController::class, 'exportExcel'])->name('clients.export-excel');
@@ -41,6 +45,7 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::resource('client-types', ClientTypeController::class)->parameters(['client-types' => 'client_type']);
     Route::resource('cities', CityController::class);
     Route::get('advisors/search', [AdvisorController::class, 'search'])->name('advisors.search');
+    Route::put('advisors/{advisor}/cazador-access', [AdvisorController::class, 'updateCazadorAccess'])->name('advisors.cazador-access.update');
     Route::resource('advisors', AdvisorController::class)->except(['destroy']);
     Route::resource('teams', TeamController::class);
     Route::get('membership-types/{membership_type}/bulk-assign', [MembershipTypeController::class, 'bulkAssign'])->name('membership-types.bulk-assign');

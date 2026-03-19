@@ -3,7 +3,11 @@
 namespace Tests\Feature\Api\Cazador;
 
 use App\Models\Inmopro\Advisor;
+use Database\Seeders\Inmopro\AdvisorLevelSeeder;
+use Database\Seeders\Inmopro\AdvisorSeeder;
+use Database\Seeders\Inmopro\TeamSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class CazadorAuthTest extends TestCase
@@ -13,9 +17,9 @@ class CazadorAuthTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\Inmopro\TeamSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
+        $this->seed(TeamSeeder::class);
+        $this->seed(AdvisorLevelSeeder::class);
+        $this->seed(AdvisorSeeder::class);
     }
 
     public function test_advisor_can_login_with_username_and_pin(): void
@@ -60,5 +64,26 @@ class CazadorAuthTest extends TestCase
             'name' => 'Asesor API',
             'phone' => '999111222',
         ]);
+    }
+
+    public function test_login_route_is_rate_limited_per_ip(): void
+    {
+        Cache::flush();
+
+        $advisor = Advisor::firstOrFail();
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson(route('api.v1.cazador.auth.login'), [
+                'username' => $advisor->username,
+                'pin' => '000000',
+            ]);
+        }
+
+        $this->postJson(route('api.v1.cazador.auth.login'), [
+            'username' => $advisor->username,
+            'pin' => '000000',
+        ])->assertStatus(429);
+
+        Cache::flush();
     }
 }

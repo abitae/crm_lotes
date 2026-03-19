@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Inmopro;
 
+use App\Services\Inmopro\ClientDuplicateRegistrationChecker;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreClientRequest extends FormRequest
@@ -15,7 +18,7 @@ class StoreClientRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -29,5 +32,25 @@ class StoreClientRequest extends FormRequest
             'city_id' => ['nullable', 'exists:cities,id'],
             'advisor_id' => ['required', 'exists:advisors,id'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            $checker = app(ClientDuplicateRegistrationChecker::class);
+            $conflict = $checker->findConflict(
+                $this->input('dni'),
+                $this->input('phone'),
+                null,
+            );
+
+            if ($conflict !== null) {
+                $validator->errors()->add('duplicate_registration', $checker->message($conflict));
+            }
+        });
     }
 }

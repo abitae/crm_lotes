@@ -58,6 +58,7 @@ export default function ClientsCreate({
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={submit} className="space-y-4">
+                            <InputError message={errors.duplicate_registration} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" />
                             <div>
                                 <Label htmlFor="name">Nombre</Label>
                                 <Input id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} className="mt-1" />

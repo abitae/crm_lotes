@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inmopro;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inmopro\StoreAdvisorRequest;
+use App\Http\Requests\Inmopro\UpdateAdvisorCazadorAccessRequest;
 use App\Http\Requests\Inmopro\UpdateAdvisorRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
@@ -129,5 +130,28 @@ class AdvisorController extends Controller
         $advisor->update($payload);
 
         return redirect()->route('inmopro.advisors.index');
+    }
+
+    public function updateCazadorAccess(UpdateAdvisorCazadorAccessRequest $request, Advisor $advisor): RedirectResponse
+    {
+        $validated = $request->validated();
+        $usernameChanged = $advisor->username !== $validated['username'];
+        $pinChanged = $request->filled('pin');
+
+        $advisor->username = $validated['username'];
+
+        if ($pinChanged) {
+            $advisor->pin = $validated['pin'];
+        }
+
+        $advisor->save();
+
+        if ($usernameChanged || $pinChanged) {
+            $advisor->apiTokens()->delete();
+        }
+
+        return redirect()
+            ->route('inmopro.advisors.index')
+            ->with('success', 'Usuario y acceso Cazador actualizados. Si cambió el PIN o el usuario, el vendedor debe iniciar sesión de nuevo en la app.');
     }
 }

@@ -2,6 +2,8 @@
 
 Documento actualizado con diagramas Mermaid del sistema `CRM Lotes`, alineado con el flujo actual de `API Cazador` y `Inmopro web`.
 
+Referencias: contrato y ejemplos en [API_CAZADOR.md](./API_CAZADOR.md); análisis técnico del API en [ANALISIS_API_CAZADOR.md](./ANALISIS_API_CAZADOR.md).
+
 ---
 
 ## 1. Arquitectura general: actores, canales y almacenamiento
@@ -26,7 +28,7 @@ flowchart LR
     end
 
     seller --> advisorApp
-    advisorApp -->|"login, clientes, tickets, proyectos, lotes, pre-reservas"| api
+    advisorApp -->|"login, clientes, recordatorios, tickets, proyectos, lotes, pre-reservas"| api
     operator --> browser
     browser -->|"inventario, clientes, transferencias, cobranza, reportes"| inmopro
     api --> db
@@ -45,9 +47,11 @@ flowchart TB
     login --> tokenCheck{"Token valido?"}
     tokenCheck -->|"No"| login
     tokenCheck -->|"Si"| profile["GET/PUT me\nPUT me/pin"]
-    profile --> ownClients["Gestionar clientes propios"]
-    ownClients --> tickets["Crear tickets de atencion"]
-    tickets --> projects["Consultar proyectos"]
+    profile --> ownClients["Gestionar clientes propios\n(tipo PROPIO)"]
+    ownClients --> reminders["Recordatorios\ncliente PROPIO"]
+    ownClients --> tickets["Tickets de atencion\ncliente PROPIO"]
+    reminders --> projects["Consultar proyectos"]
+    tickets --> projects
     projects --> lots["Consultar lotes disponibles"]
     lots --> canReserve{"Lote en LIBRE?"}
     canReserve -->|"No"| lots
@@ -235,7 +239,31 @@ flowchart TB
 
 ---
 
-## 11. Tickets de atencion y firma de escritura
+## 11. Recordatorios en API Cazador (cliente PROPIO)
+
+```mermaid
+sequenceDiagram
+    participant seller as Asesor
+    participant api as APICazador
+    participant db as BaseDeDatos
+
+    seller->>api: GET /reminders o pending_only
+    api->>db: Recordatorios del advisor con cliente tipo PROPIO
+    api-->>seller: Lista filtrada
+
+    seller->>api: POST /reminders client_id title remind_at
+    api->>db: Validar cliente advisor_id y tipo PROPIO
+    alt cliente valido
+        api->>db: Insertar advisor_reminder
+        api-->>seller: 201
+    else cliente no PROPIO o no es suyo
+        api-->>seller: 422 mensaje de reglas
+    end
+```
+
+---
+
+## 12. Tickets de atencion y firma de escritura
 
 ```mermaid
 sequenceDiagram
@@ -256,7 +284,7 @@ sequenceDiagram
 
 ---
 
-## 12. Caja, bancos y movimientos operativos
+## 13. Caja, bancos y movimientos operativos
 
 ```mermaid
 flowchart LR
@@ -270,7 +298,7 @@ flowchart LR
 
 ---
 
-## 13. Vista ejecutiva de modulos Inmopro
+## 14. Vista ejecutiva de modulos Inmopro
 
 ```mermaid
 flowchart TB
@@ -296,13 +324,14 @@ flowchart TB
 
 ---
 
-## 14. Resumen actualizado de rutas por proceso
+## 15. Resumen actualizado de rutas por proceso
 
 | Proceso | Canal | Rutas principales |
 |---------|-------|-------------------|
 | Login vendedor | API | `POST /api/v1/cazador/auth/login` |
 | Perfil vendedor | API | `GET/PUT /me`, `PUT /me/pin` |
 | Clientes del asesor | API | `GET/POST /clients`, `GET/PUT /clients/{id}` |
+| Recordatorios del asesor | API | `GET/POST /reminders`, `GET/PUT/DELETE /reminders/{id}`, `POST /reminders/{id}/complete` (cliente **PROPIO**) |
 | Tickets del asesor | API | `GET/POST /attention-tickets`, `POST /attention-tickets/{id}/cancel` |
 | Catalogo de proyectos y lotes | API | `GET /projects`, `GET /projects/{id}`, `GET /lots`, `GET /lots/{id}` |
 | Pre-reserva | API | `POST /lots/{lot}/pre-reservations` |

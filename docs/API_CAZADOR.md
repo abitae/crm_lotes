@@ -3,6 +3,10 @@
 ## Resumen
 `Cazador` es el API para vendedores. El acceso es solo para `advisors` y usa autenticacion por token propio.
 
+Análisis de arquitectura y reglas de negocio: [ANALISIS_API_CAZADOR.md](./ANALISIS_API_CAZADOR.md).
+
+Prompt maestro para Cursor (app **React Native** contra este API): [PROMPT_CURSOR_REACT_NATIVE_CAZADOR.md](./PROMPT_CURSOR_REACT_NATIVE_CAZADOR.md).
+
 Base path:
 
 `/api/v1/cazador`
@@ -20,12 +24,13 @@ Seeders utiles para pruebas:
 ## Flujo principal
 1. El vendedor hace login.
 2. Consulta o actualiza su perfil.
-3. Crea o edita sus clientes propios.
-4. Registra tickets de atencion por proyecto para sus clientes propios.
-5. Consulta proyectos y lotes disponibles.
-6. Registra una pre-reserva subiendo una imagen del voucher.
-7. El lote pasa a `PRERESERVA`.
-8. Un administrador revisa la solicitud desde el backend web y aprueba o rechaza.
+3. Crea o edita sus clientes propios (tipo **PROPIO** en la API).
+4. Opcional: crea recordatorios ligados a esos clientes **PROPIO**.
+5. Registra tickets de atencion por proyecto para sus clientes propios.
+6. Consulta proyectos y lotes disponibles.
+7. Registra una pre-reserva subiendo una imagen del voucher.
+8. El lote pasa a `PRERESERVA`.
+9. Un administrador revisa la solicitud desde el backend web y aprueba o rechaza.
 
 ## Endpoints
 
@@ -71,6 +76,7 @@ Response `200`:
 Errores tipicos:
 
 - `422` credenciales invalidas
+- `429` demasiados intentos de login desde la misma IP (limite: 10 por minuto; limitador `cazador-login`)
 
 ### POST `/auth/logout`
 Invalida el token actual.
@@ -165,11 +171,13 @@ Response `201`:
 }
 ```
 
+**Unicidad DNI y telefono:** no puede existir otro cliente en el sistema con el mismo DNI (si se envia) ni el mismo telefono. Si ya estan registrados, respuesta **`422`** con error de validacion en la clave `duplicate_registration` y mensaje del tipo: `Cliente ya registrado por {nombre del vendedor}` (el asesor que tiene ese cliente en el CRM).
+
 ### GET `/clients/{client}`
 Detalle de cliente propio con lotes asociados.
 
 ### PUT `/clients/{client}`
-Actualiza cliente propio.
+Actualiza cliente propio (misma regla de unicidad; el cliente que se edita se excluye de la comprobacion).
 
 ## Tickets de atencion
 
@@ -271,12 +279,18 @@ Response `200`:
 
 ## Recordatorios
 
-Recordatorios puntuales ligados a clientes del vendedor. El vendedor solo puede ver y gestionar los suyos.
+Recordatorios puntuales ligados a **clientes propios** del vendedor (tipo de cliente **`PROPIO`**, igual que en tickets de atención y pre-reservas).
+
+Reglas:
+
+- Solo se listan y gestionan recordatorios cuyo `client_id` apunta a un cliente con `advisor_id` del token y tipo **`PROPIO`**.
+- Al crear (`POST`) o actualizar (`PUT`) un recordatorio, el `client_id` debe cumplir lo mismo; si el cliente es de otro tipo (p. ej. `PROSPECTO`) o de otro asesor, la API responde `422`.
+- `GET`, `PUT`, `DELETE` y `POST .../complete` sobre un recordatorio concreto exigen que el recordatorio sea del asesor **y** que el cliente vinculado sea **PROPIO** (si no, `404`).
 
 Los **eventos de agenda** (calendario con rango de fechas) no se exponen en esta API; se gestionan desde el panel web Inmopro (`/inmopro/agenda`).
 
 ### GET `/reminders`
-Lista recordatorios del vendedor.
+Lista recordatorios del vendedor (solo los asociados a clientes **PROPIO**).
 
 Query params opcionales:
 
@@ -311,15 +325,15 @@ Request:
 }
 ```
 
-El cliente debe pertenecer al vendedor autenticado.
+El cliente debe pertenecer al vendedor autenticado y ser de tipo **`PROPIO`**.
 
 Response `201`: mismo objeto que en listado, con `message`: "Recordatorio creado."
 
 ### GET `/reminders/{reminder}`
-Detalle de un recordatorio propio.
+Detalle de un recordatorio propio (cliente **PROPIO**).
 
 ### PUT `/reminders/{reminder}`
-Actualiza un recordatorio propio. Body igual que en POST.
+Actualiza un recordatorio propio. Body igual que en POST (incluye `client_id` que debe ser **PROPIO** del asesor).
 
 ### DELETE `/reminders/{reminder}`
 Elimina un recordatorio propio.
@@ -331,8 +345,8 @@ Response `200`: objeto del recordatorio actualizado, con `message`: "Recordatori
 
 Errores tipicos (recordatorios):
 
-- `404` recordatorio no encontrado o de otro vendedor
-- `422` el cliente no pertenece al vendedor autenticado
+- `404` recordatorio no encontrado, de otro vendedor o cuyo cliente no es **PROPIO**
+- `422` con mensaje: `El cliente debe pertenecer al vendedor y ser de tipo PROPIO.`
 
 ## Proyectos
 
@@ -486,6 +500,130 @@ En tickets de atencion:
 - administracion agenda desde `/inmopro/attention-tickets`
 - el vendedor puede cancelar desde Cazador mientras no este `realizado` o `cancelado`
 
+## Ejemplos detallados de uso (cURL)
+
+Sustituye `BASE` por la URL de tu entorno (p. ej. `https://crm-lotes.test`) y guarda el token devuelto en una variable de shell.
+
+### 1. Autenticacion
+
+```bash
+curl -s -X POST "$BASE/api/v1/cazador/auth/login" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"username":"asesor1","pin":"123456","device_name":"CLI"}'
+```
+
+Respuesta esperada: `token` en JSON. Exporta por ejemplo:
+
+```bash
+export TOKEN="pega_aqui_el_token_plano"
+```
+
+### 2. Perfil
+
+```bash
+curl -s "$BASE/api/v1/cazador/me" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 3. Cliente PROPIO (alta desde API)
+
+Los clientes creados con `POST /clients` quedan como **PROPIO** automaticamente.
+
+```bash
+curl -s -X POST "$BASE/api/v1/cazador/clients" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "Cliente Demo API",
+    "dni": "87654321",
+    "phone": "987000111",
+    "email": "demo@example.com",
+    "referred_by": "Referido prueba",
+    "city_id": 1
+  }'
+```
+
+Anota `data.id` del cliente (ej. `CLIENT_ID=25`).
+
+### 4. Recordatorios (requiere cliente PROPIO)
+
+Listar pendientes:
+
+```bash
+curl -s "$BASE/api/v1/cazador/reminders?pending_only=1" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Crear (usa un `CLIENT_ID` de un cliente **PROPIO** del asesor):
+
+```bash
+curl -s -X POST "$BASE/api/v1/cazador/reminders" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{
+    \"client_id\": $CLIENT_ID,
+    \"title\": \"Seguimiento oferta\",
+    \"notes\": \"Llamar antes del viernes\",
+    \"remind_at\": \"2026-03-25T10:00:00\"
+  }"
+```
+
+Si `client_id` es de tipo distinto de **PROPIO** (p. ej. prospecto cargado solo en backoffice), la API responde **422** con el mensaje de reglas de negocio.
+
+Marcar como realizado (sustituye `REMINDER_ID`):
+
+```bash
+curl -s -X POST "$BASE/api/v1/cazador/reminders/REMINDER_ID/complete" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 5. Ticket de atencion (cliente PROPIO + proyecto)
+
+```bash
+curl -s -X POST "$BASE/api/v1/cazador/attention-tickets" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{
+    \"client_id\": $CLIENT_ID,
+    \"project_id\": 1,
+    \"notes\": \"Solicita visita al proyecto\"
+  }"
+```
+
+### 6. Pre-reserva (multipart)
+
+El voucher debe ser un archivo de imagen real; ejemplo con `curl` desde archivo:
+
+```bash
+curl -s -X POST "$BASE/api/v1/cazador/lots/LOT_ID/pre-reservations" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "client_id=$CLIENT_ID" \
+  -F "project_id=1" \
+  -F "lot_id=LOT_ID" \
+  -F "amount=1500" \
+  -F "payment_reference=OP-999" \
+  -F "notes=Abono inicial" \
+  -F "voucher_image=@/ruta/local/comprobante.png"
+```
+
+`lot_id` en el cuerpo debe coincidir con `LOT_ID` en la URL; el lote debe estar **LIBRE**.
+
+### 7. Cerrar sesion
+
+```bash
+curl -s -X POST "$BASE/api/v1/cazador/auth/logout" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ## Seeders relacionados
 Para un entorno de prueba consistente, `DatabaseSeeder` ahora carga:
 
@@ -508,4 +646,5 @@ Para un entorno de prueba consistente, `DatabaseSeeder` ahora carga:
 4. Consultar `/api/v1/cazador/projects`
 5. Crear un cliente propio
 6. Crear un ticket de atencion
-7. Registrar una pre-reserva con voucher
+7. Listar y crear un recordatorio con un cliente **PROPIO**
+8. Registrar una pre-reserva con voucher

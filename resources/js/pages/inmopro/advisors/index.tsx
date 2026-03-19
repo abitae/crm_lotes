@@ -1,6 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { FormEvent, useEffect, useState } from 'react';
-import { Search, UserPlus, ChevronRight, Phone, Calendar, Eye, Plus, Pencil, Trash2, Receipt } from 'lucide-react';
+import { Search, UserPlus, ChevronRight, Phone, Calendar, Eye, Plus, Pencil, Trash2, Receipt, KeyRound } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ type Team = { id: number; name: string; color?: string };
 type Advisor = {
     id: number;
     name: string;
+    username?: string;
     email: string;
     phone: string;
     personal_quota: string;
@@ -99,6 +100,7 @@ export default function AdvisorsIndex({
 }: PageProps) {
     const [modalCreateAdvisor, setModalCreateAdvisor] = useState(false);
     const [modalEditAdvisor, setModalEditAdvisor] = useState<Advisor | null>(null);
+    const [modalCazadorAccess, setModalCazadorAccess] = useState<Advisor | null>(null);
     const [modalCreateMembership, setModalCreateMembership] = useState(false);
     const [modalMembershipDetail, setModalMembershipDetail] = useState<MembershipDetail | null>(null);
 
@@ -204,7 +206,10 @@ export default function AdvisorsIndex({
                                                 </span>
                                                 <div>
                                                     <p className="font-bold leading-none text-slate-800">{adv.name}</p>
-                                                    <p className="text-[10px] text-slate-400">{adv.email}</p>
+                                                    <p className="text-[10px] text-slate-400">
+                                                        {adv.email}
+                                                        {adv.username ? ` · @${adv.username}` : ''}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </td>
@@ -244,6 +249,15 @@ export default function AdvisorsIndex({
                                             );
                                         })}
                                         <td className="px-4 py-3 text-right">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-slate-400 hover:text-amber-700"
+                                                onClick={() => setModalCazadorAccess(adv)}
+                                                title="Usuario y PIN (app Cazador)"
+                                            >
+                                                <KeyRound className="h-4 w-4" />
+                                            </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -294,6 +308,15 @@ export default function AdvisorsIndex({
                         advisorLevels={advisorLevels}
                         advisorsList={advisorsList.filter((a) => a.id !== modalEditAdvisor.id)}
                         teams={teams}
+                    />
+                )}
+
+                {modalCazadorAccess && (
+                    <AdvisorCazadorAccessModal
+                        key={modalCazadorAccess.id}
+                        open={!!modalCazadorAccess}
+                        onOpenChange={(open) => !open && setModalCazadorAccess(null)}
+                        advisor={modalCazadorAccess}
                     />
                 )}
 
@@ -571,6 +594,97 @@ function EditAdvisorModal({
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
                         <Button type="submit" disabled={processing}>Actualizar</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function AdvisorCazadorAccessModal({
+    open,
+    onOpenChange,
+    advisor,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    advisor: Advisor;
+}) {
+    const { data, setData, put, processing, errors, reset } = useForm({
+        username: advisor.username ?? '',
+        pin: '',
+        pin_confirmation: '',
+    });
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        put(`/inmopro/advisors/${advisor.id}/cazador-access`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset('pin', 'pin_confirmation');
+                onOpenChange(false);
+            },
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Acceso app Cazador</DialogTitle>
+                    <DialogDescription>
+                        Usuario y PIN de 6 dígitos para <strong>{advisor.name}</strong>. Si cambia el PIN o el usuario, las sesiones abiertas en la app móvil se cerrarán.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="cazador-username">Usuario</Label>
+                        <Input
+                            id="cazador-username"
+                            autoComplete="username"
+                            value={data.username}
+                            onChange={(e) => setData('username', e.target.value)}
+                            className="mt-1"
+                            required
+                        />
+                        <InputError message={errors.username} />
+                    </div>
+                    <div>
+                        <Label htmlFor="cazador-pin">Nuevo PIN (6 dígitos)</Label>
+                        <Input
+                            id="cazador-pin"
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={6}
+                            autoComplete="new-password"
+                            placeholder="Dejar vacío para no cambiar"
+                            value={data.pin}
+                            onChange={(e) => setData('pin', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="mt-1"
+                        />
+                        <InputError message={errors.pin} />
+                    </div>
+                    <div>
+                        <Label htmlFor="cazador-pin-confirmation">Confirmar PIN</Label>
+                        <Input
+                            id="cazador-pin-confirmation"
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={6}
+                            autoComplete="new-password"
+                            value={data.pin_confirmation}
+                            onChange={(e) => setData('pin_confirmation', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className="mt-1"
+                        />
+                        <InputError message={errors.pin_confirmation} />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={processing}>
+                            Guardar acceso
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>

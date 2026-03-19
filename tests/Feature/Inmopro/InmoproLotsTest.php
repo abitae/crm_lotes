@@ -7,6 +7,13 @@ use App\Models\Inmopro\Commission;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\User;
+use Database\Seeders\Inmopro\AdvisorLevelSeeder;
+use Database\Seeders\Inmopro\AdvisorSeeder;
+use Database\Seeders\Inmopro\ClientSeeder;
+use Database\Seeders\Inmopro\CommissionStatusSeeder;
+use Database\Seeders\Inmopro\LotSeeder;
+use Database\Seeders\Inmopro\LotStatusSeeder;
+use Database\Seeders\Inmopro\ProjectSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,13 +24,13 @@ class InmoproLotsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\LotStatusSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\CommissionStatusSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ProjectSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ClientSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\LotSeeder::class);
+        $this->seed(AdvisorLevelSeeder::class);
+        $this->seed(LotStatusSeeder::class);
+        $this->seed(CommissionStatusSeeder::class);
+        $this->seed(ProjectSeeder::class);
+        $this->seed(AdvisorSeeder::class);
+        $this->seed(ClientSeeder::class);
+        $this->seed(LotSeeder::class);
     }
 
     public function test_guests_cannot_visit_lots_index(): void
@@ -110,7 +117,10 @@ class InmoproLotsTest extends TestCase
     public function test_updating_lot_recalculates_remaining_balance_and_normalizes_dates(): void
     {
         $user = User::factory()->create();
-        $lot = Lot::firstOrFail();
+        $transferredId = LotStatus::where('code', LotStatus::CODE_TRANSFERIDO)->value('id');
+        $lot = Lot::query()
+            ->when($transferredId, fn ($q) => $q->where('lot_status_id', '!=', $transferredId))
+            ->firstOrFail();
         $statusReservado = LotStatus::where('code', 'RESERVADO')->firstOrFail();
         $this->actingAs($user);
 

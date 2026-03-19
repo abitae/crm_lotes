@@ -2,6 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { Calendar, CheckCircle2, DollarSign, Percent, Search } from 'lucide-react';
 import Pagination, { type PaginationLink } from '@/components/pagination';
 import AppLayout from '@/layouts/app-layout';
+import { confirmCommissionMarkPaid } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
 type Commission = {
@@ -43,8 +44,24 @@ export default function Commissions({
         });
     };
 
-    const markAsPaid = (id: number) => {
-        router.post(`/inmopro/commissions/${id}/mark-as-paid`);
+    const markAsPaid = async (commission: Commission) => {
+        const advisorName = commission.advisor?.name ?? 'Sin asesor';
+        const amountLabel = `S/ ${Number(commission.amount).toLocaleString()}`;
+        const lotLabel = `${commission.lot?.block ?? '—'}-${commission.lot?.number ?? '—'}`;
+        const projectName = commission.lot?.project?.name ?? 'Sin proyecto';
+
+        const confirmed = await confirmCommissionMarkPaid({
+            advisorName,
+            amountLabel,
+            lotLabel,
+            projectName,
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        router.post(`/inmopro/commissions/${commission.id}/mark-as-paid`);
     };
 
     return (
@@ -158,7 +175,7 @@ export default function Commissions({
                                             {commission.status?.code === 'PENDIENTE' ? (
                                                 <button
                                                     type="button"
-                                                    onClick={() => markAsPaid(commission.id)}
+                                                    onClick={() => void markAsPaid(commission)}
                                                     className="inline-flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-black uppercase text-amber-700"
                                                 >
                                                     <CheckCircle2 className="h-3.5 w-3.5" />

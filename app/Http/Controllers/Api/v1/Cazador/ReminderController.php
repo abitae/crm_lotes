@@ -21,6 +21,7 @@ class ReminderController extends Controller
         $query = AdvisorReminder::query()
             ->with('client:id,name')
             ->where('advisor_id', $advisor->id)
+            ->whereHas('client', fn ($clientQuery) => $clientQuery->whereHas('type', fn ($typeQuery) => $typeQuery->where('code', 'PROPIO')))
             ->orderBy('remind_at');
 
         if ($request->boolean('pending_only')) {
@@ -39,14 +40,11 @@ class ReminderController extends Controller
         /** @var Advisor $advisor */
         $advisor = $request->attributes->get('advisor');
 
-        $client = Client::query()
-            ->whereKey($request->integer('client_id'))
-            ->where('advisor_id', $advisor->id)
-            ->first();
+        $client = $this->ownedPropioClient($advisor, $request->integer('client_id'));
 
         if (! $client) {
             return response()->json([
-                'message' => 'El cliente no pertenece al vendedor autenticado.',
+                'message' => 'El cliente debe pertenecer al vendedor y ser de tipo PROPIO.',
             ], 422);
         }
 
@@ -85,14 +83,11 @@ class ReminderController extends Controller
 
         /** @var Advisor $advisor */
         $advisor = $request->attributes->get('advisor');
-        $client = Client::query()
-            ->whereKey($request->integer('client_id'))
-            ->where('advisor_id', $advisor->id)
-            ->first();
+        $client = $this->ownedPropioClient($advisor, $request->integer('client_id'));
 
         if (! $client) {
             return response()->json([
-                'message' => 'El cliente no pertenece al vendedor autenticado.',
+                'message' => 'El cliente debe pertenecer al vendedor y ser de tipo PROPIO.',
             ], 422);
         }
 
@@ -143,6 +138,16 @@ class ReminderController extends Controller
             ->with('client:id,name')
             ->whereKey($reminder->id)
             ->where('advisor_id', $advisor->id)
+            ->whereHas('client', fn ($clientQuery) => $clientQuery->whereHas('type', fn ($typeQuery) => $typeQuery->where('code', 'PROPIO')))
+            ->first();
+    }
+
+    private function ownedPropioClient(Advisor $advisor, int $clientId): ?Client
+    {
+        return Client::query()
+            ->whereKey($clientId)
+            ->where('advisor_id', $advisor->id)
+            ->whereHas('type', fn ($query) => $query->where('code', 'PROPIO'))
             ->first();
     }
 

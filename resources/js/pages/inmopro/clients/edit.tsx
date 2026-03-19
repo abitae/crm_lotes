@@ -61,6 +61,7 @@ export default function ClientsEdit({
             <div className="p-4">
                 <h2 className="mb-6 text-2xl font-black text-slate-800">Editar cliente</h2>
                 <form onSubmit={submit} className="max-w-2xl space-y-4">
+                    <InputError message={errors.duplicate_registration} className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" />
                     <div>
                         <Label htmlFor="name">Nombre</Label>
                         <Input id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} className="mt-1" />

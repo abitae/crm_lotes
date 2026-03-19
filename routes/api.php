@@ -11,7 +11,9 @@ use App\Http\Controllers\Api\v1\Cazador\ReminderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
-    Route::post('auth/login', [AuthController::class, 'login'])->name('auth.login');
+    Route::post('auth/login', [AuthController::class, 'login'])
+        ->middleware('throttle:cazador-login')
+        ->name('auth.login');
 
     Route::middleware('advisor.api')->group(function (): void {
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');

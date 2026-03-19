@@ -11,6 +11,7 @@ use App\Models\Inmopro\LotPreReservation;
 use App\Models\Inmopro\LotStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class PreReservationController extends Controller
 {
@@ -70,29 +71,35 @@ class PreReservationController extends Controller
             ], 500);
         }
 
-        $storedPath = $request->file('voucher_image')->store('cazador/pre-reservations', 'public');
+        $preReservation = DB::transaction(function () use ($advisor, $client, $lot, $request, $preReservationStatusId) {
+            $storedPath = $request->file('voucher_image')->store('cazador/pre-reservations', 'public');
 
-        $preReservation = DB::transaction(function () use ($advisor, $client, $lot, $request, $storedPath, $preReservationStatusId) {
-            $preReservation = LotPreReservation::create([
-                'lot_id' => $lot->id,
-                'client_id' => $client->id,
-                'advisor_id' => $advisor->id,
-                'status' => 'PENDIENTE',
-                'amount' => $request->input('amount'),
-                'voucher_path' => $storedPath,
-                'payment_reference' => $request->input('payment_reference'),
-                'notes' => $request->input('notes'),
-            ]);
+            try {
+                $preReservation = LotPreReservation::create([
+                    'lot_id' => $lot->id,
+                    'client_id' => $client->id,
+                    'advisor_id' => $advisor->id,
+                    'status' => 'PENDIENTE',
+                    'amount' => $request->input('amount'),
+                    'voucher_path' => $storedPath,
+                    'payment_reference' => $request->input('payment_reference'),
+                    'notes' => $request->input('notes'),
+                ]);
 
-            $lot->update([
-                'lot_status_id' => $preReservationStatusId,
-                'client_id' => $client->id,
-                'advisor_id' => $advisor->id,
-                'client_name' => $client->name,
-                'client_dni' => $client->dni,
-            ]);
+                $lot->update([
+                    'lot_status_id' => $preReservationStatusId,
+                    'client_id' => $client->id,
+                    'advisor_id' => $advisor->id,
+                    'client_name' => $client->name,
+                    'client_dni' => $client->dni,
+                ]);
 
-            return $preReservation;
+                return $preReservation;
+            } catch (\Throwable $e) {
+                Storage::disk('public')->delete($storedPath);
+
+                throw $e;
+            }
         });
 
         return response()->json([

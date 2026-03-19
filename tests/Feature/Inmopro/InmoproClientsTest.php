@@ -7,6 +7,15 @@ use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\ClientType;
 use App\Models\User;
+use Database\Seeders\Inmopro\AdvisorLevelSeeder;
+use Database\Seeders\Inmopro\AdvisorSeeder;
+use Database\Seeders\Inmopro\CitySeeder;
+use Database\Seeders\Inmopro\ClientSeeder;
+use Database\Seeders\Inmopro\ClientTypeSeeder;
+use Database\Seeders\Inmopro\CommissionStatusSeeder;
+use Database\Seeders\Inmopro\LotStatusSeeder;
+use Database\Seeders\Inmopro\ProjectSeeder;
+use Database\Seeders\Inmopro\TeamSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -20,15 +29,15 @@ class InmoproClientsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\Inmopro\TeamSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ClientTypeSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\LotStatusSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\CommissionStatusSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ProjectSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\CitySeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ClientSeeder::class);
+        $this->seed(TeamSeeder::class);
+        $this->seed(ClientTypeSeeder::class);
+        $this->seed(AdvisorLevelSeeder::class);
+        $this->seed(LotStatusSeeder::class);
+        $this->seed(CommissionStatusSeeder::class);
+        $this->seed(ProjectSeeder::class);
+        $this->seed(CitySeeder::class);
+        $this->seed(AdvisorSeeder::class);
+        $this->seed(ClientSeeder::class);
     }
 
     public function test_guests_cannot_visit_clients_index(): void
@@ -72,6 +81,56 @@ class InmoproClientsTest extends TestCase
             'client_type_id' => $type->id,
             'advisor_id' => $advisor->id,
         ]);
+    }
+
+    public function test_authenticated_users_cannot_create_client_with_duplicate_dni_or_phone(): void
+    {
+        $user = User::factory()->create();
+        $existing = Client::query()->with('advisor')->firstOrFail();
+        $type = ClientType::first();
+        $advisor = Advisor::first();
+        $city = City::first();
+        $this->actingAs($user);
+
+        $this->post(route('inmopro.clients.store'), [
+            'name' => 'Cliente Duplicado',
+            'dni' => $existing->dni,
+            'phone' => '888777666',
+            'email' => 'dup@example.com',
+            'client_type_id' => $type->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city?->id,
+        ])->assertSessionHasErrors(['duplicate_registration']);
+
+        $this->post(route('inmopro.clients.store'), [
+            'name' => 'Cliente Duplicado 2',
+            'dni' => '33445566',
+            'phone' => $existing->phone,
+            'email' => 'dup2@example.com',
+            'client_type_id' => $type->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city?->id,
+        ])->assertSessionHasErrors(['duplicate_registration']);
+    }
+
+    public function test_authenticated_users_cannot_update_client_to_duplicate_phone(): void
+    {
+        $user = User::factory()->create();
+        $clients = Client::query()->orderBy('id')->take(2)->get();
+        $client = $clients->first();
+        $other = $clients->last();
+        $this->assertNotSame($client->id, $other->id);
+        $this->actingAs($user);
+
+        $this->put(route('inmopro.clients.update', $client), [
+            'name' => $client->name,
+            'dni' => $client->dni,
+            'phone' => $other->phone,
+            'email' => $client->email,
+            'client_type_id' => $client->client_type_id,
+            'advisor_id' => $client->advisor_id,
+            'city_id' => $client->city_id,
+        ])->assertSessionHasErrors(['duplicate_registration']);
     }
 
     public function test_authenticated_users_can_update_client(): void

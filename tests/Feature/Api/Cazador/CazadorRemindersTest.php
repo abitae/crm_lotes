@@ -7,6 +7,12 @@ use App\Models\Inmopro\AdvisorReminder;
 use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\ClientType;
+use Database\Seeders\Inmopro\AdvisorLevelSeeder;
+use Database\Seeders\Inmopro\AdvisorSeeder;
+use Database\Seeders\Inmopro\CitySeeder;
+use Database\Seeders\Inmopro\ClientSeeder;
+use Database\Seeders\Inmopro\ClientTypeSeeder;
+use Database\Seeders\Inmopro\TeamSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,12 +23,12 @@ class CazadorRemindersTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\Inmopro\TeamSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ClientTypeSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\CitySeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ClientSeeder::class);
+        $this->seed(TeamSeeder::class);
+        $this->seed(ClientTypeSeeder::class);
+        $this->seed(CitySeeder::class);
+        $this->seed(AdvisorLevelSeeder::class);
+        $this->seed(AdvisorSeeder::class);
+        $this->seed(ClientSeeder::class);
     }
 
     public function test_advisor_can_create_reminder_for_own_client(): void
@@ -89,9 +95,34 @@ class CazadorRemindersTest extends TestCase
         ])->json('token');
     }
 
+    public function test_advisor_cannot_create_reminder_for_non_propio_client(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $city = City::firstOrFail();
+        $prospectoType = ClientType::query()->where('code', 'PROSPECTO')->firstOrFail();
+        $client = Client::create([
+            'name' => 'Cliente prospecto',
+            'dni' => (string) (81000000 + $advisor->id),
+            'phone' => '988888888',
+            'email' => 'prospecto'.$advisor->id.'@test.com',
+            'client_type_id' => $prospectoType->id,
+            'city_id' => $city->id,
+            'advisor_id' => $advisor->id,
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer '.$this->loginToken($advisor))
+            ->postJson(route('api.v1.cazador.reminders.store'), [
+                'client_id' => $client->id,
+                'title' => 'Llamar',
+                'remind_at' => '2026-03-20T09:00:00',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'El cliente debe pertenecer al vendedor y ser de tipo PROPIO.');
+    }
+
     private function createClientForAdvisor(Advisor $advisor): Client
     {
-        $type = ClientType::firstOrFail();
+        $type = ClientType::query()->where('code', 'PROPIO')->firstOrFail();
         $city = City::firstOrFail();
 
         return Client::create([
