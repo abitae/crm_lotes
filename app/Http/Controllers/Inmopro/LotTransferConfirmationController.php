@@ -136,6 +136,7 @@ class LotTransferConfirmationController extends Controller
                 'status' => LotTransferConfirmation::STATUS_APPROVED,
                 'reviewed_by' => $request->user()->id,
                 'reviewed_at' => now(),
+                'review_notes' => $request->string('review_notes')->toString(),
                 'rejection_reason' => null,
             ]);
 

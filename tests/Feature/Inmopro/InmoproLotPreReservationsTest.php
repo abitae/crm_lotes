@@ -9,6 +9,8 @@ use App\Models\Inmopro\LotPreReservation;
 use App\Models\Inmopro\LotStatus;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class InmoproLotPreReservationsTest extends TestCase
@@ -65,17 +67,68 @@ class InmoproLotPreReservationsTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->post(route('inmopro.lot-pre-reservations.approve', $preReservation))
+            ->post(route('inmopro.lot-pre-reservations.approve', $preReservation), [
+                'review_notes' => 'Voucher validado y monto conforme.',
+            ])
             ->assertRedirect(route('inmopro.lot-pre-reservations.index'));
 
         $this->assertDatabaseHas('lot_pre_reservations', [
             'id' => $preReservation->id,
             'status' => 'APROBADA',
+            'notes' => 'Voucher validado y monto conforme.',
             'reviewed_by' => $user->id,
         ]);
         $this->assertDatabaseHas('lots', [
             'id' => $lot->id,
             'lot_status_id' => $reservedStatus->id,
         ]);
+    }
+
+    public function test_authenticated_users_can_register_pre_reservation(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+        $lot = Lot::whereHas('status', fn ($query) => $query->where('code', 'LIBRE'))->firstOrFail();
+        $client = Client::query()->whereNotNull('advisor_id')->firstOrFail();
+        $preReservationStatus = LotStatus::where('code', 'PRERESERVA')->firstOrFail();
+
+        $this->actingAs($user)
+            ->post(route('inmopro.lot-pre-reservations.store'), [
+                'project_id' => $lot->project_id,
+                'lot_id' => $lot->id,
+                'advisor_id' => $client->advisor_id,
+                'client_id' => $client->id,
+                'amount' => 1500.50,
+                'payment_reference' => 'OPER-2026-001',
+                'notes' => 'Registro desde bandeja administrativa.',
+                'voucher_image' => UploadedFile::fake()->image('voucher.png'),
+            ])
+            ->assertRedirect(route('inmopro.lot-pre-reservations.index'));
+
+        $this->assertDatabaseHas('lot_pre_reservations', [
+            'lot_id' => $lot->id,
+            'client_id' => $client->id,
+            'advisor_id' => $client->advisor_id,
+            'status' => 'PENDIENTE',
+            'amount' => 1500.50,
+            'payment_reference' => 'OPER-2026-001',
+            'notes' => 'Registro desde bandeja administrativa.',
+        ]);
+
+        $this->assertDatabaseHas('lots', [
+            'id' => $lot->id,
+            'lot_status_id' => $preReservationStatus->id,
+            'client_id' => $client->id,
+            'advisor_id' => $client->advisor_id,
+            'client_dni' => $client->dni,
+        ]);
+
+        $voucherPath = LotPreReservation::query()
+            ->where('lot_id', $lot->id)
+            ->value('voucher_path');
+
+        $this->assertNotNull($voucherPath);
+        Storage::disk('public')->assertExists($voucherPath);
     }
 }

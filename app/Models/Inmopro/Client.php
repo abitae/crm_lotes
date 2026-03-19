@@ -61,4 +61,20 @@ class Client extends Model
     {
         return $this->hasMany(AttentionTicket::class, 'client_id');
     }
+
+    /**
+     * @return HasMany<AdvisorAgendaEvent, $this>
+     */
+    public function agendaEvents(): HasMany
+    {
+        return $this->hasMany(AdvisorAgendaEvent::class, 'client_id');
+    }
+
+    /**
+     * @return HasMany<AdvisorReminder, $this>
+     */
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(AdvisorReminder::class, 'client_id');
+    }
 }

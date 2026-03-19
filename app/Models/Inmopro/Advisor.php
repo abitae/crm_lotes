@@ -142,4 +142,20 @@ class Advisor extends Model
     {
         return $this->hasMany(AttentionTicket::class, 'advisor_id');
     }
+
+    /**
+     * @return HasMany<AdvisorAgendaEvent, $this>
+     */
+    public function agendaEvents(): HasMany
+    {
+        return $this->hasMany(AdvisorAgendaEvent::class, 'advisor_id');
+    }
+
+    /**
+     * @return HasMany<AdvisorReminder, $this>
+     */
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(AdvisorReminder::class, 'advisor_id');
+    }
 }

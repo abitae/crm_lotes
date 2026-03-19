@@ -16,6 +16,18 @@ class ApproveLotTransferConfirmationRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        return [
+            'review_notes' => ['required', 'string', 'max:1000'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'review_notes.required' => 'Debe ingresar una reseña antes de aprobar.',
+        ];
     }
 }

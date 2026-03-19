@@ -17,4 +17,16 @@ export async function confirmDelete(title: string, text?: string): Promise<boole
     return result.isConfirmed;
 }
 
+export function showSuccessToast(message: string): void {
+    void Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: message,
+        showConfirmButton: false,
+        timer: 2500,
+        timerProgressBar: true,
+    });
+}
+
 export { Swal };

@@ -1,7 +1,7 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Check, Eye, Search, Upload, X } from 'lucide-react';
-import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Check, Eye, ImagePlus, Search, Upload, X } from 'lucide-react';
+import type { ChangeEvent, FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
 import Pagination, { type PaginationLink } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date';
+import { showSuccessToast } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
 type Project = { id: number; name: string };
@@ -25,6 +26,7 @@ type TransferConfirmation = {
     evidence_path: string;
     created_at: string;
     reviewed_at?: string | null;
+    review_notes?: string | null;
     rejection_reason?: string | null;
     requester?: { name: string } | null;
     reviewer?: { name: string } | null;
@@ -53,8 +55,20 @@ export default function LotTransferConfirmationsIndex({
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Transferencias', href: '/inmopro/lot-transfer-confirmations' },
     ];
+    const [selectedLot, setSelectedLot] = useState<LotRow | null>(null);
     const [selectedTransfer, setSelectedTransfer] = useState<Exclude<TransferConfirmation, null> | null>(null);
+    const [registerOpen, setRegisterOpen] = useState(false);
+    const [approveOpen, setApproveOpen] = useState(false);
     const [rejectOpen, setRejectOpen] = useState(false);
+    const [registerPreview, setRegisterPreview] = useState<string | null>(null);
+    const registerForm = useForm<{
+        evidence_image: File | null;
+    }>({
+        evidence_image: null,
+    });
+    const approveForm = useForm({
+        review_notes: '',
+    });
     const rejectForm = useForm({
         rejection_reason: '',
     });
@@ -69,12 +83,82 @@ export default function LotTransferConfirmationsIndex({
         }, { preserveState: true });
     };
 
-    const approve = (transferId: number) => {
-        router.post(`/inmopro/lot-transfer-confirmations/${transferId}/approve`);
+    useEffect(() => {
+        return () => {
+            if (registerPreview) {
+                URL.revokeObjectURL(registerPreview);
+            }
+        };
+    }, [registerPreview]);
+
+    const openRegisterDialog = (lot: LotRow) => {
+        registerForm.reset();
+        registerForm.clearErrors();
+        setSelectedLot(lot);
+        setRegisterPreview(null);
+        setRegisterOpen(true);
+    };
+
+    const handleRegisterImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] ?? null;
+        registerForm.setData('evidence_image', file);
+
+        if (registerPreview) {
+            URL.revokeObjectURL(registerPreview);
+        }
+
+        setRegisterPreview(file ? URL.createObjectURL(file) : null);
+    };
+
+    const submitRegister = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!selectedLot) {
+            return;
+        }
+
+        registerForm.post(`/inmopro/lots/${selectedLot.id}/transfer-confirmation`, {
+            forceFormData: true,
+            onSuccess: () => {
+                setRegisterOpen(false);
+                setSelectedLot(null);
+                registerForm.reset();
+                if (registerPreview) {
+                    URL.revokeObjectURL(registerPreview);
+                }
+                setRegisterPreview(null);
+                showSuccessToast('Transferencia registrada correctamente');
+            },
+        });
+    };
+
+    const openApproveDialog = (transfer: Exclude<TransferConfirmation, null>) => {
+        approveForm.reset();
+        approveForm.clearErrors();
+        setSelectedTransfer(transfer);
+        setApproveOpen(true);
+    };
+
+    const approve = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!selectedTransfer) {
+            return;
+        }
+
+        approveForm.post(`/inmopro/lot-transfer-confirmations/${selectedTransfer.id}/approve`, {
+            onSuccess: () => {
+                setApproveOpen(false);
+                setSelectedTransfer(null);
+                approveForm.reset();
+                showSuccessToast('Transferencia aprobada correctamente');
+            },
+        });
     };
 
     const openRejectDialog = (transfer: Exclude<TransferConfirmation, null>) => {
         rejectForm.reset();
+        rejectForm.clearErrors();
         setSelectedTransfer(transfer);
         setRejectOpen(true);
     };
@@ -102,8 +186,27 @@ export default function LotTransferConfirmationsIndex({
                 <div>
                     <h2 className="text-2xl font-black text-slate-800">Confirmacion de transferencias</h2>
                     <p className="mt-1 text-sm text-slate-500">
-                        Revise lotes reservados, registre la evidencia de transferencia y apruebe o rechace las revisiones pendientes.
+                        Gestione el registro y la revision de transferencias desde una sola bandeja operativa.
                     </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lotes visibles</p>
+                        <p className="mt-3 text-3xl font-black text-slate-900">{lots.data.length}</p>
+                    </div>
+                    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">Pendientes de revision</p>
+                        <p className="mt-3 text-3xl font-black text-amber-700">
+                            {lots.data.filter((lot) => lot.latest_transfer_confirmation?.status === 'PENDIENTE').length}
+                        </p>
+                    </div>
+                    <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Listos para registrar</p>
+                        <p className="mt-3 text-3xl font-black text-emerald-700">
+                            {lots.data.filter((lot) => lot.status?.code === 'RESERVADO' && lot.latest_transfer_confirmation?.status !== 'PENDIENTE').length}
+                        </p>
+                    </div>
                 </div>
 
                 <form onSubmit={submitFilters} className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-[240px_1fr_160px]">
@@ -230,16 +333,14 @@ export default function LotTransferConfirmationsIndex({
                                                             </a>
                                                         ) : null}
                                                         {canRegister ? (
-                                                            <Button type="button" size="sm" asChild>
-                                                                <Link href={`/inmopro/lots/${lot.id}/transfer-confirmation`}>
-                                                                    <Upload className="h-4 w-4" />
-                                                                    Registrar
-                                                                </Link>
+                                                            <Button type="button" size="sm" onClick={() => openRegisterDialog(lot)}>
+                                                                <Upload className="h-4 w-4" />
+                                                                Registrar
                                                             </Button>
                                                         ) : null}
                                                         {isPending && transfer ? (
                                                             <>
-                                                                <Button type="button" size="sm" onClick={() => approve(transfer.id)}>
+                                                                <Button type="button" size="sm" onClick={() => openApproveDialog(transfer)}>
                                                                     <Check className="h-4 w-4" />
                                                                     Aprobar
                                                                 </Button>
@@ -264,6 +365,158 @@ export default function LotTransferConfirmationsIndex({
                 </div>
             </div>
 
+            <Dialog open={registerOpen} onOpenChange={(open) => {
+                setRegisterOpen(open);
+
+                if (!open) {
+                    setSelectedLot(null);
+                    registerForm.reset();
+                    registerForm.clearErrors();
+                    if (registerPreview) {
+                        URL.revokeObjectURL(registerPreview);
+                    }
+                    setRegisterPreview(null);
+                }
+            }}>
+                <DialogContent className="sm:max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Registrar transferencia</DialogTitle>
+                        <DialogDescription>
+                            Suba la evidencia desde este modal para marcar el lote como transferido y dejarlo pendiente de revisión.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedLot ? (
+                        <form onSubmit={submitRegister} className="space-y-5">
+                            <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Lote</p>
+                                    <p className="mt-1 text-base font-semibold text-slate-800">
+                                        {selectedLot.block}-{selectedLot.number}
+                                    </p>
+                                    <p className="text-sm text-slate-500">{selectedLot.project?.name ?? 'Sin proyecto'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Cliente y asesor</p>
+                                    <p className="mt-1 text-base font-semibold text-slate-800">
+                                        {selectedLot.client?.name ?? 'Sin cliente'}
+                                    </p>
+                                    <p className="text-sm text-slate-500">{selectedLot.advisor?.name ?? 'Sin asesor'}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label
+                                    htmlFor="register_transfer_image"
+                                    className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center transition hover:border-emerald-400 hover:bg-emerald-50"
+                                >
+                                    <div className="rounded-full bg-white p-3 shadow-sm">
+                                        <ImagePlus className="h-6 w-6 text-emerald-600" />
+                                    </div>
+                                    <p className="mt-4 font-semibold text-slate-800">
+                                        {registerForm.data.evidence_image ? 'Cambiar evidencia' : 'Seleccionar evidencia de transferencia'}
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Formatos permitidos: JPG, PNG, WEBP. Máximo 5 MB.
+                                    </p>
+                                </label>
+                                <input
+                                    id="register_transfer_image"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleRegisterImageChange}
+                                    className="hidden"
+                                />
+                                <InputError message={registerForm.errors.evidence_image} />
+                            </div>
+
+                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                                {registerPreview ? (
+                                    <img
+                                        src={registerPreview}
+                                        alt="Vista previa de la evidencia"
+                                        className="max-h-[420px] w-full object-contain"
+                                    />
+                                ) : (
+                                    <div className="flex min-h-[260px] flex-col items-center justify-center px-6 py-10 text-center">
+                                        <ImagePlus className="h-10 w-10 text-slate-300" />
+                                        <p className="mt-3 font-medium text-slate-600">Vista previa de la imagen</p>
+                                        <p className="mt-1 text-sm text-slate-400">
+                                            La imagen seleccionada aparecerá aquí antes de registrar la transferencia.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setRegisterOpen(false)}>
+                                    Cancelar
+                                </Button>
+                                <Button type="submit" disabled={registerForm.processing}>
+                                    Registrar transferencia
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={approveOpen} onOpenChange={(open) => {
+                setApproveOpen(open);
+
+                if (!open) {
+                    setSelectedTransfer(null);
+                    approveForm.reset();
+                }
+            }}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Aprobar transferencia</DialogTitle>
+                        <DialogDescription>
+                            Revise la evidencia cargada, registre una reseña y confirme la aprobación.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedTransfer ? (
+                        <form onSubmit={approve} className="space-y-4">
+                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                                <img
+                                    src={`/storage/${selectedTransfer.evidence_path}`}
+                                    alt={`Evidencia transferencia ${selectedTransfer.id}`}
+                                    className="max-h-[420px] w-full object-contain"
+                                />
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Objetivo de la revisión</p>
+                                <p className="mt-1 text-sm text-slate-600">
+                                    Confirme que la evidencia coincide con la operación antes de aprobar y dejar las comisiones generadas.
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <label htmlFor="transfer_review_notes" className="text-sm font-medium text-slate-700">
+                                    Reseña de aprobación
+                                </label>
+                                <textarea
+                                    id="transfer_review_notes"
+                                    value={approveForm.data.review_notes}
+                                    onChange={(event) => approveForm.setData('review_notes', event.target.value)}
+                                    rows={4}
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"
+                                    placeholder="Detalle breve de la validación realizada"
+                                />
+                                <InputError message={approveForm.errors.review_notes} />
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setApproveOpen(false)}>
+                                    Cancelar
+                                </Button>
+                                <Button type="submit" disabled={approveForm.processing}>
+                                    Aprobar transferencia
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={rejectOpen} onOpenChange={(open) => {
                 setRejectOpen(open);
 
@@ -280,6 +533,15 @@ export default function LotTransferConfirmationsIndex({
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitReject} className="space-y-4">
+                        {selectedTransfer ? (
+                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                                <img
+                                    src={`/storage/${selectedTransfer.evidence_path}`}
+                                    alt={`Evidencia transferencia ${selectedTransfer.id}`}
+                                    className="max-h-[260px] w-full object-contain"
+                                />
+                            </div>
+                        ) : null}
                         <textarea
                             value={rejectForm.data.rejection_reason}
                             onChange={(event) => rejectForm.setData('rejection_reason', event.target.value)}

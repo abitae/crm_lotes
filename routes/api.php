@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\v1\Cazador\AgendaEventController;
 use App\Http\Controllers\Api\v1\Cazador\AttentionTicketController;
 use App\Http\Controllers\Api\v1\Cazador\AuthController;
 use App\Http\Controllers\Api\v1\Cazador\ClientController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Api\v1\Cazador\LotController;
 use App\Http\Controllers\Api\v1\Cazador\PreReservationController;
 use App\Http\Controllers\Api\v1\Cazador\ProfileController;
 use App\Http\Controllers\Api\v1\Cazador\ProjectController;
+use App\Http\Controllers\Api\v1\Cazador\ReminderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
@@ -25,6 +27,18 @@ Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
         Route::get('attention-tickets', [AttentionTicketController::class, 'index'])->name('attention-tickets.index');
         Route::post('attention-tickets', [AttentionTicketController::class, 'store'])->name('attention-tickets.store');
         Route::post('attention-tickets/{attentionTicket}/cancel', [AttentionTicketController::class, 'cancel'])->name('attention-tickets.cancel');
+
+        Route::get('agenda-events', [AgendaEventController::class, 'index'])->name('agenda-events.index');
+        Route::post('agenda-events', [AgendaEventController::class, 'store'])->name('agenda-events.store');
+        Route::get('agenda-events/{agendaEvent}', [AgendaEventController::class, 'show'])->name('agenda-events.show');
+        Route::put('agenda-events/{agendaEvent}', [AgendaEventController::class, 'update'])->name('agenda-events.update');
+        Route::delete('agenda-events/{agendaEvent}', [AgendaEventController::class, 'destroy'])->name('agenda-events.destroy');
+        Route::get('reminders', [ReminderController::class, 'index'])->name('reminders.index');
+        Route::post('reminders', [ReminderController::class, 'store'])->name('reminders.store');
+        Route::get('reminders/{reminder}', [ReminderController::class, 'show'])->name('reminders.show');
+        Route::put('reminders/{reminder}', [ReminderController::class, 'update'])->name('reminders.update');
+        Route::delete('reminders/{reminder}', [ReminderController::class, 'destroy'])->name('reminders.destroy');
+        Route::post('reminders/{reminder}/complete', [ReminderController::class, 'complete'])->name('reminders.complete');
 
         Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
         Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');

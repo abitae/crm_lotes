@@ -23,6 +23,11 @@ class StoreAdvisorMembershipPaymentRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0.01'],
             'paid_at' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
+            'advisor_membership_installment_id' => [
+                'nullable',
+                'exists:advisor_membership_installments,id',
+            ],
+            'cash_account_id' => ['nullable', 'exists:cash_accounts,id'],
         ];
     }
 }

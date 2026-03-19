@@ -13,8 +13,11 @@ class AdvisorMembership extends Model
      */
     protected $fillable = [
         'advisor_id',
+        'membership_type_id',
         'year',
         'amount',
+        'start_date',
+        'end_date',
     ];
 
     /**
@@ -25,6 +28,8 @@ class AdvisorMembership extends Model
         return [
             'year' => 'integer',
             'amount' => 'decimal:2',
+            'start_date' => 'date',
+            'end_date' => 'date',
         ];
     }
 
@@ -34,6 +39,22 @@ class AdvisorMembership extends Model
     public function advisor(): BelongsTo
     {
         return $this->belongsTo(Advisor::class);
+    }
+
+    /**
+     * @return BelongsTo<MembershipType, $this>
+     */
+    public function membershipType(): BelongsTo
+    {
+        return $this->belongsTo(MembershipType::class, 'membership_type_id');
+    }
+
+    /**
+     * @return HasMany<AdvisorMembershipInstallment, $this>
+     */
+    public function installments(): HasMany
+    {
+        return $this->hasMany(AdvisorMembershipInstallment::class, 'advisor_membership_id')->orderBy('sequence');
     }
 
     /**

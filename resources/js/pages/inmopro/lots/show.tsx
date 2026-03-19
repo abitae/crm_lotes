@@ -46,6 +46,7 @@ export default function LotsShow({ lot, canConfirmTransfer }: { lot: Lot; canCon
 
     const formatDate = (d: string | undefined) => (d ? new Date(d).toLocaleDateString('es') : '—');
     const formatMoney = (v: string | undefined) => (v != null && v !== '' ? Number(v).toLocaleString('es') : '—');
+    const transferQueueUrl = `/inmopro/lot-transfer-confirmations?search=${encodeURIComponent(`${lot.block}-${lot.number}`)}`;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -66,9 +67,9 @@ export default function LotsShow({ lot, canConfirmTransfer }: { lot: Lot; canCon
                     <div className="flex flex-wrap gap-2">
                         {canConfirmTransfer && lot.status?.code === 'RESERVADO' ? (
                             <Button asChild>
-                                <Link href={`/inmopro/lots/${lot.id}/transfer-confirmation`}>
+                                <Link href={transferQueueUrl}>
                                     <CheckCircle2 className="h-4 w-4" />
-                                    Confirmar transferencia
+                                    Gestionar transferencia
                                 </Link>
                             </Button>
                         ) : null}

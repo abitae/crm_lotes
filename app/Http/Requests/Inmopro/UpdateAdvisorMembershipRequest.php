@@ -4,7 +4,7 @@ namespace App\Http\Requests\Inmopro;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class ApproveLotPreReservationRequest extends FormRequest
+class UpdateAdvisorMembershipRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -20,17 +20,10 @@ class ApproveLotPreReservationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'review_notes' => ['required', 'string', 'max:1000'],
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return [
-            'review_notes.required' => 'Debe ingresar una reseña antes de aprobar.',
+            'amount' => ['required', 'numeric', 'min:0'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'membership_type_id' => ['nullable', 'exists:membership_types,id'],
         ];
     }
 }

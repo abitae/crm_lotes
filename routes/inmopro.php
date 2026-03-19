@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Controllers\Inmopro\AccountsReceivableController;
+use App\Http\Controllers\Inmopro\AdvisorAgendaEventController;
 use App\Http\Controllers\Inmopro\AdvisorController;
 use App\Http\Controllers\Inmopro\AdvisorLevelController;
 use App\Http\Controllers\Inmopro\AdvisorMembershipController;
+use App\Http\Controllers\Inmopro\AdvisorReminderController;
+use App\Http\Controllers\Inmopro\AgendaController;
 use App\Http\Controllers\Inmopro\AttentionTicketController;
 use App\Http\Controllers\Inmopro\CashAccountController;
 use App\Http\Controllers\Inmopro\CityController;
@@ -17,6 +20,7 @@ use App\Http\Controllers\Inmopro\LotController;
 use App\Http\Controllers\Inmopro\LotPreReservationController;
 use App\Http\Controllers\Inmopro\LotStatusController;
 use App\Http\Controllers\Inmopro\LotTransferConfirmationController;
+use App\Http\Controllers\Inmopro\MembershipTypeController;
 use App\Http\Controllers\Inmopro\ProcessDiagramsController;
 use App\Http\Controllers\Inmopro\ProjectController;
 use App\Http\Controllers\Inmopro\ReportController;
@@ -39,6 +43,9 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::get('advisors/search', [AdvisorController::class, 'search'])->name('advisors.search');
     Route::resource('advisors', AdvisorController::class)->except(['destroy']);
     Route::resource('teams', TeamController::class);
+    Route::get('membership-types/{membership_type}/bulk-assign', [MembershipTypeController::class, 'bulkAssign'])->name('membership-types.bulk-assign');
+    Route::post('membership-types/{membership_type}/bulk-assign', [MembershipTypeController::class, 'bulkAssignStore'])->name('membership-types.bulk-assign.store');
+    Route::resource('membership-types', MembershipTypeController::class)->parameters(['membership-types' => 'membership_type']);
     Route::post('advisor-memberships/{advisor_membership}/payments', [AdvisorMembershipController::class, 'storePayment'])->name('advisor-memberships.payments.store');
     Route::resource('advisor-memberships', AdvisorMembershipController::class)->parameters(['advisor-memberships' => 'advisor_membership']);
     Route::resource('lot-statuses', LotStatusController::class)->parameters(['lot-statuses' => 'lot_status']);
@@ -60,6 +67,7 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::post('attention-tickets/{attention_ticket}/delivery-deed/mark-signed', [AttentionTicketController::class, 'markDeedSigned'])->name('attention-tickets.delivery-deed.mark-signed');
     Route::resource('attention-tickets', AttentionTicketController::class)->parameters(['attention-tickets' => 'attention_ticket']);
     Route::get('lot-pre-reservations', [LotPreReservationController::class, 'index'])->name('lot-pre-reservations.index');
+    Route::post('lot-pre-reservations', [LotPreReservationController::class, 'store'])->name('lot-pre-reservations.store');
     Route::post('lot-pre-reservations/{lot_pre_reservation}/approve', [LotPreReservationController::class, 'approve'])->name('lot-pre-reservations.approve');
     Route::post('lot-pre-reservations/{lot_pre_reservation}/reject', [LotPreReservationController::class, 'reject'])->name('lot-pre-reservations.reject');
     Route::get('lot-transfer-confirmations', [LotTransferConfirmationController::class, 'index'])->name('lot-transfer-confirmations.index');
@@ -68,4 +76,12 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::post('lot-transfer-confirmations/{lot_transfer_confirmation}/approve', [LotTransferConfirmationController::class, 'approve'])->name('lot-transfer-confirmations.approve');
     Route::post('lot-transfer-confirmations/{lot_transfer_confirmation}/reject', [LotTransferConfirmationController::class, 'reject'])->name('lot-transfer-confirmations.reject');
     Route::get('process-diagrams', ProcessDiagramsController::class)->name('process-diagrams.index');
+    Route::get('agenda', [AgendaController::class, 'index'])->name('agenda.index');
+    Route::post('advisor-agenda-events', [AdvisorAgendaEventController::class, 'store'])->name('advisor-agenda-events.store');
+    Route::put('advisor-agenda-events/{advisor_agenda_event}', [AdvisorAgendaEventController::class, 'update'])->name('advisor-agenda-events.update');
+    Route::delete('advisor-agenda-events/{advisor_agenda_event}', [AdvisorAgendaEventController::class, 'destroy'])->name('advisor-agenda-events.destroy');
+    Route::post('advisor-reminders', [AdvisorReminderController::class, 'store'])->name('advisor-reminders.store');
+    Route::put('advisor-reminders/{advisor_reminder}', [AdvisorReminderController::class, 'update'])->name('advisor-reminders.update');
+    Route::delete('advisor-reminders/{advisor_reminder}', [AdvisorReminderController::class, 'destroy'])->name('advisor-reminders.destroy');
+    Route::post('advisor-reminders/{advisor_reminder}/complete', [AdvisorReminderController::class, 'complete'])->name('advisor-reminders.complete');
 });

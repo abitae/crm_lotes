@@ -96,12 +96,15 @@ class InmoproLotTransferConfirmationsTest extends TestCase
         $countBefore = Commission::query()->where('lot_id', $lot->id)->count();
 
         $this->actingAs($user)
-            ->post(route('inmopro.lot-transfer-confirmations.approve', $transfer))
+            ->post(route('inmopro.lot-transfer-confirmations.approve', $transfer), [
+                'review_notes' => 'Se valida la evidencia y coincide con la operación.',
+            ])
             ->assertRedirect(route('inmopro.lot-transfer-confirmations.index'));
 
         $this->assertDatabaseHas('lot_transfer_confirmations', [
             'id' => $transfer->id,
             'status' => LotTransferConfirmation::STATUS_APPROVED,
+            'review_notes' => 'Se valida la evidencia y coincide con la operación.',
             'reviewed_by' => $user->id,
         ]);
         $this->assertGreaterThan(

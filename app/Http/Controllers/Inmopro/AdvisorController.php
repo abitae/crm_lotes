@@ -8,6 +8,7 @@ use App\Http\Requests\Inmopro\UpdateAdvisorRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
 use App\Models\Inmopro\AdvisorMembership;
+use App\Models\Inmopro\MembershipType;
 use App\Models\Inmopro\Team;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -36,7 +37,12 @@ class AdvisorController extends Controller
 
     public function index(Request $request): Response
     {
-        $query = Advisor::with(['level', 'superior', 'team', 'memberships.payments'])->withCount('lots');
+        $query = Advisor::with([
+            'level', 'superior', 'team',
+            'memberships.membershipType',
+            'memberships.installments',
+            'memberships.payments',
+        ])->withCount('lots');
 
         if ($request->filled('search')) {
             $term = $request->input('search');
@@ -50,10 +56,11 @@ class AdvisorController extends Controller
         $advisorLevels = AdvisorLevel::orderBy('sort_order')->get();
         $advisorsList = Advisor::orderBy('name')->get(['id', 'name']);
         $teams = Team::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color']);
+        $membershipTypes = MembershipType::orderBy('name')->get(['id', 'name', 'months', 'amount']);
 
         $membershipDetail = null;
         if ($request->filled('membership_id')) {
-            $m = AdvisorMembership::with(['advisor', 'payments'])->find($request->input('membership_id'));
+            $m = AdvisorMembership::with(['advisor', 'membershipType', 'installments', 'payments'])->find($request->input('membership_id'));
             if ($m) {
                 $membershipDetail = [
                     'membership' => $m,
@@ -74,6 +81,7 @@ class AdvisorController extends Controller
             'advisorLevels' => $advisorLevels,
             'advisorsList' => $advisorsList,
             'teams' => $teams,
+            'membershipTypes' => $membershipTypes,
             'membershipDetail' => $membershipDetail,
             'advisorForModal' => $advisorForModal,
             'openModal' => $request->input('modal'),

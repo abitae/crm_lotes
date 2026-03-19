@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import {
     BookOpen,
     Building2,
+    Calendar,
     ChevronRight,
     DollarSign,
     FileCheck,
@@ -72,10 +73,12 @@ const managementSections: NavSection[] = [
         label: 'Comercial',
         icon: Users,
         items: [
+            { title: 'Agenda', href: '/inmopro/agenda', icon: Calendar },
             { title: 'Clientes', href: '/inmopro/clients', icon: Users },
             { title: 'Tipos de cliente', href: '/inmopro/client-types', icon: Users },
             { title: 'Ciudades', href: '/inmopro/cities', icon: MapPin },
             { title: 'Vendedores', href: '/inmopro/advisors', icon: UserCheck },
+            { title: 'Tipos de membresía', href: '/inmopro/membership-types', icon: Receipt },
             { title: 'Teams comerciales', href: '/inmopro/teams', icon: ShieldCheck },
             { title: 'Niveles de asesor', href: '/inmopro/advisor-levels', icon: Layers },
         ],
