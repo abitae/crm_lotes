@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\v1\Cazador\AttentionTicketController;
 use App\Http\Controllers\Api\v1\Cazador\AuthController;
 use App\Http\Controllers\Api\v1\Cazador\ClientController;
+use App\Http\Controllers\Api\v1\Cazador\DashboardController;
 use App\Http\Controllers\Api\v1\Cazador\LotController;
 use App\Http\Controllers\Api\v1\Cazador\PreReservationController;
 use App\Http\Controllers\Api\v1\Cazador\ProfileController;
@@ -20,6 +21,8 @@ Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
         Route::get('me', [ProfileController::class, 'show'])->name('me.show');
         Route::put('me', [ProfileController::class, 'update'])->name('me.update');
         Route::put('me/pin', [ProfileController::class, 'updatePin'])->name('me.pin.update');
+
+        Route::get('dashboard', [DashboardController::class, 'show'])->name('dashboard.show');
 
         Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
         Route::post('clients', [ClientController::class, 'store'])->name('clients.store');

@@ -57,6 +57,7 @@ sequenceDiagram
 | Perfil        | `GET me`                                     | ProfileController         | Payload en `data`                                       |
 | Perfil        | `PUT me`                                     | ProfileController         | UpdateAdvisorProfileRequest                             |
 | Perfil        | `PUT me/pin`                                 | ProfileController         | PIN actual + nuevo; comprueba `current_pin`             |
+| Inicio        | `GET dashboard`                              | DashboardController       | Estadísticas del asesor (clientes, pre-reservas, lotes por estado, tickets y recordatorios pendientes) |
 | Clientes      | `GET clients`                                | ClientController          | Filtro `search`; solo `advisor_id` + tipo PROPIO        |
 | Clientes      | `POST clients`                               | ClientController          | Fuerza `client_type_id` PROPIO                          |
 | Clientes      | `GET/PUT clients/{client}`                   | ClientController          | `ownedClient`: 404 si no es suyo o no PROPIO            |

@@ -23,14 +23,15 @@ Seeders utiles para pruebas:
 
 ## Flujo principal
 1. El vendedor hace login.
-2. Consulta o actualiza su perfil.
-3. Crea o edita sus clientes propios (tipo **PROPIO** en la API).
-4. Opcional: crea recordatorios ligados a esos clientes **PROPIO**.
-5. Registra tickets de atencion por proyecto para sus clientes propios.
-6. Consulta proyectos y lotes disponibles.
-7. Registra una pre-reserva subiendo una imagen del voucher.
-8. El lote pasa a `PRERESERVA`.
-9. Un administrador revisa la solicitud desde el backend web y aprueba o rechaza.
+2. Opcional: `GET /dashboard` para métricas de inicio (clientes, pre-reservas, lotes por estado, pendientes).
+3. Consulta o actualiza su perfil.
+4. Crea o edita sus clientes propios (tipo **PROPIO** en la API).
+5. Opcional: crea recordatorios ligados a esos clientes **PROPIO**.
+6. Registra tickets de atencion por proyecto para sus clientes propios.
+7. Consulta proyectos y lotes disponibles.
+8. Registra una pre-reserva subiendo una imagen del voucher.
+9. El lote pasa a `PRERESERVA`.
+10. Un administrador revisa la solicitud desde el backend web y aprueba o rechaza.
 
 ## Endpoints
 
@@ -118,6 +119,41 @@ Request:
   "pin_confirmation": "654321"
 }
 ```
+
+### GET `/dashboard`
+Resumen para la pantalla de inicio: conteos del vendedor autenticado.
+
+Response `200`:
+
+```json
+{
+  "data": {
+    "clients_count": 12,
+    "pre_reservations": {
+      "active": 2,
+      "pending": 1,
+      "approved": 1,
+      "rejected": 0
+    },
+    "lots": {
+      "pre_reservation": 1,
+      "reserved": 2,
+      "transferred": 3,
+      "installments": 0
+    },
+    "attention_tickets_pending": 1,
+    "reminders_pending": 4
+  }
+}
+```
+
+Notas:
+
+- `clients_count`: clientes **PROPIO** con `advisor_id` del token.
+- `pre_reservations`: filas en `lot_pre_reservations` del asesor; `active` = `pending` + `approved`.
+- `lots`: unidades donde el lote tiene `advisor_id` del asesor, agrupadas por código de estado (`PRERESERVA`, `RESERVADO`, `TRANSFERIDO`, `CUOTAS`).
+- `attention_tickets_pending`: tickets con estado `pendiente`.
+- `reminders_pending`: recordatorios sin `completed_at`, solo con clientes PROPIO del asesor (misma regla que el listado de recordatorios).
 
 ## Clientes propios
 
