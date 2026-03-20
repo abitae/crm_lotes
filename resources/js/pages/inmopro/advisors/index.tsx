@@ -1,11 +1,10 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { FormEvent, useEffect, useState } from 'react';
-import { Search, UserPlus, ChevronRight, Phone, Calendar, Eye, Plus, Pencil, Trash2, Receipt, KeyRound } from 'lucide-react';
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Search, UserPlus, ChevronRight, Plus, Pencil, Receipt, KeyRound } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
+import Pagination, { type PaginationLink } from '@/components/pagination';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -14,18 +13,22 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import Pagination, { type PaginationLink } from '@/components/pagination';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/app-layout';
 import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
 type AdvisorLevel = { id: number; name: string };
 type Team = { id: number; name: string; color?: string };
+type CityOption = { id: number; name: string; department?: string | null };
 type Advisor = {
     id: number;
     name: string;
     username?: string;
     email: string;
     phone: string;
+    city_id?: number;
     personal_quota: string;
     team_id?: number;
     advisor_level_id?: number;
@@ -34,6 +37,7 @@ type Advisor = {
     team?: Team;
     level?: { name: string; color?: string };
     superior?: { name: string };
+    city?: { id: number; name: string; department?: string | null };
     memberships?: Membership[];
 };
 type Payment = { id: number; amount: string; paid_at: string; notes?: string | null };
@@ -71,6 +75,7 @@ type PageProps = {
     advisorLevels: AdvisorLevel[];
     advisorsList: { id: number; name: string }[];
     teams: Team[];
+    cities: CityOption[];
     membershipTypes: MembershipTypeOption[];
     membershipDetail: MembershipDetail | null;
     advisorForModal: Advisor | null;
@@ -92,6 +97,7 @@ export default function AdvisorsIndex({
     advisorLevels,
     advisorsList,
     teams,
+    cities,
     membershipTypes,
     membershipDetail,
     advisorForModal,
@@ -104,12 +110,22 @@ export default function AdvisorsIndex({
     const [modalCreateMembership, setModalCreateMembership] = useState(false);
     const [modalMembershipDetail, setModalMembershipDetail] = useState<MembershipDetail | null>(null);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- abrir modales desde ?modal= en la URL */
     useEffect(() => {
-        if (openModal === 'create_advisor') setModalCreateAdvisor(true);
-        if (openModal === 'edit_advisor' && advisorForModal) setModalEditAdvisor(advisorForModal);
-        if (openModal === 'create_membership') setModalCreateMembership(true);
-        if (membershipDetail) setModalMembershipDetail(membershipDetail);
+        if (openModal === 'create_advisor') {
+            setModalCreateAdvisor(true);
+        }
+        if (openModal === 'edit_advisor' && advisorForModal) {
+            setModalEditAdvisor(advisorForModal);
+        }
+        if (openModal === 'create_membership') {
+            setModalCreateMembership(true);
+        }
+        if (membershipDetail) {
+            setModalMembershipDetail(membershipDetail);
+        }
     }, [openModal, advisorForModal, membershipDetail]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -188,6 +204,7 @@ export default function AdvisorsIndex({
                                 <tr className="border-b border-slate-100 bg-slate-50/50">
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Nivel / Vendedor</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Team</th>
+                                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Ciudad</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Superior</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Cuota</th>
                                     {MEMBERSHIP_YEARS.map((y) => (
@@ -220,6 +237,12 @@ export default function AdvisorsIndex({
                                             >
                                                 {adv.team?.name ?? 'Sin team'}
                                             </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-slate-700">
+                                            <span className="font-medium text-slate-800">{adv.city?.name ?? '—'}</span>
+                                            {adv.city?.department ? (
+                                                <span className="block text-[10px] text-slate-400">{adv.city.department}</span>
+                                            ) : null}
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{adv.superior?.name ?? 'Alta Gerencia'}</td>
                                         <td className="px-4 py-3 font-medium text-slate-700">S/ {Number(adv.personal_quota).toLocaleString()}</td>
@@ -297,6 +320,7 @@ export default function AdvisorsIndex({
                     advisorLevels={advisorLevels}
                     advisorsList={advisorsList}
                     teams={teams}
+                    cities={cities}
                 />
 
                 {/* Modal: Editar vendedor */}
@@ -308,6 +332,7 @@ export default function AdvisorsIndex({
                         advisorLevels={advisorLevels}
                         advisorsList={advisorsList.filter((a) => a.id !== modalEditAdvisor.id)}
                         teams={teams}
+                        cities={cities}
                     />
                 )}
 
@@ -375,17 +400,20 @@ function CreateAdvisorModal({
     advisorLevels,
     advisorsList,
     teams,
+    cities,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     advisorLevels: AdvisorLevel[];
     advisorsList: { id: number; name: string }[];
     teams: Team[];
+    cities: CityOption[];
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
         phone: '',
         email: '',
+        city_id: cities[0]?.id ?? 0,
         team_id: teams[0]?.id ?? 0,
         advisor_level_id: advisorLevels[0]?.id ?? 0,
         superior_id: null as number | null,
@@ -419,6 +447,23 @@ function CreateAdvisorModal({
                         <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
                         <InputError message={errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="city_id">Ciudad</Label>
+                        <select
+                            id="city_id"
+                            value={data.city_id}
+                            onChange={(e) => setData('city_id', Number(e.target.value))}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                            {cities.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name}
+                                    {c.department ? ` · ${c.department}` : ''}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.city_id} />
                     </div>
                     <div>
                         <Label htmlFor="team_id">Team</Label>
@@ -491,6 +536,7 @@ function EditAdvisorModal({
     advisorLevels,
     advisorsList,
     teams,
+    cities,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -498,11 +544,13 @@ function EditAdvisorModal({
     advisorLevels: AdvisorLevel[];
     advisorsList: { id: number; name: string }[];
     teams: Team[];
+    cities: CityOption[];
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: advisor.name,
         phone: advisor.phone,
         email: advisor.email,
+        city_id: advisor.city_id ?? cities[0]?.id ?? 0,
         team_id: advisor.team_id ?? teams[0]?.id ?? 0,
         advisor_level_id: advisor.advisor_level_id ?? advisorLevels[0]?.id ?? 0,
         superior_id: advisor.superior_id ?? (null as number | null),
@@ -536,6 +584,23 @@ function EditAdvisorModal({
                         <Label htmlFor="edit-email">Email</Label>
                         <Input id="edit-email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
                         <InputError message={errors.email} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-city">Ciudad</Label>
+                        <select
+                            id="edit-city"
+                            value={data.city_id}
+                            onChange={(e) => setData('city_id', Number(e.target.value))}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                        >
+                            {cities.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name}
+                                    {c.department ? ` · ${c.department}` : ''}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.city_id} />
                     </div>
                     <div>
                         <Label htmlFor="edit-team">Team</Label>

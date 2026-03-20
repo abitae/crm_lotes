@@ -9,6 +9,7 @@ use App\Http\Requests\Inmopro\UpdateAdvisorRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
 use App\Models\Inmopro\AdvisorMembership;
+use App\Models\Inmopro\City;
 use App\Models\Inmopro\MembershipType;
 use App\Models\Inmopro\Team;
 use Illuminate\Http\JsonResponse;
@@ -39,7 +40,7 @@ class AdvisorController extends Controller
     public function index(Request $request): Response
     {
         $query = Advisor::with([
-            'level', 'superior', 'team',
+            'level', 'superior', 'team', 'city',
             'memberships.membershipType',
             'memberships.installments',
             'memberships.payments',
@@ -58,6 +59,11 @@ class AdvisorController extends Controller
         $advisorsList = Advisor::orderBy('name')->get(['id', 'name']);
         $teams = Team::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color']);
         $membershipTypes = MembershipType::orderBy('name')->get(['id', 'name', 'months', 'amount']);
+        $cities = City::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'department']);
 
         $membershipDetail = null;
         if ($request->filled('membership_id')) {
@@ -74,7 +80,7 @@ class AdvisorController extends Controller
 
         $advisorForModal = null;
         if ($request->filled('modal') && $request->input('modal') === 'edit_advisor' && $request->filled('advisor_id')) {
-            $advisorForModal = Advisor::with('level')->find($request->input('advisor_id'));
+            $advisorForModal = Advisor::with(['level', 'city'])->find($request->input('advisor_id'));
         }
 
         return Inertia::render('inmopro/advisors/index', [
@@ -82,6 +88,7 @@ class AdvisorController extends Controller
             'advisorLevels' => $advisorLevels,
             'advisorsList' => $advisorsList,
             'teams' => $teams,
+            'cities' => $cities,
             'membershipTypes' => $membershipTypes,
             'membershipDetail' => $membershipDetail,
             'advisorForModal' => $advisorForModal,

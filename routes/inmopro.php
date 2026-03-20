@@ -15,6 +15,7 @@ use App\Http\Controllers\Inmopro\ClientTypeController;
 use App\Http\Controllers\Inmopro\CommissionController;
 use App\Http\Controllers\Inmopro\CommissionStatusController;
 use App\Http\Controllers\Inmopro\DashboardController;
+use App\Http\Controllers\Inmopro\DateroController;
 use App\Http\Controllers\Inmopro\FinancialController;
 use App\Http\Controllers\Inmopro\LotAiFollowUpSuggestionController;
 use App\Http\Controllers\Inmopro\LotController;
@@ -47,6 +48,7 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::get('advisors/search', [AdvisorController::class, 'search'])->name('advisors.search');
     Route::put('advisors/{advisor}/cazador-access', [AdvisorController::class, 'updateCazadorAccess'])->name('advisors.cazador-access.update');
     Route::resource('advisors', AdvisorController::class)->except(['destroy']);
+    Route::resource('dateros', DateroController::class);
     Route::resource('teams', TeamController::class);
     Route::get('membership-types/{membership_type}/bulk-assign', [MembershipTypeController::class, 'bulkAssign'])->name('membership-types.bulk-assign');
     Route::post('membership-types/{membership_type}/bulk-assign', [MembershipTypeController::class, 'bulkAssignStore'])->name('membership-types.bulk-assign.store');

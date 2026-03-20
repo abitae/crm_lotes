@@ -4,8 +4,16 @@ namespace Tests\Feature\Inmopro;
 
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
+use App\Models\Inmopro\City;
 use App\Models\Inmopro\Team;
 use App\Models\User;
+use Database\Seeders\Inmopro\AdvisorLevelSeeder;
+use Database\Seeders\Inmopro\AdvisorSeeder;
+use Database\Seeders\Inmopro\CitySeeder;
+use Database\Seeders\Inmopro\CommissionStatusSeeder;
+use Database\Seeders\Inmopro\LotStatusSeeder;
+use Database\Seeders\Inmopro\ProjectSeeder;
+use Database\Seeders\Inmopro\TeamSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,12 +24,13 @@ class InmoproAdvisorsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\Inmopro\TeamSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\LotStatusSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\CommissionStatusSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ProjectSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
+        $this->seed(TeamSeeder::class);
+        $this->seed(CitySeeder::class);
+        $this->seed(AdvisorLevelSeeder::class);
+        $this->seed(LotStatusSeeder::class);
+        $this->seed(CommissionStatusSeeder::class);
+        $this->seed(ProjectSeeder::class);
+        $this->seed(AdvisorSeeder::class);
     }
 
     public function test_guests_cannot_visit_advisors_index(): void
@@ -37,7 +46,7 @@ class InmoproAdvisorsTest extends TestCase
 
         $response = $this->get(route('inmopro.advisors.index'));
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->component('inmopro/advisors/index')->has('advisors')->has('teams'));
+        $response->assertInertia(fn ($page) => $page->component('inmopro/advisors/index')->has('advisors')->has('teams')->has('cities'));
     }
 
     public function test_authenticated_users_can_create_advisor(): void
@@ -45,12 +54,14 @@ class InmoproAdvisorsTest extends TestCase
         $user = User::factory()->create();
         $level = AdvisorLevel::first();
         $team = Team::first();
+        $city = City::firstOrFail();
         $this->actingAs($user);
 
         $response = $this->post(route('inmopro.advisors.store'), [
             'name' => 'Asesor Nuevo Test',
             'phone' => '999888777',
             'email' => 'asesor@example.com',
+            'city_id' => $city->id,
             'team_id' => $team->id,
             'advisor_level_id' => $level->id,
             'personal_quota' => 10,
@@ -75,6 +86,7 @@ class InmoproAdvisorsTest extends TestCase
             'name' => 'Asesor Actualizado',
             'phone' => $advisor->phone,
             'email' => $advisor->email,
+            'city_id' => $advisor->city_id ?? City::firstOrFail()->id,
             'team_id' => $advisor->team_id,
             'advisor_level_id' => $advisor->advisor_level_id,
             'personal_quota' => 15,

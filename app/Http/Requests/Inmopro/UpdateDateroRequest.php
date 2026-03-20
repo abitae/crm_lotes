@@ -2,18 +2,23 @@
 
 namespace App\Http\Requests\Inmopro;
 
+use App\Models\Inmopro\Datero;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateAdvisorRequest extends FormRequest
+class UpdateDateroRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('pin') === '' || $this->input('pin') === null) {
+            $this->merge(['pin' => null]);
+        }
     }
 
     /**
@@ -21,18 +26,19 @@ class UpdateAdvisorRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var Datero $datero */
+        $datero = $this->route('datero');
+
         return [
+            'advisor_id' => ['required', 'exists:advisors,id'],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:50'],
             'email' => ['required', 'email', 'max:255'],
             'city_id' => ['required', Rule::exists('cities', 'id')->where('is_active', true)],
-            'username' => ['nullable', 'string', 'max:255', Rule::unique('advisors', 'username')->ignore($this->route('advisor'))],
+            'dni' => ['required', 'string', 'max:20', Rule::unique('dateros', 'dni')->ignore($datero->id)],
+            'username' => ['required', 'string', 'max:255', Rule::unique('dateros', 'username')->ignore($datero->id), Rule::unique('advisors', 'username')],
             'pin' => ['nullable', 'digits:6'],
             'is_active' => ['nullable', 'boolean'],
-            'team_id' => ['required', 'exists:teams,id'],
-            'advisor_level_id' => ['required', 'exists:advisor_levels,id'],
-            'superior_id' => ['nullable', 'exists:advisors,id'],
-            'personal_quota' => ['required', 'numeric', 'min:0'],
         ];
     }
 }

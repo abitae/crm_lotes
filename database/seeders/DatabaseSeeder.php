@@ -40,6 +40,8 @@ class DatabaseSeeder extends Seeder
             Inmopro\ClientSeeder::class,
             Inmopro\LotSeeder::class,
             Inmopro\LotPreReservationSeeder::class,
+            Inmopro\FunctionalTestingSeeder::class,
+            Inmopro\Asesor1RemindersAndTicketsSeeder::class,
         ]);
     }
 }

@@ -4,6 +4,7 @@ namespace Tests\Feature\Inmopro;
 
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
+use App\Models\Inmopro\City;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotPayment;
 use App\Models\Inmopro\LotStatus;
@@ -106,10 +107,19 @@ class InmoproReportsTest extends TestCase
             'sort_order' => 1,
         ]);
 
+        $city = City::create([
+            'name' => 'Lima',
+            'code' => 'LIM',
+            'department' => 'Lima',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
         $advisor = Advisor::create([
             'name' => 'Asesor Uno',
             'phone' => '999111222',
             'email' => 'asesor@example.com',
+            'city_id' => $city->id,
             'team_id' => $team->id,
             'advisor_level_id' => $level->id,
             'personal_quota' => 80000,

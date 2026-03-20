@@ -31,7 +31,7 @@ Eres un desarrollador senior en **React Native** y **TypeScript**. Debes:
   3. Clientes propios (listar, crear, editar, detalle con lotes)  
   4. Recordatorios (cliente **PROPIO** obligatorio)  
   5. Tickets de atención (crear, listar, cancelar)  
-  6. Catálogo: proyectos y lotes  
+  6. Catálogo: proyectos y lotes; **mis lotes** por estado (`GET my-lots`)  
   7. Pre-reserva con **imagen** del voucher (multipart)  
   8. Logout  
 
@@ -99,6 +99,7 @@ Prefijo real: **`/api/v1/cazador`** (Laravel monta `api.php` bajo `/api`).
 | POST | `reminders/{id}/complete` | Bearer | — | vacío |
 | GET | `projects` | Bearer | — | — |
 | GET | `projects/{id}` | Bearer | — | — |
+| GET | `my-lots` | Bearer | `status` (código `LIBRE`/`PRERESERVA`/…), `project_id`, `search` opcionales | — |
 | GET | `lots` | Bearer | `project_id`, `search`, `available_only` (default **true**) | — |
 | GET | `lots/{id}` | Bearer | — | — |
 | POST | `lots/{id}/pre-reservations` | Bearer | `id` en URL = lote | **multipart** (ver 6.6) |

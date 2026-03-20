@@ -44,6 +44,7 @@ Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
 
         Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
         Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+        Route::get('my-lots', [LotController::class, 'indexMine'])->name('my-lots.index');
         Route::get('lots', [LotController::class, 'index'])->name('lots.index');
         Route::get('lots/{lot}', [LotController::class, 'show'])->name('lots.show');
         Route::post('lots/{lot}/pre-reservations', [PreReservationController::class, 'store'])->name('lots.pre-reservations.store');

@@ -28,7 +28,7 @@ Seeders utiles para pruebas:
 4. Crea o edita sus clientes propios (tipo **PROPIO** en la API).
 5. Opcional: crea recordatorios ligados a esos clientes **PROPIO**.
 6. Registra tickets de atencion por proyecto para sus clientes propios.
-7. Consulta proyectos y lotes disponibles.
+7. Consulta proyectos, lotes disponibles y **sus lotes asignados** (`GET /my-lots`, opcionalmente por estado).
 8. Registra una pre-reserva subiendo una imagen del voucher.
 9. El lote pasa a `PRERESERVA`.
 10. Un administrador revisa la solicitud desde el backend web y aprueba o rechaza.
@@ -416,8 +416,58 @@ Detalle de proyecto.
 
 ## Lotes
 
+### GET `/my-lots`
+Lista las unidades donde el lote tiene `advisor_id` del vendedor autenticado (misma regla que los conteos `lots` en `GET /dashboard`).
+
+Query params opcionales:
+
+- `status` — codigo de estado del lote: `LIBRE`, `PRERESERVA`, `RESERVADO`, `TRANSFERIDO`, `CUOTAS` (debe ser un codigo de sistema valido).
+- `project_id` — filtra por proyecto.
+- `search` — coincidencia parcial en `block` o `number`.
+
+Si no se envia `status`, se devuelven todos los lotes del asesor sin filtrar por estado.
+
+Cada elemento usa el mismo formato enriquecido que `GET /lots/{lot}` (incluye `client`, `advisor` y `pre_reservations` con historial reciente).
+
+Response `200`:
+
+```json
+{
+  "data": [
+    {
+      "id": 10,
+      "block": "A",
+      "number": 5,
+      "area": "105.00",
+      "price": "30000.00",
+      "project": { "id": 1, "name": "Villa Norte - Mito" },
+      "status": {
+        "id": 3,
+        "name": "Reservado",
+        "code": "RESERVADO",
+        "color": "#f59e0b"
+      },
+      "can_pre_reserve": false,
+      "client": { "id": 25, "name": "Cliente Ejemplo" },
+      "advisor": { "id": 4, "name": "Asesor Demo" },
+      "pre_reservations": [
+        {
+          "id": 2,
+          "status": "APROBADA",
+          "created_at": "2026-03-18 10:00:00"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Errores tipicos:
+
+- `422` si `status` no es un codigo de estado de sistema valido.
+
 ### GET `/lots`
-Lista lotes.
+Lista lotes (catalogo; no filtra por asesor).
 
 Query params opcionales:
 

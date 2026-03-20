@@ -24,6 +24,7 @@ class Advisor extends Model
         'name',
         'phone',
         'email',
+        'city_id',
         'username',
         'pin',
         'is_active',
@@ -60,6 +61,14 @@ class Advisor extends Model
                 return Hash::needsRehash($value) ? Hash::make($value) : $value;
             },
         );
+    }
+
+    /**
+     * @return BelongsTo<City, $this>
+     */
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(City::class, 'city_id');
     }
 
     /**
@@ -164,5 +173,13 @@ class Advisor extends Model
     public function reminders(): HasMany
     {
         return $this->hasMany(AdvisorReminder::class, 'advisor_id');
+    }
+
+    /**
+     * @return HasMany<Datero, $this>
+     */
+    public function dateros(): HasMany
+    {
+        return $this->hasMany(Datero::class, 'advisor_id');
     }
 }

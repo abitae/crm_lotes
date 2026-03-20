@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Inmopro;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreAdvisorRequest extends FormRequest
 {
@@ -15,7 +17,7 @@ class StoreAdvisorRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -23,6 +25,7 @@ class StoreAdvisorRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:50'],
             'email' => ['required', 'email', 'max:255'],
+            'city_id' => ['required', Rule::exists('cities', 'id')->where('is_active', true)],
             'username' => ['nullable', 'string', 'max:255', 'unique:advisors,username'],
             'pin' => ['nullable', 'digits:6'],
             'is_active' => ['nullable', 'boolean'],

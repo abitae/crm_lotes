@@ -4,8 +4,10 @@ namespace Database\Seeders\Inmopro;
 
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
+use App\Models\Inmopro\City;
 use App\Models\Inmopro\Team;
 use Illuminate\Database\Seeder;
+use RuntimeException;
 
 class AdvisorSeeder extends Seeder
 {
@@ -14,8 +16,17 @@ class AdvisorSeeder extends Seeder
      */
     public function run(): void
     {
+        if (! City::query()->exists()) {
+            $this->call(CitySeeder::class);
+        }
+
         if (! Team::query()->exists()) {
             $this->call(TeamSeeder::class);
+        }
+
+        $defaultCityId = City::query()->orderBy('sort_order')->orderBy('id')->value('id');
+        if ($defaultCityId === null) {
+            throw new RuntimeException('AdvisorSeeder requiere al menos una ciudad. Ejecute CitySeeder.');
         }
 
         $level4 = AdvisorLevel::where('code', 'NIVEL_4')->first();
@@ -34,6 +45,7 @@ class AdvisorSeeder extends Seeder
                     'username' => "director{$i}",
                     'pin' => '123456',
                     'is_active' => true,
+                    'city_id' => $defaultCityId,
                     'team_id' => $teams[($i - 1) % $teams->count()]->id,
                     'advisor_level_id' => $level4->id,
                     'superior_id' => null,
@@ -53,6 +65,7 @@ class AdvisorSeeder extends Seeder
                     'username' => "gerente{$i}",
                     'pin' => '123456',
                     'is_active' => true,
+                    'city_id' => $defaultCityId,
                     'team_id' => $teams[($i - 1) % $teams->count()]->id,
                     'advisor_level_id' => $level3->id,
                     'superior_id' => $superior->id,
@@ -72,6 +85,7 @@ class AdvisorSeeder extends Seeder
                     'username' => "senior{$i}",
                     'pin' => '123456',
                     'is_active' => true,
+                    'city_id' => $defaultCityId,
                     'team_id' => $teams[($i - 1) % $teams->count()]->id,
                     'advisor_level_id' => $level2->id,
                     'superior_id' => $superior->id,
@@ -90,6 +104,7 @@ class AdvisorSeeder extends Seeder
                     'username' => "asesor{$i}",
                     'pin' => '123456',
                     'is_active' => true,
+                    'city_id' => $defaultCityId,
                     'team_id' => $teams[($i - 1) % $teams->count()]->id,
                     'advisor_level_id' => $level1->id,
                     'superior_id' => $superior->id,
