@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\v1\Cazador\AttentionTicketController;
 use App\Http\Controllers\Api\v1\Cazador\AuthController;
+use App\Http\Controllers\Api\v1\Cazador\CityController;
 use App\Http\Controllers\Api\v1\Cazador\ClientController;
 use App\Http\Controllers\Api\v1\Cazador\DashboardController;
 use App\Http\Controllers\Api\v1\Cazador\LotController;
@@ -23,6 +24,8 @@ Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
         Route::put('me/pin', [ProfileController::class, 'updatePin'])->name('me.pin.update');
 
         Route::get('dashboard', [DashboardController::class, 'show'])->name('dashboard.show');
+
+        Route::get('cities', [CityController::class, 'index'])->name('cities.index');
 
         Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
         Route::post('clients', [ClientController::class, 'store'])->name('clients.store');

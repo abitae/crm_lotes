@@ -155,6 +155,28 @@ Notas:
 - `attention_tickets_pending`: tickets con estado `pendiente`.
 - `reminders_pending`: recordatorios sin `completed_at`, solo con clientes PROPIO del asesor (misma regla que el listado de recordatorios).
 
+### GET `/cities`
+Lista ciudades **activas** (`is_active = true`) para selects en el formulario de clientes. Orden: `sort_order`, luego `name`.
+
+Query opcional:
+
+- `search`: filtra por coincidencia parcial en `name` o `department`.
+
+Response `200`:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "Lima",
+      "department": "Lima",
+      "code": "LIM"
+    }
+  ]
+}
+```
+
 ## Clientes propios
 
 Reglas:
