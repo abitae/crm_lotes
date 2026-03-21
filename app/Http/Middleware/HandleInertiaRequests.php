@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\AppBrandingResolver;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -37,7 +38,8 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            'name' => config('app.name'),
+            'name' => AppBrandingResolver::resolvedDisplayName(),
+            'brandingLogoUrl' => AppBrandingResolver::logoUrl(),
             'auth' => [
                 'user' => fn () => $request->user()
                     ? [

@@ -10,6 +10,7 @@ use App\Models\Inmopro\AttentionTicket;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\DeliveryDeed;
 use App\Models\Inmopro\Project;
+use App\Support\AppBrandingResolver;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -157,7 +158,7 @@ class AttentionTicketController extends Controller
         return Inertia::render('inmopro/operations/delivery-deed-print', [
             'ticket' => $attention_ticket->load(['lot.project', 'lot.client', 'advisor']),
             'deed' => $deed,
-            'companyName' => config('app.name'),
+            'companyName' => AppBrandingResolver::resolvedDisplayName(),
         ]);
     }
 

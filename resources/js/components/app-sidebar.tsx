@@ -13,10 +13,12 @@ import {
     Layers,
     LayoutGrid,
     MapPin,
+    Palette,
     Percent,
     Receipt,
     ShieldCheck,
     Tag,
+    Target,
     UserCheck,
     Users,
     WalletCards,
@@ -68,6 +70,7 @@ const managementSections: NavSection[] = [
             { title: 'Cuentas por cobrar', href: '/inmopro/accounts-receivable', icon: WalletCards },
             { title: 'Comisiones', href: '/inmopro/commissions', icon: Percent },
             { title: 'Reportes', href: '/inmopro/reports', icon: LayoutGrid },
+            { title: 'Meta general reportes', href: '/inmopro/report-settings', icon: Target },
         ],
     },
     {
@@ -103,6 +106,11 @@ const managementSections: NavSection[] = [
         items: [
             { title: 'Procesos del sistema', href: '/inmopro/process-diagrams', icon: GitBranch },
         ],
+    },
+    {
+        label: 'Sistema',
+        icon: Palette,
+        items: [{ title: 'Personalización', href: '/inmopro/branding', icon: Palette }],
     },
 ];
 

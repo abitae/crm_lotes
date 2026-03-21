@@ -17,7 +17,7 @@
 </head>
 <body>
     <h1>Inventario de Lotes · {{ $project->name }}</h1>
-    <p class="meta">{{ config('app.name') }} · Generado el {{ now()->format('d/m/Y H:i') }}</p>
+    <p class="meta">{{ $resolvedAppName }} · Generado el {{ now()->format('d/m/Y H:i') }}</p>
 
     @foreach ($blockGroups as $block => $lots)
     <div class="block-title">Manzana {{ $block }} ({{ count($lots) }} lotes)</div>
@@ -43,6 +43,6 @@
     </table>
     @endforeach
 
-    <p class="footer">Documento generado por {{ config('app.name') }}. Uso interno.</p>
+    <p class="footer">Documento generado por {{ $resolvedAppName }}. Uso interno.</p>
 </body>
 </html>

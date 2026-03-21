@@ -2,10 +2,11 @@
 
 namespace Database\Factories\Inmopro;
 
+use App\Models\Inmopro\Team;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Inmopro\Team>
+ * @extends Factory<Team>
  */
 class TeamFactory extends Factory
 {
@@ -23,6 +24,7 @@ class TeamFactory extends Factory
             'color' => $this->faker->hexColor(),
             'sort_order' => $this->faker->numberBetween(1, 20),
             'is_active' => true,
+            'group_sales_goal' => 0,
         ];
     }
 }

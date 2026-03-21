@@ -7,7 +7,16 @@ import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
 import type { BreadcrumbItem } from '@/types';
 
-type Team = { id: number; name: string; code: string; description?: string | null; color?: string | null; sort_order?: number; is_active: boolean };
+type Team = {
+    id: number;
+    name: string;
+    code: string;
+    description?: string | null;
+    color?: string | null;
+    sort_order?: number;
+    is_active: boolean;
+    group_sales_goal?: string | number;
+};
 
 export default function TeamsEdit({ team }: { team: Team }) {
     const { data, setData, put, processing, errors } = useForm({
@@ -17,6 +26,7 @@ export default function TeamsEdit({ team }: { team: Team }) {
         color: team.color ?? '#0f766e',
         sort_order: team.sort_order ?? 0,
         is_active: team.is_active,
+        group_sales_goal: Number(team.group_sales_goal ?? 0),
     });
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -59,6 +69,20 @@ export default function TeamsEdit({ team }: { team: Team }) {
                             <Label htmlFor="sort_order">Orden</Label>
                             <Input id="sort_order" type="number" min={0} value={data.sort_order} onChange={(e) => setData('sort_order', Number(e.target.value))} className="mt-1" />
                         </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="group_sales_goal">Meta grupal (S/)</Label>
+                        <Input
+                            id="group_sales_goal"
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={data.group_sales_goal}
+                            onChange={(e) => setData('group_sales_goal', Number(e.target.value))}
+                            className="mt-1"
+                        />
+                        <p className="mt-1 text-xs text-slate-500">Si es 0, en reportes se usa la suma de cuotas personales del equipo.</p>
+                        <InputError message={errors.group_sales_goal} />
                     </div>
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                         <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />

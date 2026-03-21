@@ -28,7 +28,7 @@ Seeders utiles para pruebas:
 2. Opcional: `GET /dashboard` para métricas de inicio (clientes, pre-reservas, lotes por estado, pendientes).
 3. Consulta o actualiza su perfil.
 4. Gestiona los **dateros** a su cargo (alta y edicion; mismo alcance que en el panel Inmopro para su `advisor_id`).
-5. Crea o edita sus clientes propios (tipo **PROPIO** en la API).
+5. Lista y edita clientes **PROPIO** y **DATERO** (captados por sus dateros); el alta desde la API solo crea tipo **PROPIO**.
 6. Opcional: crea recordatorios ligados a esos clientes **PROPIO**.
 7. Registra tickets de atencion por proyecto para sus clientes propios.
 8. Consulta proyectos, lotes disponibles y **sus lotes asignados** (`GET /my-lots`, opcionalmente por estado).
@@ -272,11 +272,11 @@ Response `200`:
 
 Reglas:
 
-- El vendedor solo ve clientes con `advisor_id` propio.
-- Los clientes creados por el API se guardan automaticamente con tipo `PROPIO`.
+- El vendedor solo ve clientes con `advisor_id` propio y tipo **`PROPIO`** o **`DATERO`** (clientes captados por los dateros de ese asesor se listan y se pueden ver/editar en detalle).
+- Los clientes **creados** con `POST /clients` se guardan siempre con tipo **`PROPIO`**. No se puede dar de alta un cliente **DATERO** desde este API (eso lo hace la app Datero).
 
 ### GET `/clients`
-Lista clientes propios.
+Lista clientes propios y clientes tipo DATERO del asesor.
 
 Query params opcionales:
 
@@ -310,6 +310,10 @@ Response `201`:
     "phone": "987654321",
     "email": "cliente@demo.com",
     "referred_by": "Campana digital",
+    "client_type": {
+      "code": "PROPIO",
+      "name": "Propio"
+    },
     "city": {
       "id": 1,
       "name": "Lima",
@@ -319,6 +323,8 @@ Response `201`:
   }
 }
 ```
+
+Cada elemento incluye `client_type` con `code` y `name` (`PROPIO`, `DATERO`, etc.) para distinguir en la app.
 
 **Unicidad DNI y telefono:** no puede existir otro cliente en el sistema con el mismo DNI (si se envia) ni el mismo telefono. Si ya estan registrados, respuesta **`422`** con error de validacion en la clave `duplicate_registration` y mensaje del tipo: `Cliente ya registrado por {nombre del vendedor}` (el asesor que tiene ese cliente en el CRM).
 

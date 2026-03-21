@@ -1,8 +1,8 @@
 import { Link } from '@inertiajs/react';
-import AppLogoIcon from '@/components/app-logo-icon';
+import AppBrandingLogo from '@/components/app-branding-logo';
 import FlashSwal from '@/components/flash-swal';
-import type { AuthLayoutProps } from '@/types';
 import { home } from '@/routes';
+import type { AuthLayoutProps } from '@/types';
 
 export default function AuthSimpleLayout({
     children,
@@ -20,7 +20,10 @@ export default function AuthSimpleLayout({
                             className="flex flex-col items-center gap-2 font-medium"
                         >
                             <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                                <AppLogoIcon className="size-9 fill-current text-[var(--foreground)] dark:text-white" />
+                                <AppBrandingLogo
+                                    iconClassName="size-9 fill-current text-[var(--foreground)] dark:text-white"
+                                    imageClassName="size-9 object-contain"
+                                />
                             </div>
                             <span className="sr-only">{title}</span>
                         </Link>

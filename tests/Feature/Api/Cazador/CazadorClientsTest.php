@@ -6,6 +6,7 @@ use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\ClientType;
+use App\Models\Inmopro\Datero;
 use Database\Seeders\Inmopro\AdvisorLevelSeeder;
 use Database\Seeders\Inmopro\AdvisorSeeder;
 use Database\Seeders\Inmopro\CitySeeder;
@@ -119,6 +120,176 @@ class CazadorClientsTest extends TestCase
             ])
             ->assertUnprocessable()
             ->assertJsonPath('errors.duplicate_registration.0', 'Cliente ya registrado por '.$existing->advisor->name);
+    }
+
+    public function test_advisor_can_list_show_and_update_datero_clients_for_same_advisor(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $city = City::firstOrFail();
+        $dateroType = ClientType::query()->where('code', 'DATERO')->firstOrFail();
+        $token = $this->loginToken($advisor);
+
+        $datero = Datero::create([
+            'advisor_id' => $advisor->id,
+            'name' => 'Datero Test Cazador',
+            'phone' => '900000000',
+            'email' => 'datero_cazador_client@test.com',
+            'city_id' => $city->id,
+            'dni' => '44119998',
+            'username' => 'datero_cazador_clients_test',
+            'pin' => '654321',
+            'is_active' => true,
+        ]);
+
+        $client = Client::create([
+            'name' => 'Cliente captado por datero',
+            'dni' => '55667798',
+            'phone' => '900222334',
+            'client_type_id' => $dateroType->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city->id,
+            'registered_by_datero_id' => $datero->id,
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson(route('api.v1.cazador.clients.index'))
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Cliente captado por datero'])
+            ->assertJsonFragment(['code' => 'DATERO']);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson(route('api.v1.cazador.clients.show', $client))
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Cliente captado por datero')
+            ->assertJsonPath('data.client_type.code', 'DATERO');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson(route('api.v1.cazador.clients.update', $client), [
+                'name' => 'Cliente Datero editado por asesor',
+                'dni' => '55667798',
+                'phone' => '900222334',
+                'city_id' => $city->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Cliente Datero editado por asesor');
+    }
+
+    public function test_index_filters_by_client_type_propio(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $city = City::firstOrFail();
+        $ownType = ClientType::where('code', 'PROPIO')->firstOrFail();
+        $dateroType = ClientType::query()->where('code', 'DATERO')->firstOrFail();
+        $token = $this->loginToken($advisor);
+
+        Client::create([
+            'name' => 'Solo Propio Lista',
+            'dni' => '20000001',
+            'phone' => '900000011',
+            'client_type_id' => $ownType->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city->id,
+        ]);
+
+        Client::create([
+            'name' => 'Solo Datero Lista',
+            'dni' => '20000002',
+            'phone' => '900000022',
+            'client_type_id' => $dateroType->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city->id,
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson(route('api.v1.cazador.clients.index', ['client_type' => 'PROPIO']))
+            ->assertOk();
+
+        $names = collect($response->json('data'))->pluck('name')->all();
+        $this->assertContains('Solo Propio Lista', $names);
+        $this->assertNotContains('Solo Datero Lista', $names);
+    }
+
+    public function test_index_filters_by_client_type_datero(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $city = City::firstOrFail();
+        $ownType = ClientType::where('code', 'PROPIO')->firstOrFail();
+        $dateroType = ClientType::query()->where('code', 'DATERO')->firstOrFail();
+        $token = $this->loginToken($advisor);
+
+        Client::create([
+            'name' => 'Propio Para Filtro Datero',
+            'dni' => '20000003',
+            'phone' => '900000033',
+            'client_type_id' => $ownType->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city->id,
+        ]);
+
+        Client::create([
+            'name' => 'Datero Para Filtro Datero',
+            'dni' => '20000004',
+            'phone' => '900000044',
+            'client_type_id' => $dateroType->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city->id,
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson(route('api.v1.cazador.clients.index', ['client_type' => 'DATERO']))
+            ->assertOk();
+
+        $names = collect($response->json('data'))->pluck('name')->all();
+        $this->assertNotContains('Propio Para Filtro Datero', $names);
+        $this->assertContains('Datero Para Filtro Datero', $names);
+    }
+
+    public function test_index_accepts_search_with_client_type(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $city = City::firstOrFail();
+        $ownType = ClientType::where('code', 'PROPIO')->firstOrFail();
+        $token = $this->loginToken($advisor);
+
+        Client::create([
+            'name' => 'Busqueda Alfa Propio',
+            'dni' => '20000005',
+            'phone' => '900000055',
+            'client_type_id' => $ownType->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city->id,
+        ]);
+
+        Client::create([
+            'name' => 'Busqueda Alfa Otro Propio',
+            'dni' => '20000006',
+            'phone' => '900000066',
+            'client_type_id' => $ownType->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city->id,
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson(route('api.v1.cazador.clients.index', [
+                'client_type' => 'PROPIO',
+                'search' => 'Alfa Propio',
+            ]))
+            ->assertOk();
+
+        $names = collect($response->json('data'))->pluck('name')->all();
+        $this->assertContains('Busqueda Alfa Propio', $names);
+        $this->assertNotContains('Busqueda Alfa Otro Propio', $names);
+    }
+
+    public function test_index_rejects_invalid_client_type(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $token = $this->loginToken($advisor);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson(route('api.v1.cazador.clients.index', ['client_type' => 'OTRO']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['client_type']);
     }
 
     public function test_advisor_cannot_access_clients_from_another_advisor(): void

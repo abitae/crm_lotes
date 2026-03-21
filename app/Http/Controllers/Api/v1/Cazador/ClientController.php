@@ -8,8 +8,10 @@ use App\Http\Requests\Api\v1\Cazador\UpdateClientRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\ClientType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ClientController extends Controller
 {
@@ -18,15 +20,20 @@ class ClientController extends Controller
         /** @var Advisor $advisor */
         $advisor = $request->attributes->get('advisor');
 
-        $clients = Client::query()
-            ->with('city')
-            ->where('advisor_id', $advisor->id)
-            ->whereHas('type', function ($query) {
-                $query->whereIn('code', ['PROPIO', 'DATERO']);
+        $request->validate([
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'client_type' => ['sometimes', 'nullable', 'string', Rule::in(['PROPIO', 'DATERO'])],
+        ]);
+
+        $clients = $this->advisorVisibleClientsQuery($advisor)
+            ->with(['city', 'type'])
+            ->when($request->filled('client_type'), function (Builder $query) use ($request): void {
+                $code = (string) $request->input('client_type');
+                $query->whereHas('type', fn ($typeQuery) => $typeQuery->where('code', $code));
             })
-            ->when($request->filled('search'), function ($query) use ($request) {
+            ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $term = (string) $request->input('search');
-                $query->where(function ($nestedQuery) use ($term) {
+                $query->where(function ($nestedQuery) use ($term): void {
                     $nestedQuery->where('name', 'like', "%{$term}%")
                         ->orWhere('dni', 'like', "%{$term}%")
                         ->orWhere('phone', 'like', "%{$term}%");
@@ -87,15 +94,26 @@ class ClientController extends Controller
         ]);
     }
 
+    /**
+     * Clientes visibles para el asesor en el API Cazador: PROPIO (propios) y DATERO (captados por sus dateros).
+     * El alta desde este API solo crea tipo PROPIO (método store).
+     *
+     * @return Builder<Client>
+     */
+    private function advisorVisibleClientsQuery(Advisor $advisor): Builder
+    {
+        return Client::query()
+            ->where('advisor_id', $advisor->id)
+            ->whereHas('type', fn ($query) => $query->whereIn('code', ['PROPIO', 'DATERO']));
+    }
+
     private function ownedClient(Request $request, Client $client): ?Client
     {
         /** @var Advisor $advisor */
         $advisor = $request->attributes->get('advisor');
 
-        return Client::query()
+        return $this->advisorVisibleClientsQuery($advisor)
             ->whereKey($client->id)
-            ->where('advisor_id', $advisor->id)
-            ->whereHas('type', fn ($query) => $query->where('code', 'PROPIO'))
             ->first();
     }
 
@@ -104,6 +122,8 @@ class ClientController extends Controller
      */
     private function clientPayload(Client $client, bool $includeLots = false): array
     {
+        $client->loadMissing('type');
+
         return [
             'id' => $client->id,
             'name' => $client->name,
@@ -111,6 +131,10 @@ class ClientController extends Controller
             'phone' => $client->phone,
             'email' => $client->email,
             'referred_by' => $client->referred_by,
+            'client_type' => $client->type ? [
+                'code' => $client->type->code,
+                'name' => $client->type->name,
+            ] : null,
             'city' => $client->city ? [
                 'id' => $client->city->id,
                 'name' => $client->city->name,

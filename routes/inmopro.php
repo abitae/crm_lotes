@@ -7,6 +7,7 @@ use App\Http\Controllers\Inmopro\AdvisorLevelController;
 use App\Http\Controllers\Inmopro\AdvisorMembershipController;
 use App\Http\Controllers\Inmopro\AdvisorReminderController;
 use App\Http\Controllers\Inmopro\AgendaController;
+use App\Http\Controllers\Inmopro\AppBrandingController;
 use App\Http\Controllers\Inmopro\AttentionTicketController;
 use App\Http\Controllers\Inmopro\CashAccountController;
 use App\Http\Controllers\Inmopro\CityController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\Inmopro\MembershipTypeController;
 use App\Http\Controllers\Inmopro\ProcessDiagramsController;
 use App\Http\Controllers\Inmopro\ProjectController;
 use App\Http\Controllers\Inmopro\ReportController;
+use App\Http\Controllers\Inmopro\ReportSalesConfigController;
 use App\Http\Controllers\Inmopro\TeamController;
 use Illuminate\Support\Facades\Route;
 
@@ -69,6 +71,11 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::post('commissions/{commission}/mark-as-paid', [CommissionController::class, 'markAsPaid'])->name('commissions.mark-as-paid');
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('reports/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
+    Route::get('reports/csv', [ReportController::class, 'csv'])->name('reports.csv');
+    Route::get('report-settings', [ReportSalesConfigController::class, 'edit'])->name('report-settings.edit');
+    Route::put('report-settings', [ReportSalesConfigController::class, 'update'])->name('report-settings.update');
+    Route::get('branding', [AppBrandingController::class, 'edit'])->name('branding.edit');
+    Route::put('branding', [AppBrandingController::class, 'update'])->name('branding.update');
     Route::get('attention-tickets/calendar', [AttentionTicketController::class, 'calendar'])->name('attention-tickets.calendar');
     Route::get('attention-tickets/{attention_ticket}/delivery-deed', [AttentionTicketController::class, 'deliveryDeed'])->name('attention-tickets.delivery-deed');
     Route::post('attention-tickets/{attention_ticket}/delivery-deed/mark-signed', [AttentionTicketController::class, 'markDeedSigned'])->name('attention-tickets.delivery-deed.mark-signed');

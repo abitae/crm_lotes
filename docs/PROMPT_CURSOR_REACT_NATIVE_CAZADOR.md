@@ -113,7 +113,8 @@ Prefijo real: **`/api/v1/cazador`** (Laravel monta `api.php` bajo `/api`).
 
 ### 5.1 Clientes (API Cazador)
 
-- Solo se listan / muestran / editan clientes del asesor autenticado con tipo **PROPIO** (el API fuerza PROPIO en el alta).
+- Se listan / muestran / editan clientes del asesor con tipo **PROPIO** o **DATERO** (los DATERO son captados por dateros de ese vendedor). El **alta** (`POST /clients`) solo crea tipo **PROPIO**; no se crean DATERO desde este API.
+- La respuesta incluye `client_type` (`code`, `name`) para distinguir en la UI.
 - **Unicidad global:** no puede haber otro cliente con el mismo **DNI** (si se envía y no vacío) ni el mismo **teléfono** (no vacío). Respuesta **422** con error de validación:
   - Clave: `duplicate_registration`
   - Mensaje ejemplo: `Cliente ya registrado por Juan Perez` (nombre del asesor que tiene el cliente en CRM).
@@ -176,7 +177,7 @@ Si PIN actual incorrecto: **422**, `message`: *El PIN actual no es válido.*
 - `referred_by`: opcional  
 - `city_id`: opcional, existe en `cities`  
 
-Respuesta **201** en POST con `data` que incluye `city` anidado y `lots` (vacío en alta). PUT devuelve actualización según implementación (ver doc API).
+Respuesta **201** en POST con `data` que incluye `client_type` (siempre **PROPIO** en alta), `city` anidado y `lots` (vacío en alta). PUT/listado/detalle pueden incluir `client_type` **PROPIO** o **DATERO**. Ver [API_CAZADOR.md](./API_CAZADOR.md) sección clientes.
 
 ### 6.3.1 GET/POST/PUT `/dateros`
 

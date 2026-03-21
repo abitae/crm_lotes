@@ -7,6 +7,7 @@ use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
+use App\Models\Inmopro\ReportSalesConfig;
 use App\Models\Inmopro\Team;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\View;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use Mpdf\Mpdf;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
@@ -42,9 +44,59 @@ class ReportController extends Controller
         $mpdf->WriteHTML($html);
         $pdf = $mpdf->Output('', 'S');
 
+        $filename = 'reporte-ventas-'.now()->format('Y-m-d').'.pdf';
+        $disposition = $request->input('disposition') === 'attachment' ? 'attachment' : 'inline';
+
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="reporte-ventas-'.now()->format('Y-m-d').'.pdf"',
+            'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
+        ]);
+    }
+
+    public function csv(Request $request): StreamedResponse
+    {
+        $payload = $this->buildReportPayload($request);
+        $filename = 'reporte-ventas-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($payload): void {
+            $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                return;
+            }
+
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            $entityColumn = match ($payload['view']) {
+                'teams' => 'Equipo',
+                'advisors' => 'Vendedor',
+                default => 'Proyecto',
+            };
+
+            fputcsv($handle, [
+                $entityColumn,
+                'Ventas (S/)',
+                'Meta fila (S/)',
+                '% Cumplimiento',
+                'Cobrado (S/)',
+                'Pendiente (S/)',
+                'Lotes',
+            ], ';');
+
+            foreach ($payload['rows'] as $row) {
+                fputcsv($handle, [
+                    $row['label'],
+                    number_format((float) $row['sold_amount'], 2, '.', ''),
+                    number_format((float) $row['goal_amount'], 2, '.', ''),
+                    (string) $row['pct'],
+                    number_format((float) $row['collected_amount'], 2, '.', ''),
+                    number_format((float) $row['pending_amount'], 2, '.', ''),
+                    (string) $row['lots_count'],
+                ], ';');
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
@@ -54,17 +106,19 @@ class ReportController extends Controller
     private function buildReportPayload(Request $request): array
     {
         $view = $this->resolveView($request);
+        $dateRange = $this->resolveReportDateRange($request);
+
         $filters = [
             'view' => $view,
             'project_id' => $request->filled('project_id') ? $request->integer('project_id') : null,
             'team_id' => $request->filled('team_id') ? $request->integer('team_id') : null,
             'advisor_id' => $request->filled('advisor_id') ? $request->integer('advisor_id') : null,
-            'start_date' => $request->input('start_date'),
-            'end_date' => $request->input('end_date'),
+            'start_date' => $dateRange['start_date'],
+            'end_date' => $dateRange['end_date'],
         ];
 
         $projects = Project::query()->orderBy('name')->get(['id', 'name']);
-        $teams = Team::query()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color', 'is_active']);
+        $teams = Team::query()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color', 'is_active', 'group_sales_goal']);
         $advisors = Advisor::query()
             ->with('team:id,name,color')
             ->orderBy('name')
@@ -85,8 +139,8 @@ class ReportController extends Controller
             ->when($filters['project_id'], fn (Builder $builder, int $projectId) => $builder->where('project_id', $projectId))
             ->when($filters['advisor_id'], fn (Builder $builder, int $advisorId) => $builder->where('advisor_id', $advisorId))
             ->when($filters['team_id'], fn (Builder $builder, int $teamId) => $builder->whereHas('advisor', fn (Builder $advisorQuery) => $advisorQuery->where('team_id', $teamId)))
-            ->when($filters['start_date'], fn (Builder $builder, string $startDate) => $builder->whereDate('contract_date', '>=', $startDate))
-            ->when($filters['end_date'], fn (Builder $builder, string $endDate) => $builder->whereDate('contract_date', '<=', $endDate))
+            ->whereDate('contract_date', '>=', $filters['start_date'])
+            ->whereDate('contract_date', '<=', $filters['end_date'])
             ->get();
 
         $filteredAdvisors = $advisors
@@ -100,9 +154,11 @@ class ReportController extends Controller
             default => $this->buildAdvisorRows($filteredAdvisors, $lots),
         };
 
+        $generalSalesGoal = (float) ReportSalesConfig::current()->general_sales_goal;
+
         $summary = [
             'sold_amount' => round((float) collect($rows)->sum('sold_amount'), 2),
-            'goal_amount' => round((float) collect($rows)->sum('goal_amount'), 2),
+            'goal_amount' => round($generalSalesGoal, 2),
             'collected_amount' => round((float) collect($rows)->sum('collected_amount'), 2),
             'pending_amount' => round((float) collect($rows)->sum('pending_amount'), 2),
             'lots_count' => (int) collect($rows)->sum('lots_count'),
@@ -110,6 +166,14 @@ class ReportController extends Controller
         ];
         $summary['pct'] = $summary['goal_amount'] > 0
             ? (int) round(($summary['sold_amount'] / $summary['goal_amount']) * 100)
+            : 0;
+
+        $summary['rows_goal_sum'] = round((float) collect($rows)->sum('goal_amount'), 2);
+        $summary['avg_sale_per_lot'] = $summary['lots_count'] > 0
+            ? round($summary['sold_amount'] / $summary['lots_count'], 2)
+            : 0.0;
+        $summary['collection_pct'] = $summary['sold_amount'] > 0
+            ? (int) round(($summary['collected_amount'] / $summary['sold_amount']) * 100)
             : 0;
 
         return [
@@ -123,6 +187,7 @@ class ReportController extends Controller
             'advisors' => $filteredAdvisors->values(),
             'generatedAt' => now()->format('d/m/Y H:i'),
             'filterLabels' => $this->buildFilterLabels($filters, $projects, $teams, $advisors),
+            'reportSettingsUrl' => route('inmopro.report-settings.edit'),
         ];
     }
 
@@ -135,6 +200,46 @@ class ReportController extends Controller
         }
 
         return $view;
+    }
+
+    /**
+     * Rango de fechas por defecto: inicio = primer día del mes actual, fin = hoy.
+     * Si solo se envía fin: inicio = primer día del mes de esa fecha.
+     * Si solo se envía inicio: fin = hoy.
+     *
+     * @return array{start_date: string, end_date: string}
+     */
+    private function resolveReportDateRange(Request $request): array
+    {
+        $startInput = $request->input('start_date');
+        $endInput = $request->input('end_date');
+
+        $startFilled = $startInput !== null && $startInput !== '';
+        $endFilled = $endInput !== null && $endInput !== '';
+
+        if (! $startFilled && ! $endFilled) {
+            $start = now()->startOfMonth()->toDateString();
+            $end = now()->toDateString();
+        } elseif (! $startFilled && $endFilled) {
+            $endCarbon = Carbon::parse((string) $endInput);
+            $start = $endCarbon->copy()->startOfMonth()->toDateString();
+            $end = $endCarbon->toDateString();
+        } elseif ($startFilled && ! $endFilled) {
+            $start = Carbon::parse((string) $startInput)->toDateString();
+            $end = now()->toDateString();
+        } else {
+            $start = Carbon::parse((string) $startInput)->toDateString();
+            $end = Carbon::parse((string) $endInput)->toDateString();
+        }
+
+        if ($start > $end) {
+            [$start, $end] = [$end, $start];
+        }
+
+        return [
+            'start_date' => $start,
+            'end_date' => $end,
+        ];
     }
 
     /**
@@ -162,6 +267,11 @@ class ReportController extends Controller
     }
 
     /**
+     * - Vista vendedores: meta = `advisors.personal_quota` (Inmopro → Asesores).
+     * - Vista teams: meta = `teams.group_sales_goal` si es mayor que 0; si no, suma de `personal_quota` del equipo (compatibilidad).
+     * - Vista proyectos: meta = suma de `personal_quota` de asesores con lotes en el proyecto (rango filtrado).
+     * - Tarjeta "Meta" del resumen: `report_sales_config.general_sales_goal` (Inmopro → Meta general de reportes).
+     *
      * @param  Collection<int, Team>  $teams
      * @param  Collection<int, Advisor>  $advisors
      * @param  Collection<int, Lot>  $lots
@@ -172,12 +282,15 @@ class ReportController extends Controller
         return $teams->map(function (Team $team) use ($advisors, $lots): array {
             $teamAdvisors = $advisors->where('team_id', $team->id)->values();
             $teamLots = $lots->filter(fn (Lot $lot) => $lot->advisor?->team_id === $team->id)->values();
+            $quotaSum = (float) $teamAdvisors->sum('personal_quota');
+            $groupGoal = (float) ($team->group_sales_goal ?? 0);
+            $goalAmount = $groupGoal > 0 ? $groupGoal : $quotaSum;
 
             return $this->makeRow(
                 $team->id,
                 $team->name,
                 $teamLots,
-                (float) $teamAdvisors->sum('personal_quota'),
+                $goalAmount,
                 ['color' => $team->color]
             );
         })->filter(fn (array $row) => $row['lots_count'] > 0 || $row['goal_amount'] > 0)->sortByDesc('sold_amount')->values()->all();
@@ -274,7 +387,7 @@ class ReportController extends Controller
     private function viewLabel(string $view): string
     {
         return match ($view) {
-            'teams' => 'Teams',
+            'teams' => 'Equipos',
             'advisors' => 'Vendedores',
             default => 'Proyectos',
         };

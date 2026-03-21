@@ -2,13 +2,14 @@
 
 namespace App\Models\Inmopro;
 
+use Database\Factories\Inmopro\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Team extends Model
 {
-    /** @use HasFactory<\Database\Factories\Inmopro\TeamFactory> */
+    /** @use HasFactory<TeamFactory> */
     use HasFactory;
 
     /**
@@ -21,6 +22,7 @@ class Team extends Model
         'color',
         'sort_order',
         'is_active',
+        'group_sales_goal',
     ];
 
     /**
@@ -30,6 +32,7 @@ class Team extends Model
     {
         return [
             'is_active' => 'boolean',
+            'group_sales_goal' => 'decimal:2',
         ];
     }
 

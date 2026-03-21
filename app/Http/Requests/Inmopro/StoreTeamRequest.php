@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Inmopro;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreTeamRequest extends FormRequest
@@ -12,7 +13,7 @@ class StoreTeamRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -23,6 +24,7 @@ class StoreTeamRequest extends FormRequest
             'color' => ['nullable', 'string', 'max:20'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
+            'group_sales_goal' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }
