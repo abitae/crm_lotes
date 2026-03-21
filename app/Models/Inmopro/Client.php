@@ -20,6 +20,7 @@ class Client extends Model
         'client_type_id',
         'city_id',
         'advisor_id',
+        'registered_by_datero_id',
     ];
 
     /**
@@ -44,6 +45,14 @@ class Client extends Model
     public function advisor(): BelongsTo
     {
         return $this->belongsTo(Advisor::class);
+    }
+
+    /**
+     * @return BelongsTo<Datero, $this>
+     */
+    public function registeredByDatero(): BelongsTo
+    {
+        return $this->belongsTo(Datero::class, 'registered_by_datero_id');
     }
 
     /**

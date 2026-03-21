@@ -5,6 +5,7 @@ namespace App\Models\Inmopro;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Hash;
 
 class Datero extends Model
@@ -73,5 +74,21 @@ class Datero extends Model
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class, 'city_id');
+    }
+
+    /**
+     * @return HasMany<DateroApiToken, $this>
+     */
+    public function apiTokens(): HasMany
+    {
+        return $this->hasMany(DateroApiToken::class);
+    }
+
+    /**
+     * @return HasMany<Client, $this>
+     */
+    public function registeredClients(): HasMany
+    {
+        return $this->hasMany(Client::class, 'registered_by_datero_id');
     }
 }

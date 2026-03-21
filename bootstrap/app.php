@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AuthenticateAdvisorApiToken;
+use App\Http\Middleware\AuthenticateDateroApiToken;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'advisor.api' => AuthenticateAdvisorApiToken::class,
+            'datero.api' => AuthenticateDateroApiToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

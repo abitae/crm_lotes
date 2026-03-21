@@ -18,6 +18,7 @@ class ClientTypeSeeder extends Seeder
             ['name' => 'Comprador final', 'code' => 'COMPRADOR_FINAL', 'description' => 'Cliente que compra para uso propio.', 'color' => '#0f766e', 'sort_order' => 3],
             ['name' => 'Inversionista', 'code' => 'INVERSIONISTA', 'description' => 'Cliente que compra como inversión.', 'color' => '#1d4ed8', 'sort_order' => 4],
             ['name' => 'Corporativo', 'code' => 'CORPORATIVO', 'description' => 'Empresa o cuenta institucional.', 'color' => '#b45309', 'sort_order' => 5],
+            ['name' => 'Datero', 'code' => 'DATERO', 'description' => 'Cliente captado por un datero y asignado al vendedor responsable.', 'color' => '#7c3aed', 'sort_order' => 6],
         ];
 
         foreach ($types as $type) {

@@ -43,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('cazador-login', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
         });
+
+        RateLimiter::for('datero-login', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
     }
 
     /**

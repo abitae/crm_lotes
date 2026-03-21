@@ -11,6 +11,10 @@ use App\Http\Controllers\Api\v1\Cazador\PreReservationController;
 use App\Http\Controllers\Api\v1\Cazador\ProfileController;
 use App\Http\Controllers\Api\v1\Cazador\ProjectController;
 use App\Http\Controllers\Api\v1\Cazador\ReminderController;
+use App\Http\Controllers\Api\v1\Datero\AuthController as DateroAuthController;
+use App\Http\Controllers\Api\v1\Datero\CityController as DateroCityController;
+use App\Http\Controllers\Api\v1\Datero\ClientController as DateroClientController;
+use App\Http\Controllers\Api\v1\Datero\ProfileController as DateroProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
@@ -53,5 +57,24 @@ Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
         Route::get('lots', [LotController::class, 'index'])->name('lots.index');
         Route::get('lots/{lot}', [LotController::class, 'show'])->name('lots.show');
         Route::post('lots/{lot}/pre-reservations', [PreReservationController::class, 'store'])->name('lots.pre-reservations.store');
+    });
+});
+
+Route::prefix('v1/datero')->name('api.v1.datero.')->group(function (): void {
+    Route::post('auth/login', [DateroAuthController::class, 'login'])
+        ->middleware('throttle:datero-login')
+        ->name('auth.login');
+
+    Route::middleware('datero.api')->group(function (): void {
+        Route::post('auth/logout', [DateroAuthController::class, 'logout'])->name('auth.logout');
+        Route::get('me', [DateroProfileController::class, 'show'])->name('me.show');
+        Route::put('me/pin', [DateroProfileController::class, 'updatePin'])->name('me.pin.update');
+
+        Route::get('cities', [DateroCityController::class, 'index'])->name('cities.index');
+
+        Route::get('clients', [DateroClientController::class, 'index'])->name('clients.index');
+        Route::post('clients', [DateroClientController::class, 'store'])->name('clients.store');
+        Route::get('clients/{client}', [DateroClientController::class, 'show'])->name('clients.show');
+        Route::put('clients/{client}', [DateroClientController::class, 'update'])->name('clients.update');
     });
 });
