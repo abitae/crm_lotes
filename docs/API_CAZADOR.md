@@ -7,6 +7,8 @@ Análisis de arquitectura y reglas de negocio: [ANALISIS_API_CAZADOR.md](./ANALI
 
 Prompt maestro para Cursor (app **React Native** contra este API): [PROMPT_CURSOR_REACT_NATIVE_CAZADOR.md](./PROMPT_CURSOR_REACT_NATIVE_CAZADOR.md).
 
+API y prompt para la app móvil de **dateros** (captadores): [API_DATERO.md](./API_DATERO.md) y [PROMPT_CURSOR_REACT_NATIVE_DATERO.md](./PROMPT_CURSOR_REACT_NATIVE_DATERO.md).
+
 Base path:
 
 `/api/v1/cazador`
