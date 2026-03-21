@@ -21,8 +21,9 @@ class ClientController extends Controller
         $clients = Client::query()
             ->with('city')
             ->where('advisor_id', $advisor->id)
-            ->whereHas('type', fn ($query) => $query->where('code', 'PROPIO'))
-            ->whereHas('type', fn ($query) => $query->where('code', 'DATERO'))
+            ->whereHas('type', function ($query) {
+                $query->whereIn('code', ['PROPIO', 'DATERO']);
+            })
             ->when($request->filled('search'), function ($query) use ($request) {
                 $term = (string) $request->input('search');
                 $query->where(function ($nestedQuery) use ($term) {
