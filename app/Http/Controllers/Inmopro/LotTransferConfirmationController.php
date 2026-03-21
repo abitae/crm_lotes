@@ -25,7 +25,7 @@ class LotTransferConfirmationController extends Controller
 
     public function index(Request $request): Response
     {
-        abort_unless($request->user()?->can('confirm-lot-transfer'), 403);
+        abort_unless($request->user()?->can('inmopro.lot-transfer-confirmations.index'), 403);
 
         $search = trim((string) $request->string('search'));
 
@@ -73,7 +73,7 @@ class LotTransferConfirmationController extends Controller
 
     public function create(Request $request, Lot $lot): Response
     {
-        abort_unless($request->user()?->can('confirm-lot-transfer'), 403);
+        abort_unless($request->user()?->can('inmopro.lots.transfer-confirmation'), 403);
 
         $lot->load(['project', 'status', 'client', 'advisor', 'latestTransferConfirmation']);
 

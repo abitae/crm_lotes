@@ -53,7 +53,8 @@ class HandleInertiaRequests extends Middleware
                         ]),
                         'avatar' => null,
                         'two_factor_enabled' => $request->user()->two_factor_secret !== null,
-                        'permissions' => $request->user()->permissionCodes(),
+                        'permissions' => $request->user()->permissionNamesForFrontend(),
+                        'roles' => $request->user()->getRoleNames()->values()->all(),
                     ]
                     : null,
             ],

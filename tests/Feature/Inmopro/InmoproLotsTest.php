@@ -52,7 +52,10 @@ class InmoproLotsTest extends TestCase
     public function test_authenticated_users_can_update_lot_status(): void
     {
         $user = User::factory()->create();
-        $lot = Lot::first();
+        $transferredId = LotStatus::where('code', LotStatus::CODE_TRANSFERIDO)->value('id');
+        $lot = Lot::query()
+            ->when($transferredId, fn ($q) => $q->where('lot_status_id', '!=', $transferredId))
+            ->firstOrFail();
         $statusReservado = LotStatus::where('code', 'RESERVADO')->first();
         $this->actingAs($user);
 
@@ -92,7 +95,10 @@ class InmoproLotsTest extends TestCase
     public function test_updating_lot_with_new_client_name_only_creates_client(): void
     {
         $user = User::factory()->create();
-        $lot = Lot::first();
+        $transferredId = LotStatus::where('code', LotStatus::CODE_TRANSFERIDO)->value('id');
+        $lot = Lot::query()
+            ->when($transferredId, fn ($q) => $q->where('lot_status_id', '!=', $transferredId))
+            ->firstOrFail();
         $statusReservado = LotStatus::where('code', 'RESERVADO')->first();
         $this->actingAs($user);
 

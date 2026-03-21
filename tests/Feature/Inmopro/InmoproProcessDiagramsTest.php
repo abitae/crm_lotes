@@ -19,7 +19,7 @@ class InmoproProcessDiagramsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('inmopro/process-diagrams')
-                ->has('diagrams', 13)
+                ->has('diagrams', 20)
                 ->where('diagrams.0.title', '1. Arquitectura general: actores, canales y almacenamiento')
             );
     }

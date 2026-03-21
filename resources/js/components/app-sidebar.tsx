@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     Building2,
@@ -9,6 +9,7 @@ import {
     FileCheck,
     Folder,
     GitBranch,
+    KeyRound,
     Landmark,
     Layers,
     LayoutGrid,
@@ -170,6 +171,18 @@ function NavSectionGroup({
 
 export function AppSidebar() {
     const { isCurrentUrl } = useCurrentUrl();
+    const auth = usePage<{ auth: { user?: { roles?: string[] } | null } }>().props.auth;
+    const isSuperAdmin = auth.user?.roles?.includes('super-admin') ?? false;
+
+    const accessControlSection: NavSection = {
+        label: 'Control de acceso',
+        icon: ShieldCheck,
+        items: [
+            { title: 'Roles', href: '/inmopro/access-control/roles', icon: ShieldCheck },
+            { title: 'Permisos', href: '/inmopro/access-control/permissions', icon: KeyRound },
+            { title: 'Usuarios', href: '/inmopro/access-control/users', icon: Users },
+        ],
+    };
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -209,6 +222,10 @@ export function AppSidebar() {
                 {managementSections.map((section) => (
                     <NavSectionGroup key={section.label} section={section} isCurrentUrl={isCurrentUrl} />
                 ))}
+
+                {isSuperAdmin ? (
+                    <NavSectionGroup key={accessControlSection.label} section={accessControlSection} isCurrentUrl={isCurrentUrl} />
+                ) : null}
             </SidebarContent>
 
             <SidebarFooter>

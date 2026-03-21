@@ -3,16 +3,17 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    /** @use HasFactory<UserFactory> */
+    use HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -23,6 +24,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'email_verified_at',
     ];
 
     /**
@@ -52,31 +54,15 @@ class User extends Authenticatable
     }
 
     /**
-     * @return BelongsToMany<Role, $this>
+     * @return list<string>
      */
-    public function roles(): BelongsToMany
+    public function permissionNamesForFrontend(): array
     {
-        return $this->belongsToMany(Role::class)->withTimestamps();
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    public function permissionCodes(): array
-    {
-        return $this->roles()
-            ->with('permissions:id,code')
-            ->get()
-            ->pluck('permissions')
-            ->flatten()
-            ->pluck('code')
+        return $this->getAllPermissions()
+            ->pluck('name')
             ->unique()
+            ->sort()
             ->values()
             ->all();
-    }
-
-    public function hasPermission(string $permissionCode): bool
-    {
-        return in_array($permissionCode, $this->permissionCodes(), true);
     }
 }

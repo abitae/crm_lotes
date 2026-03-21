@@ -11,6 +11,7 @@ use App\Models\Inmopro\ClientType;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
+use Carbon\Carbon;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -195,7 +196,7 @@ class LotController extends Controller
 
         return Inertia::render('inmopro/lots/show', [
             'lot' => $lot,
-            'canConfirmTransfer' => request()->user()?->can('confirm-lot-transfer') ?? false,
+            'canConfirmTransfer' => request()->user()?->can('inmopro.lots.transfer-confirmation') ?? false,
         ]);
     }
 
@@ -271,7 +272,7 @@ class LotController extends Controller
                 continue;
             }
 
-            $validated[$field] = \Carbon\Carbon::parse((string) $validated[$field])->toDateString();
+            $validated[$field] = Carbon::parse((string) $validated[$field])->toDateString();
         }
 
         return $validated;

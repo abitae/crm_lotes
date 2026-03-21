@@ -2,17 +2,18 @@
 
 namespace App\Http\Requests\Inmopro;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ApproveLotTransferConfirmationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('confirm-lot-transfer') ?? false;
+        return $this->user()?->can('inmopro.lot-transfer-confirmations.approve') ?? false;
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {

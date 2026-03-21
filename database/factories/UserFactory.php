@@ -2,12 +2,15 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
@@ -55,5 +58,20 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
             'two_factor_confirmed_at' => now(),
         ]);
+    }
+
+    /**
+     * @return $this
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            if (! App::runningUnitTests()) {
+                return;
+            }
+
+            Role::findOrCreate('super-admin', 'web');
+            $user->assignRole('super-admin');
+        });
     }
 }

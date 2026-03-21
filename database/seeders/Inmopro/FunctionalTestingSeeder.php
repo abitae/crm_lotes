@@ -10,10 +10,10 @@ use App\Models\Inmopro\Datero;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use RuntimeException;
+use Spatie\Permission\Models\Role;
 
 /**
  * Datos fijos para pruebas manuales y E2E (Inmopro + Cazador).
@@ -59,10 +59,8 @@ class FunctionalTestingSeeder extends Seeder
             ],
         );
 
-        $adminRole = Role::query()->where('code', 'ADMIN')->first();
-        if ($adminRole) {
-            $user->roles()->syncWithoutDetaching([$adminRole->id]);
-        }
+        $superAdmin = Role::findOrCreate('super-admin', 'web');
+        $user->assignRole($superAdmin);
     }
 
     private function seedFunctionalDatero(): void

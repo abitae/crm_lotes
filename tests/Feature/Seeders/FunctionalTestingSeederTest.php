@@ -43,7 +43,7 @@ class FunctionalTestingSeederTest extends TestCase
         $this->assertTrue(Lot::query()->where('number', 900)->whereHas('status', fn ($q) => $q->where('code', 'LIBRE'))->exists());
 
         $user = User::query()->where('email', 'qa.funcional@crm-lotes.test')->firstOrFail();
-        $this->assertTrue($user->roles()->where('code', 'ADMIN')->exists());
+        $this->assertTrue($user->hasRole('super-admin'));
 
         $datero = Datero::query()->where('username', 'datero_funcional')->firstOrFail();
         $this->assertNotSame('654321', $datero->getRawOriginal('pin'));

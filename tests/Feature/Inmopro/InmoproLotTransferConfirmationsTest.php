@@ -8,12 +8,19 @@ use App\Models\Inmopro\Commission;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\LotTransferConfirmation;
-use App\Models\Permission;
-use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\Inmopro\AdvisorLevelSeeder;
+use Database\Seeders\Inmopro\AdvisorSeeder;
+use Database\Seeders\Inmopro\ClientSeeder;
+use Database\Seeders\Inmopro\CommissionStatusSeeder;
+use Database\Seeders\Inmopro\LotSeeder;
+use Database\Seeders\Inmopro\LotStatusSeeder;
+use Database\Seeders\Inmopro\ProjectSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class InmoproLotTransferConfirmationsTest extends TestCase
@@ -29,13 +36,13 @@ class InmoproLotTransferConfirmationsTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\LotStatusSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\CommissionStatusSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ProjectSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\ClientSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\LotSeeder::class);
+        $this->seed(AdvisorLevelSeeder::class);
+        $this->seed(LotStatusSeeder::class);
+        $this->seed(CommissionStatusSeeder::class);
+        $this->seed(ProjectSeeder::class);
+        $this->seed(AdvisorSeeder::class);
+        $this->seed(ClientSeeder::class);
+        $this->seed(LotSeeder::class);
 
         $this->statusIds = [
             'RESERVADO' => (int) LotStatus::query()->where('code', 'RESERVADO')->value('id'),
@@ -151,19 +158,23 @@ class InmoproLotTransferConfirmationsTest extends TestCase
     private function createTransferManager(): User
     {
         $user = User::factory()->create();
-        $permission = Permission::query()->create([
-            'name' => 'Confirmar transferencia de lotes',
-            'code' => 'confirm-lot-transfer',
-            'is_system' => true,
-        ]);
-        $role = Role::query()->create([
-            'name' => 'Administrador transferencias',
-            'code' => 'TRANSFER_ADMIN',
-            'is_system' => true,
-        ]);
+        $user->syncRoles([]);
 
-        $role->permissions()->sync([$permission->id]);
-        $user->roles()->sync([$role->id]);
+        $names = [
+            'inmopro.lot-transfer-confirmations.index',
+            'inmopro.lots.transfer-confirmation',
+            'inmopro.lots.transfer-confirmation.store',
+            'inmopro.lot-transfer-confirmations.approve',
+            'inmopro.lot-transfer-confirmations.reject',
+        ];
+
+        $permissions = collect($names)->map(fn (string $name) => Permission::findOrCreate($name, 'web'));
+
+        $role = Role::firstOrCreate(
+            ['name' => 'transfer-manager-test', 'guard_name' => 'web'],
+        );
+        $role->syncPermissions($permissions);
+        $user->assignRole($role);
 
         return $user;
     }

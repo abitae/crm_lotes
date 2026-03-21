@@ -2,31 +2,35 @@
 
 namespace Database\Seeders;
 
-use App\Models\Permission;
-use App\Models\Role;
 use App\Models\User;
+use App\Support\InmoproPermissionSynchronizer;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class AuthorizationSeeder extends Seeder
 {
     public function run(): void
     {
-        $permission = Permission::query()->firstOrCreate(
-            ['code' => 'confirm-lot-transfer'],
-            ['name' => 'Confirmar transferencia de lotes', 'is_system' => true]
-        );
+        InmoproPermissionSynchronizer::syncFromRoutes();
 
-        $adminRole = Role::query()->firstOrCreate(
-            ['code' => 'ADMIN'],
-            ['name' => 'Administrador', 'is_system' => true]
-        );
+        $superAdmin = Role::findOrCreate('super-admin', 'web');
+        $superAdmin->syncPermissions(Permission::query()->where('guard_name', 'web')->get());
 
-        $adminRole->permissions()->syncWithoutDetaching([$permission->id]);
+        $emails = config('rbac.super_admin_emails', []);
+        if ($emails === [] && app()->environment('local', 'testing')) {
+            $emails = ['abel.arana@hotmail.com'];
+        }
 
-        User::query()
-            ->where('email', 'abel.arana@hotmail.com')
-            ->each(function (User $user) use ($adminRole): void {
-                $user->roles()->syncWithoutDetaching([$adminRole->id]);
+        foreach ($emails as $email) {
+            $email = trim((string) $email);
+            if ($email === '') {
+                continue;
+            }
+
+            User::query()->where('email', $email)->each(function (User $user) use ($superAdmin): void {
+                $user->assignRole($superAdmin);
             });
+        }
     }
 }

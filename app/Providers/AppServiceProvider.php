@@ -83,8 +83,12 @@ class AppServiceProvider extends ServiceProvider
             : null
         );
 
-        Gate::before(function (User $user, string $ability): ?bool {
-            return $user->hasPermission($ability) ? true : null;
+        Gate::before(function (?User $user, string $ability): ?bool {
+            if (! $user instanceof User) {
+                return null;
+            }
+
+            return $user->hasRole('super-admin') ? true : null;
         });
     }
 }
