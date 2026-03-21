@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\v1\Cazador\AuthController;
 use App\Http\Controllers\Api\v1\Cazador\CityController;
 use App\Http\Controllers\Api\v1\Cazador\ClientController;
 use App\Http\Controllers\Api\v1\Cazador\DashboardController;
+use App\Http\Controllers\Api\v1\Cazador\DateroController;
 use App\Http\Controllers\Api\v1\Cazador\LotController;
 use App\Http\Controllers\Api\v1\Cazador\PreReservationController;
 use App\Http\Controllers\Api\v1\Cazador\ProfileController;
@@ -26,6 +27,10 @@ Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
         Route::get('dashboard', [DashboardController::class, 'show'])->name('dashboard.show');
 
         Route::get('cities', [CityController::class, 'index'])->name('cities.index');
+
+        Route::get('dateros', [DateroController::class, 'index'])->name('dateros.index');
+        Route::post('dateros', [DateroController::class, 'store'])->name('dateros.store');
+        Route::put('dateros/{datero}', [DateroController::class, 'update'])->name('dateros.update');
 
         Route::get('clients', [ClientController::class, 'index'])->name('clients.index');
         Route::post('clients', [ClientController::class, 'store'])->name('clients.store');

@@ -25,13 +25,14 @@ Seeders utiles para pruebas:
 1. El vendedor hace login.
 2. Opcional: `GET /dashboard` para métricas de inicio (clientes, pre-reservas, lotes por estado, pendientes).
 3. Consulta o actualiza su perfil.
-4. Crea o edita sus clientes propios (tipo **PROPIO** en la API).
-5. Opcional: crea recordatorios ligados a esos clientes **PROPIO**.
-6. Registra tickets de atencion por proyecto para sus clientes propios.
-7. Consulta proyectos, lotes disponibles y **sus lotes asignados** (`GET /my-lots`, opcionalmente por estado).
-8. Registra una pre-reserva subiendo una imagen del voucher.
-9. El lote pasa a `PRERESERVA`.
-10. Un administrador revisa la solicitud desde el backend web y aprueba o rechaza.
+4. Gestiona los **dateros** a su cargo (alta y edicion; mismo alcance que en el panel Inmopro para su `advisor_id`).
+5. Crea o edita sus clientes propios (tipo **PROPIO** en la API).
+6. Opcional: crea recordatorios ligados a esos clientes **PROPIO**.
+7. Registra tickets de atencion por proyecto para sus clientes propios.
+8. Consulta proyectos, lotes disponibles y **sus lotes asignados** (`GET /my-lots`, opcionalmente por estado).
+9. Registra una pre-reserva subiendo una imagen del voucher.
+10. El lote pasa a `PRERESERVA`.
+11. Un administrador revisa la solicitud desde el backend web y aprueba o rechaza.
 
 ## Endpoints
 
@@ -174,6 +175,94 @@ Response `200`:
       "code": "LIM"
     }
   ]
+}
+```
+
+## Dateros
+
+Reglas:
+
+- Solo se listan y modifican dateros con `advisor_id` igual al vendedor del token.
+- El `username` del datero debe ser unico entre `dateros` y no puede coincidir con el `username` de ningun `advisor`.
+- El PIN del datero (6 digitos) no se devuelve en las respuestas JSON.
+- `city_id` debe ser una ciudad **activa** (misma regla que en Inmopro).
+
+### GET `/dateros`
+
+Lista dateros del vendedor autenticado.
+
+Query opcional:
+
+- `search`: coincidencia parcial en nombre, correo, DNI o usuario.
+
+Response `200`:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "Datero QA",
+      "phone": "987000999",
+      "email": "datero.qa@crm-lotes.test",
+      "dni": "45987654",
+      "username": "datero_funcional",
+      "is_active": true,
+      "last_login_at": null,
+      "city": {
+        "id": 1,
+        "name": "Lima",
+        "department": "Lima"
+      }
+    }
+  ]
+}
+```
+
+### POST `/dateros`
+
+Crea un datero asignado al vendedor autenticado.
+
+Request:
+
+```json
+{
+  "name": "Datero movil",
+  "phone": "987654321",
+  "email": "datero@app.com",
+  "city_id": 1,
+  "dni": "40123456",
+  "username": "datero_movil_01",
+  "pin": "123456",
+  "is_active": true
+}
+```
+
+`is_active` es opcional (por defecto en base de datos: `true`).
+
+Response `201`:
+
+```json
+{
+  "message": "Datero registrado.",
+  "data": { "...": "mismo shape que en el listado" }
+}
+```
+
+### PUT `/dateros/{datero}`
+
+Actualiza un datero propio. Si el `id` no existe o pertenece a otro asesor: **`404`** con `message`: `Datero no encontrado.`
+
+Request: mismos campos que en alta, excepto:
+
+- `pin`: opcional; si se omite o va vacio, se conserva el PIN actual.
+
+Response `200`:
+
+```json
+{
+  "message": "Datero actualizado.",
+  "data": { "...": "mismo shape que en el listado" }
 }
 ```
 

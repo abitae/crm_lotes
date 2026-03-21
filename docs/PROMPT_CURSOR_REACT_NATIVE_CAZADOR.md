@@ -84,6 +84,9 @@ Prefijo real: **`/api/v1/cazador`** (Laravel monta `api.php` bajo `/api`).
 | GET | `me` | Bearer | — | — |
 | PUT | `me` | Bearer | — | JSON perfil (ver 6.1) |
 | PUT | `me/pin` | Bearer | — | JSON PIN (ver 6.2) |
+| GET | `dateros` | Bearer | `search` opcional | — |
+| POST | `dateros` | Bearer | — | JSON datero (ver 6.3.1) |
+| PUT | `dateros/{id}` | Bearer | — | JSON datero; `pin` opcional (ver 6.3.1) |
 | GET | `clients` | Bearer | `search` opcional | — |
 | POST | `clients` | Bearer | — | JSON cliente (ver 6.3) |
 | GET | `clients/{id}` | Bearer | — | — |
@@ -175,6 +178,13 @@ Si PIN actual incorrecto: **422**, `message`: *El PIN actual no es válido.*
 
 Respuesta **201** en POST con `data` que incluye `city` anidado y `lots` (vacío en alta). PUT devuelve actualización según implementación (ver doc API).
 
+### 6.3.1 GET/POST/PUT `/dateros`
+
+- Solo dateros del asesor autenticado; **404** `Datero no encontrado.` si el id es de otro asesor (PUT).
+- `username` único en `dateros` y no puede repetir `username` de ningún `advisor`.
+- **POST:** `name`, `phone`, `email`, `city_id` (ciudad activa), `dni`, `username`, `pin` (6 dígitos), `is_active` opcional.
+- **PUT:** mismos campos; `pin` opcional (omitir o vacío = no cambiar PIN). Respuestas con `data` (sin exponer `pin`).
+
 ### 6.4 POST `/attention-tickets`
 
 - `client_id`: requerido, existe en `clients`  
@@ -209,6 +219,7 @@ Respuesta **201** incluye `voucher_url` absoluta al comprobante en `storage`.
 ## 7. Modelo de errores en la app
 
 - **401:** limpiar sesión, ir a login; mostrar `message` si útil.
+- **404:** algunos recursos por id ajeno al asesor (ej. PUT `/dateros/{id}`): usar `message` del JSON.
 - **422:**  
   - Mostrar `message` raíz si existe (muchas rutas de negocio).  
   - Si existe `errors` (validación Laravel), mapear por campo en formularios; tratar `duplicate_registration` como mensaje global destacado.  
