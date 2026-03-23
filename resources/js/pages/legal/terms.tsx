@@ -94,6 +94,10 @@ export default function LegalTerms() {
                             {publisherContact.email}
                         </a>
                     </li>
+                    <li>
+                        <span className="font-medium text-slate-800 dark:text-slate-200">Domicilio:</span>{' '}
+                        {publisherContact.physicalAddress}
+                    </li>
                 </ul>
                 <p className={paragraph}>
                     Los usuarios corporativos pueden además dirigirse al responsable de sistemas o al área legal de su

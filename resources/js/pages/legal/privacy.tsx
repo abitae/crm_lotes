@@ -17,8 +17,8 @@ export default function LegalPrivacy() {
                 </p>
                 <p className={paragraph}>
                     <span className="font-medium text-slate-800 dark:text-slate-200">Editor del servicio y contacto:</span>{' '}
-                    {publisherContact.fullName}. Para consultas sobre esta política, privacidad o datos personales
-                    relacionados con la aplicación, puede escribir a{' '}
+                    {publisherContact.fullName}, con domicilio en {publisherContact.physicalAddress}. Para consultas sobre
+                    esta política, privacidad o datos personales relacionados con la aplicación, puede escribir a{' '}
                     <a
                         href={`mailto:${publisherContact.email}`}
                         className="font-medium text-emerald-600 underline-offset-2 hover:underline dark:text-emerald-400"
