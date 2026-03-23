@@ -2,33 +2,17 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use App\Support\InmoproPermissionSynchronizer;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 
 class AuthorizationSeeder extends Seeder
 {
+    /**
+     * Sincroniza permisos Inmopro y el rol super-admin (con todos los permisos web).
+     * No asigna el rol a ningún usuario: la asignación es manual o vía otros seeders (p. ej. desarrollo local).
+     */
     public function run(): void
     {
         InmoproPermissionSynchronizer::syncFromRoutes();
-
-        $superAdmin = Role::findByName('super-admin', 'web');
-
-        $emails = config('rbac.super_admin_emails', []);
-        if ($emails === [] && app()->environment('local', 'testing')) {
-            $emails = ['abel.arana@hotmail.com'];
-        }
-
-        foreach ($emails as $email) {
-            $email = trim((string) $email);
-            if ($email === '') {
-                continue;
-            }
-
-            User::query()->where('email', $email)->each(function (User $user) use ($superAdmin): void {
-                $user->assignRole($superAdmin);
-            });
-        }
     }
 }

@@ -13,7 +13,7 @@ Documentación de procesos relacionada: [GRAFICO_PROCESOS_SISTEMA.md](./GRAFICO_
 - **Excepción — control de acceso:** rutas con prefijo `inmopro.access-control.*` tienen permisos propios con el mismo prefijo; no se exige que el usuario tenga un permiso llamado exactamente como cada ruta de ese submódulo de forma circular. Esas rutas están protegidas con el middleware `rbac.super-admin` (solo rol `super-admin`).
 - **Middleware Inmopro:** alias `inmopro.permission` → `EnsureInmoproRoutePermission`: para rutas `inmopro.*` no exentas, `abort_unless($request->user()?->can($routeName), 403)`.
 - **Rol `super-admin`:** `Gate::before` en `AppServiceProvider` devuelve `true` para cualquier ability si el usuario tiene ese rol (operación y CRUD de acceso sin bloqueo).
-- **Sincronización:** `php artisan inmopro:sync-permissions` recorre rutas nombradas `inmopro.*` y ejecuta `Permission::findOrCreate($name, 'web')`. `AuthorizationSeeder` sincroniza, crea el rol `super-admin` con todos los permisos Inmopro y asigna ese rol a emails definidos en `config/rbac.php` (`RBAC_SUPER_ADMIN_EMAILS` en `.env`).
+- **Sincronización:** `php artisan inmopro:sync-permissions` recorre rutas nombradas `inmopro.*` y ejecuta `Permission::findOrCreate($name, 'web')`. `AuthorizationSeeder` solo sincroniza permisos y el rol `super-admin`; **no asigna** ese rol por `.env`. En `local`/`testing`, `DatabaseSeeder` puede asignar `super-admin` al usuario de desarrollo creado allí; en producción la asignación es manual (p. ej. Tinker) u otros seeders explícitos (p. ej. QA funcional).
 - **Transferencias de lote:** sustituido el permiso histórico `confirm-lot-transfer` por permisos de ruta reales (formulario: `inmopro.lots.transfer-confirmation` / `.store`; bandeja: `inmopro.lot-transfer-confirmations.*`; aprobar/rechazar: `.approve` / `.reject`).
 - **Frontend:** `HandleInertiaRequests` expone `auth.user.permissions` (nombres de permiso) y `auth.user.roles` (nombres de rol). El menú “Control de acceso” aparece si el usuario tiene rol `super-admin`.
 - **APIs (`routes/api.php`):** **sin capa Spatie**; Cazador y Datero siguen con tokens y reglas en controladores (ver §4).
@@ -52,7 +52,7 @@ Los permisos Spatie del CRM web **no sustituyen** automáticamente estas reglas;
 
 ### 1.6 Operación y riesgos a vigilar
 
-- Configurar `RBAC_SUPER_ADMIN_EMAILS` en cada entorno; sin usuarios en esa lista, el seeder puede usar un fallback solo en local/testing (revisar `AuthorizationSeeder`).
+- Asignar el rol `super-admin` en producción de forma explícita a quien corresponda (no hay lista en `.env`). Tras desplegar, ejecutar `inmopro:sync-permissions` cuando haya rutas nuevas y revisar roles en BD.
 - Nuevas rutas Inmopro: ejecutar `inmopro:sync-permissions` y asignar permisos a los roles que correspondan.
 - No confiar solo en el cliente para ocultar acciones: el middleware `inmopro.permission` aplica en servidor.
 
@@ -265,7 +265,7 @@ Se adoptó **`spatie/laravel-permission`** con permisos alineados a nombres de r
 | Permisos / roles en Inertia | `app/Http/Middleware/HandleInertiaRequests.php` |
 | Sincronización de permisos | `app/Support/InmoproPermissionSynchronizer.php`, `app/Console/Commands/SyncInmoproPermissionsCommand.php` |
 | Seeder autorización | `database/seeders/AuthorizationSeeder.php` |
-| Config super-admin emails | `config/rbac.php` |
+| Seeder base (usuario dev + rol en local/testing) | `database/seeders/DatabaseSeeder.php` |
 | Menú y control de acceso | `resources/js/components/app-sidebar.tsx` |
 | UI control de acceso | `resources/js/pages/inmopro/access-control/` |
 

@@ -6,6 +6,7 @@ use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class DatabaseSeeder extends Seeder
 {
@@ -27,6 +28,13 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AuthorizationSeeder::class,
         ]);
+
+        if (app()->environment('local', 'testing')) {
+            $admin = User::query()->where('email', 'abel.arana@hotmail.com')->first();
+            if ($admin !== null) {
+                $admin->assignRole(Role::findByName('super-admin', 'web'));
+            }
+        }
         /*
         $this->call([
             Inmopro\AdvisorLevelSeeder::class,
