@@ -40,6 +40,8 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => AppBrandingResolver::resolvedDisplayName(),
             'brandingLogoUrl' => AppBrandingResolver::logoUrl(),
+            'brandingTagline' => AppBrandingResolver::tagline(),
+            'brandingPrimaryColor' => AppBrandingResolver::primaryColorHex(),
             'auth' => [
                 'user' => fn () => $request->user()
                     ? [

@@ -20,8 +20,13 @@ class AppBrandingController extends Controller
         return Inertia::render('inmopro/branding', [
             'branding' => [
                 'display_name' => $branding->display_name,
+                'tagline' => $branding->tagline,
+                'primary_color' => $branding->primary_color,
                 'logo_url' => filled($branding->logo_path)
                     ? Storage::disk('public')->url($branding->logo_path)
+                    : null,
+                'favicon_url' => filled($branding->favicon_path)
+                    ? Storage::disk('public')->url($branding->favicon_path)
                     : null,
             ],
         ]);
@@ -44,9 +49,30 @@ class AppBrandingController extends Controller
             $branding->logo_path = null;
         }
 
+        if ($request->hasFile('favicon')) {
+            if (filled($branding->favicon_path)) {
+                Storage::disk('public')->delete($branding->favicon_path);
+            }
+            $branding->favicon_path = $request->file('favicon')->store('branding/favicons', 'public');
+        } elseif ($request->boolean('remove_favicon')) {
+            if (filled($branding->favicon_path)) {
+                Storage::disk('public')->delete($branding->favicon_path);
+            }
+            $branding->favicon_path = null;
+        }
+
         $branding->display_name = filled($validated['display_name'] ?? null)
             ? $validated['display_name']
             : null;
+
+        $branding->tagline = filled($validated['tagline'] ?? null)
+            ? $validated['tagline']
+            : null;
+
+        $branding->primary_color = filled($validated['primary_color'] ?? null)
+            ? $validated['primary_color']
+            : null;
+
         $branding->save();
 
         AppBrandingResolver::forgetCache();

@@ -12,6 +12,9 @@ class AppBranding extends Model
     protected $fillable = [
         'display_name',
         'logo_path',
+        'tagline',
+        'primary_color',
+        'favicon_path',
     ];
 
     public static function current(): self
@@ -22,6 +25,9 @@ class AppBranding extends Model
             $branding = self::query()->create([
                 'display_name' => null,
                 'logo_path' => null,
+                'tagline' => null,
+                'primary_color' => null,
+                'favicon_path' => null,
             ]);
         }
 

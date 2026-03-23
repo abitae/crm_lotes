@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AuthorizationSeeder::class,
         ]);
-
+        /*
         $this->call([
             Inmopro\AdvisorLevelSeeder::class,
             Inmopro\LotStatusSeeder::class,
@@ -43,5 +43,6 @@ class DatabaseSeeder extends Seeder
             Inmopro\FunctionalTestingSeeder::class,
             Inmopro\Asesor1RemindersAndTicketsSeeder::class,
         ]);
+        */
     }
 }

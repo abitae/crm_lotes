@@ -1,5 +1,10 @@
 import { Link } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { ReactNode } from 'react';
+
+function decodePaginationLabel(label: string): string {
+    return label.replace(/&laquo;/gi, '«').replace(/&raquo;/gi, '»').replace(/&amp;/g, '&');
+}
 
 export type PaginationLink = {
     url: string | null;
@@ -11,6 +16,41 @@ type PaginationProps = {
     links: PaginationLink[];
     className?: string;
 };
+
+function normalizeLabel(raw: string): string {
+    return raw
+        .replace(/&laquo;/gi, '«')
+        .replace(/&raquo;/gi, '»')
+        .trim()
+        .toLowerCase();
+}
+
+function paginationLinkContent(label: string): ReactNode {
+    const key = label.trim();
+    const norm = normalizeLabel(label);
+
+    if (
+        key === 'pagination.previous' ||
+        norm === '« previous' ||
+        norm.endsWith(' anterior') ||
+        norm === '« anterior' ||
+        norm === 'anterior'
+    ) {
+        return <ChevronLeft className="h-4 w-4" aria-hidden />;
+    }
+
+    if (
+        key === 'pagination.next' ||
+        norm === 'next »' ||
+        norm.startsWith('siguiente') ||
+        norm === 'siguiente »' ||
+        norm === 'siguiente'
+    ) {
+        return <ChevronRight className="h-4 w-4" aria-hidden />;
+    }
+
+    return decodePaginationLabel(label);
+}
 
 /**
  * Muestra los enlaces de paginación de Laravel (array links del paginator).
@@ -27,6 +67,7 @@ export default function Pagination({ links, className = '' }: PaginationProps) {
             className={`flex flex-wrap items-center justify-center gap-1 ${className}`}
         >
             {links.map((link, i) => {
+                const content = paginationLinkContent(link.label);
                 if (link.url === null) {
                     return (
                         <span
@@ -37,13 +78,7 @@ export default function Pagination({ links, className = '' }: PaginationProps) {
                                     : 'cursor-default text-slate-400'
                             }`}
                         >
-                            {link.label === '&laquo; Previous' ? (
-                                <ChevronLeft className="h-4 w-4" />
-                            ) : link.label === 'Next &raquo;' ? (
-                                <ChevronRight className="h-4 w-4" />
-                            ) : (
-                                link.label
-                            )}
+                            {content}
                         </span>
                     );
                 }
@@ -55,16 +90,10 @@ export default function Pagination({ links, className = '' }: PaginationProps) {
                         className={`inline-flex h-9 min-w-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors ${
                             link.active
                                 ? 'bg-slate-900 text-white'
-                                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
                         }`}
                     >
-                        {link.label === '&laquo; Previous' ? (
-                            <ChevronLeft className="h-4 w-4" />
-                        ) : link.label === 'Next &raquo;' ? (
-                            <ChevronRight className="h-4 w-4" />
-                        ) : (
-                            link.label
-                        )}
+                        {content}
                     </Link>
                 );
             })}

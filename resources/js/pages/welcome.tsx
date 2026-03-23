@@ -2,39 +2,54 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import { Building2, LayoutDashboard, LogIn, ShieldCheck } from 'lucide-react';
 import { dashboard, login } from '@/routes';
 
-export default function Welcome({ appName }: { appName: string }) {
-    const { auth } = usePage().props;
+type WelcomePageProps = {
+    auth: { user: unknown | null };
+    name: string;
+    brandingTagline?: string | null;
+    brandingPrimaryColor?: string;
+};
+
+export default function Welcome() {
+    const { auth, name, brandingTagline, brandingPrimaryColor } = usePage<WelcomePageProps>().props;
+    const accent = brandingPrimaryColor ?? '#059669';
 
     return (
         <>
-            <Head title={`${appName} — Inicio`} />
+            <Head title={`${name} — Inicio`} />
             <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-white to-emerald-50/80 text-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/40 dark:text-slate-100">
                 <div
                     className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-20"
                     style={{
-                        backgroundImage: `radial-gradient(circle at 20% 20%, rgb(16 185 129 / 0.12), transparent 45%),
+                        backgroundImage: `radial-gradient(circle at 20% 20%, color-mix(in srgb, ${accent} 18%, transparent), transparent 45%),
                             radial-gradient(circle at 80% 10%, rgb(14 165 233 / 0.08), transparent 40%),
-                            radial-gradient(circle at 50% 100%, rgb(16 185 129 / 0.1), transparent 50%)`,
+                            radial-gradient(circle at 50% 100%, color-mix(in srgb, ${accent} 15%, transparent), transparent 50%)`,
                     }}
                 />
                 <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10 lg:px-10 lg:py-14">
                     <header className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/25">
+                            <span
+                                className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-lg"
+                                style={{ backgroundColor: accent, boxShadow: `0 10px 15px -3px ${accent}40` }}
+                            >
                                 <Building2 className="h-6 w-6" aria-hidden />
                             </span>
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
                                     Panel corporativo
                                 </p>
-                                <p className="text-lg font-bold tracking-tight">{appName}</p>
+                                <p className="text-lg font-bold tracking-tight">{name}</p>
+                                {brandingTagline ? (
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">{brandingTagline}</p>
+                                ) : null}
                             </div>
                         </div>
                         <nav>
                             {auth.user ? (
                                 <Link
                                     href={dashboard()}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-700"
+                                    className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
+                                    style={{ backgroundColor: accent }}
                                 >
                                     <LayoutDashboard className="h-4 w-4" />
                                     Ir al panel
@@ -72,7 +87,8 @@ export default function Welcome({ appName }: { appName: string }) {
                                     <div className="flex flex-wrap gap-3">
                                         <Link
                                             href={login()}
-                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700"
+                                            className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:opacity-90"
+                                            style={{ backgroundColor: accent, boxShadow: `0 10px 15px -3px ${accent}4d` }}
                                         >
                                             <LogIn className="h-4 w-4" />
                                             Acceder al sistema
@@ -94,7 +110,10 @@ export default function Welcome({ appName }: { appName: string }) {
                                             { t: 'Control de acceso', d: 'Roles y permisos por ruta (Spatie).' },
                                             { t: 'Apps móviles', d: 'Cazador y Datero vía API dedicada.' },
                                         ].map((item) => (
-                                            <li key={item.t} className="flex gap-4 border-b border-slate-100 pb-5 last:border-0 last:pb-0 dark:border-slate-800">
+                                            <li
+                                                key={item.t}
+                                                className="flex gap-4 border-b border-slate-100 pb-5 last:border-0 last:pb-0 dark:border-slate-800"
+                                            >
                                                 <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                                                     <Building2 className="h-4 w-4" />
                                                 </span>
@@ -111,7 +130,7 @@ export default function Welcome({ appName }: { appName: string }) {
                     </main>
 
                     <footer className="mt-16 border-t border-slate-200/80 pt-8 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500">
-                        © {new Date().getFullYear()} {appName}. Todos los derechos reservados.
+                        © {new Date().getFullYear()} {name}. Todos los derechos reservados.
                     </footer>
                 </div>
             </div>

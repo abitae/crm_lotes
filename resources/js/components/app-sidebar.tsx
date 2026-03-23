@@ -1,13 +1,11 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
-    BookOpen,
     Building2,
     Calendar,
     ChevronRight,
     ContactRound,
     DollarSign,
     FileCheck,
-    Folder,
     GitBranch,
     KeyRound,
     Landmark,
@@ -17,6 +15,8 @@ import {
     Palette,
     Percent,
     Receipt,
+    Scale,
+    Shield,
     ShieldCheck,
     Tag,
     Target,
@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useCurrentUrl, type IsCurrentUrlFn } from '@/hooks/use-current-url';
 import { dashboard } from '@/routes';
+import legal from '@/routes/legal';
 import type { NavItem } from '@/types';
 import AppLogo from './app-logo';
 
@@ -117,14 +118,14 @@ const managementSections: NavSection[] = [
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: Folder,
+        title: 'Términos y condiciones',
+        href: legal.terms(),
+        icon: Scale,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
+        title: 'Política de privacidad',
+        href: legal.privacy(),
+        icon: Shield,
     },
 ];
 

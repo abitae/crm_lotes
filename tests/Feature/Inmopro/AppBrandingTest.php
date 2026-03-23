@@ -133,4 +133,57 @@ class AppBrandingTest extends TestCase
             ])
             ->assertSessionHasErrors('logo');
     }
+
+    public function test_authenticated_user_can_update_tagline_and_primary_color(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->put(route('inmopro.branding.update'), [
+                'display_name' => 'Marca',
+                'tagline' => 'Lotes y más',
+                'primary_color' => '#a1b2c3',
+            ])
+            ->assertRedirect(route('inmopro.branding.edit'));
+
+        $row = AppBranding::current();
+        $this->assertSame('Lotes y más', $row->tagline);
+        $this->assertSame('#a1b2c3', $row->primary_color);
+
+        AppBrandingResolver::forgetCache();
+        $this->assertSame('Lotes y más', AppBrandingResolver::tagline());
+        $this->assertSame('#a1b2c3', AppBrandingResolver::primaryColorHex());
+    }
+
+    public function test_update_rejects_invalid_primary_color(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->put(route('inmopro.branding.update'), [
+                'display_name' => 'X',
+                'primary_color' => 'red',
+            ])
+            ->assertSessionHasErrors('primary_color');
+    }
+
+    public function test_authenticated_user_can_upload_favicon(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $file = UploadedFile::fake()->image('favicon.png', 32, 32);
+
+        $this->actingAs($user)
+            ->put(route('inmopro.branding.update'), [
+                'display_name' => 'Con favicon',
+                'favicon' => $file,
+            ])
+            ->assertRedirect(route('inmopro.branding.edit'));
+
+        $path = AppBranding::current()->favicon_path;
+        $this->assertNotNull($path);
+        Storage::disk('public')->assertExists($path);
+        AppBrandingResolver::forgetCache();
+        $this->assertNotNull(AppBrandingResolver::faviconUrl());
+    }
 }

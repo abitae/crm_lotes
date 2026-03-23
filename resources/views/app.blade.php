@@ -28,13 +28,22 @@
             html.dark {
                 background-color: oklch(0.145 0 0);
             }
+
+            :root {
+                --brand-primary: {{ $brandingPrimaryColorHex ?? '#059669' }};
+            }
         </style>
 
         <title inertia>{{ $resolvedAppName }}</title>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        @if (! empty($brandingFaviconUrl))
+            <link rel="icon" href="{{ $brandingFaviconUrl }}" sizes="32x32">
+            <link rel="apple-touch-icon" href="{{ $brandingFaviconUrl }}">
+        @else
+            <link rel="icon" href="/favicon.ico" sizes="any">
+            <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+            <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        @endif
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />

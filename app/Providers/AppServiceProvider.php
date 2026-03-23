@@ -37,8 +37,16 @@ class AppServiceProvider extends ServiceProvider
 
     protected function configureViewComposers(): void
     {
+        View::composer('app', function (\Illuminate\View\View $view): void {
+            $view->with([
+                'resolvedAppName' => AppBrandingResolver::resolvedDisplayName(),
+                'brandingFaviconUrl' => AppBrandingResolver::faviconUrl(),
+                'brandingPrimaryColorHex' => AppBrandingResolver::primaryColorHex(),
+            ]);
+        });
+
         View::composer(
-            ['app', 'inmopro.report-pdf', 'inmopro.lots-export-pdf'],
+            ['inmopro.report-pdf', 'inmopro.lots-export-pdf'],
             function (\Illuminate\View\View $view): void {
                 $view->with('resolvedAppName', AppBrandingResolver::resolvedDisplayName());
             }

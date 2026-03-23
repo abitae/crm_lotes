@@ -10,8 +10,16 @@ class AppBrandingResolver
 {
     private const string CACHE_KEY = 'app_branding.snapshot';
 
+    private const string DEFAULT_PRIMARY_HEX = '#059669';
+
     /**
-     * @return array{display_name: string, logo_url: ?string}
+     * @return array{
+     *     display_name: string,
+     *     logo_url: ?string,
+     *     tagline: ?string,
+     *     primary_color: ?string,
+     *     favicon_url: ?string
+     * }
      */
     public static function snapshot(): array
     {
@@ -27,9 +35,24 @@ class AppBrandingResolver
                 $logoUrl = Storage::disk('public')->url((string) $row->logo_path);
             }
 
+            $tagline = filled($row?->tagline) ? (string) $row->tagline : null;
+
+            $primaryColor = null;
+            if (is_string($row?->primary_color) && preg_match('/^#[0-9A-Fa-f]{6}$/', $row->primary_color)) {
+                $primaryColor = $row->primary_color;
+            }
+
+            $faviconUrl = null;
+            if (filled($row?->favicon_path)) {
+                $faviconUrl = Storage::disk('public')->url((string) $row->favicon_path);
+            }
+
             return [
                 'display_name' => $displayName,
                 'logo_url' => $logoUrl,
+                'tagline' => $tagline,
+                'primary_color' => $primaryColor,
+                'favicon_url' => $faviconUrl,
             ];
         });
     }
@@ -42,6 +65,21 @@ class AppBrandingResolver
     public static function logoUrl(): ?string
     {
         return self::snapshot()['logo_url'];
+    }
+
+    public static function tagline(): ?string
+    {
+        return self::snapshot()['tagline'];
+    }
+
+    public static function primaryColorHex(): string
+    {
+        return self::snapshot()['primary_color'] ?? self::DEFAULT_PRIMARY_HEX;
+    }
+
+    public static function faviconUrl(): ?string
+    {
+        return self::snapshot()['favicon_url'];
     }
 
     public static function forgetCache(): void
