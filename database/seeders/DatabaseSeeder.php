@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
             AuthorizationSeeder::class,
         ]);
 
-        if (app()->environment('local', 'testing')) {
+        if (app()->environment('local', 'testing', 'production')) {
             $admin = User::query()->where('email', 'abel.arana@hotmail.com')->first();
             if ($admin !== null) {
                 $admin->assignRole(Role::findByName('super-admin', 'web'));
