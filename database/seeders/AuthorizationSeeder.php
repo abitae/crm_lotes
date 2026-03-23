@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Support\InmoproPermissionSynchronizer;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class AuthorizationSeeder extends Seeder
@@ -14,8 +13,7 @@ class AuthorizationSeeder extends Seeder
     {
         InmoproPermissionSynchronizer::syncFromRoutes();
 
-        $superAdmin = Role::findOrCreate('super-admin', 'web');
-        $superAdmin->syncPermissions(Permission::query()->where('guard_name', 'web')->get());
+        $superAdmin = Role::findByName('super-admin', 'web');
 
         $emails = config('rbac.super_admin_emails', []);
         if ($emails === [] && app()->environment('local', 'testing')) {

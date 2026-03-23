@@ -3,11 +3,10 @@
 use App\Http\Controllers\Inmopro\DashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
-        'canRegister' => Features::enabled(Features::registration()),
+        'appName' => config('app.name'),
     ]);
 })->name('home');
 

@@ -15,6 +15,7 @@ class SyncInmoproPermissionsCommand extends Command
     {
         $count = InmoproPermissionSynchronizer::syncFromRoutes();
         $this->info("Permisos procesados (rutas inmopro.*): {$count}");
+        $this->info('Rol super-admin actualizado con todos los permisos del guard web.');
 
         return self::SUCCESS;
     }

@@ -4,10 +4,26 @@ namespace App\Support;
 
 use Illuminate\Support\Facades\Route;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 final class InmoproPermissionSynchronizer
 {
+    /**
+     * Assign every permission on guard "web" to the "super-admin" role.
+     *
+     * Keeps the role aligned when new route permissions are synced or when
+     * extra web permissions exist in the database.
+     */
+    public static function grantAllWebPermissionsToSuperAdmin(): void
+    {
+        $superAdmin = Role::findOrCreate('super-admin', 'web');
+        $permissions = Permission::query()->where('guard_name', 'web')->get();
+        $superAdmin->syncPermissions($permissions);
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
     /**
      * Create missing Permission rows for every named route starting with "inmopro.".
      *
@@ -27,7 +43,7 @@ final class InmoproPermissionSynchronizer
             $processed++;
         }
 
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        self::grantAllWebPermissionsToSuperAdmin();
 
         return $processed;
     }
