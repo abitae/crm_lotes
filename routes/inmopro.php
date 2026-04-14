@@ -65,7 +65,18 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
         Route::resource('clients', ClientController::class);
         Route::resource('client-types', ClientTypeController::class)->parameters(['client-types' => 'client_type']);
         Route::resource('cities', CityController::class);
+        Route::get('advisor-levels/excel-template', [AdvisorLevelController::class, 'excelTemplate'])->name('advisor-levels.excel-template');
+        Route::get('advisor-levels/export-excel', [AdvisorLevelController::class, 'exportExcel'])->name('advisor-levels.export-excel');
+        Route::post('advisor-levels/import-from-excel', [AdvisorLevelController::class, 'importFromExcel'])->name('advisor-levels.import-from-excel');
+        Route::resource('advisor-levels', AdvisorLevelController::class)->parameters(['advisor-levels' => 'advisor_level']);
+        Route::get('teams/excel-template', [TeamController::class, 'excelTemplate'])->name('teams.excel-template');
+        Route::get('teams/export-excel', [TeamController::class, 'exportExcel'])->name('teams.export-excel');
+        Route::post('teams/import-from-excel', [TeamController::class, 'importFromExcel'])->name('teams.import-from-excel');
         Route::get('advisors/search', [AdvisorController::class, 'search'])->name('advisors.search');
+        Route::get('advisors/excel-template', [AdvisorController::class, 'excelTemplate'])->name('advisors.excel-template');
+        Route::get('advisors/export-excel', [AdvisorController::class, 'exportExcel'])->name('advisors.export-excel');
+        Route::post('advisors/import-preview', [AdvisorController::class, 'importPreview'])->name('advisors.import-preview');
+        Route::post('advisors/import-confirm', [AdvisorController::class, 'importConfirm'])->name('advisors.import-confirm');
         Route::put('advisors/{advisor}/cazador-access', [AdvisorController::class, 'updateCazadorAccess'])->name('advisors.cazador-access.update');
         Route::resource('advisors', AdvisorController::class)->except(['destroy']);
         Route::resource('dateros', DateroController::class);
@@ -77,7 +88,6 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
         Route::resource('advisor-memberships', AdvisorMembershipController::class)->parameters(['advisor-memberships' => 'advisor_membership']);
         Route::resource('lot-statuses', LotStatusController::class)->parameters(['lot-statuses' => 'lot_status']);
         Route::resource('commission-statuses', CommissionStatusController::class)->parameters(['commission-statuses' => 'commission_status']);
-        Route::resource('advisor-levels', AdvisorLevelController::class)->parameters(['advisor-levels' => 'advisor_level']);
         Route::get('financial', [FinancialController::class, 'index'])->name('financial.index');
         Route::get('accounts-receivable', [AccountsReceivableController::class, 'index'])->name('accounts-receivable.index');
         Route::post('lots/{lot}/installments', [AccountsReceivableController::class, 'storeInstallment'])->name('lots.installments.store');

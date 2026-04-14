@@ -1,9 +1,10 @@
-# Gráfico de procesos del sistema CRM Lotes
+# Gráfico de procesos del sistema CRM Lotes Markdow
 
 Documento de referencia con diagramas Mermaid del sistema **CRM Lotes**, alineado con **API Cazador**, **API Datero** e **Inmopro** (panel web).
 
 **Referencias cruzadas**
 
+- Flujo de negocio (CRM → venta → postventa, diagrama único): [flujo_crm_venta_postventa.md](./flujo_crm_venta_postventa.md)
 - Contrato API asesor: [API_CAZADOR.md](./API_CAZADOR.md) · Análisis: [ANALISIS_API_CAZADOR.md](./ANALISIS_API_CAZADOR.md)
 - Contrato API datero: [API_DATERO.md](./API_DATERO.md)
 - Evaluación de roles/permisos y Spatie: [EVALUACION_RBAC_Y_SPATIE.md](./EVALUACION_RBAC_Y_SPATIE.md)

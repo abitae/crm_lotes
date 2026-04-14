@@ -51,6 +51,9 @@ class AuthController extends Controller
         return [
             'id' => $advisor->id,
             'name' => $advisor->name,
+            'first_name' => $advisor->first_name,
+            'last_name' => $advisor->last_name,
+            'birth_date' => $advisor->birth_date?->toDateString(),
             'phone' => $advisor->phone,
             'email' => $advisor->email,
             'username' => $advisor->username,

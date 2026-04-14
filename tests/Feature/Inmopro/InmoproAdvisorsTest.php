@@ -46,7 +46,7 @@ class InmoproAdvisorsTest extends TestCase
 
         $response = $this->get(route('inmopro.advisors.index'));
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page->component('inmopro/advisors/index')->has('advisors')->has('teams')->has('cities'));
+        $response->assertInertia(fn ($page) => $page->component('inmopro/advisors/index')->has('advisors')->has('teams')->has('cities')->has('materialTypes'));
     }
 
     public function test_authenticated_users_can_create_advisor(): void
@@ -58,7 +58,9 @@ class InmoproAdvisorsTest extends TestCase
         $this->actingAs($user);
 
         $response = $this->post(route('inmopro.advisors.store'), [
-            'name' => 'Asesor Nuevo Test',
+            'dni' => '87654321',
+            'first_name' => 'Asesor Nuevo',
+            'last_name' => 'Test',
             'phone' => '999888777',
             'email' => 'asesor@example.com',
             'city_id' => $city->id,
@@ -69,6 +71,9 @@ class InmoproAdvisorsTest extends TestCase
 
         $response->assertRedirect(route('inmopro.advisors.index'));
         $this->assertDatabaseHas('advisors', [
+            'dni' => '87654321',
+            'first_name' => 'Asesor Nuevo',
+            'last_name' => 'Test',
             'name' => 'Asesor Nuevo Test',
             'email' => 'asesor@example.com',
             'team_id' => $team->id,
@@ -83,7 +88,9 @@ class InmoproAdvisorsTest extends TestCase
         $this->actingAs($user);
 
         $response = $this->put(route('inmopro.advisors.update', $advisor), [
-            'name' => 'Asesor Actualizado',
+            'dni' => $advisor->dni,
+            'first_name' => 'Asesor',
+            'last_name' => 'Actualizado',
             'phone' => $advisor->phone,
             'email' => $advisor->email,
             'city_id' => $advisor->city_id ?? City::firstOrFail()->id,
@@ -95,9 +102,33 @@ class InmoproAdvisorsTest extends TestCase
         $response->assertRedirect(route('inmopro.advisors.index'));
         $this->assertDatabaseHas('advisors', [
             'id' => $advisor->id,
+            'first_name' => 'Asesor',
+            'last_name' => 'Actualizado',
             'name' => 'Asesor Actualizado',
             'personal_quota' => 15,
             'username' => $advisor->username,
         ]);
+    }
+
+    public function test_store_advisor_rejects_invalid_cci(): void
+    {
+        $user = User::factory()->create();
+        $level = AdvisorLevel::first();
+        $team = Team::first();
+        $city = City::firstOrFail();
+        $this->actingAs($user);
+
+        $this->post(route('inmopro.advisors.store'), [
+            'dni' => '87654322',
+            'first_name' => 'Test',
+            'last_name' => 'CCI',
+            'phone' => '999888777',
+            'email' => 'cci-invalid@example.com',
+            'city_id' => $city->id,
+            'team_id' => $team->id,
+            'advisor_level_id' => $level->id,
+            'personal_quota' => 10,
+            'bank_cci' => '123',
+        ])->assertSessionHasErrors(['bank_cci']);
     }
 }

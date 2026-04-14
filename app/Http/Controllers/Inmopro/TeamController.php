@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers\Inmopro;
 
+use App\Exports\Inmopro\TeamsExport;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Inmopro\ImportTeamsFromExcelRequest;
 use App\Http\Requests\Inmopro\StoreTeamRequest;
 use App\Http\Requests\Inmopro\UpdateTeamRequest;
+use App\Imports\Inmopro\TeamsImport;
 use App\Models\Inmopro\Team;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TeamController extends Controller
 {
@@ -67,5 +72,35 @@ class TeamController extends Controller
         $team->delete();
 
         return redirect()->route('inmopro.teams.index');
+    }
+
+    public function excelTemplate(): BinaryFileResponse
+    {
+        return Excel::download(
+            new TeamsExport(collect()),
+            'plantilla_teams_comerciales.xlsx'
+        );
+    }
+
+    public function exportExcel(): BinaryFileResponse
+    {
+        $teams = Team::query()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        return Excel::download(
+            new TeamsExport($teams),
+            'teams_comerciales.xlsx'
+        );
+    }
+
+    public function importFromExcel(ImportTeamsFromExcelRequest $request): RedirectResponse
+    {
+        Excel::import(new TeamsImport, $request->file('file'));
+
+        return redirect()
+            ->route('inmopro.teams.index')
+            ->with('success', 'Teams comerciales importados correctamente.');
     }
 }

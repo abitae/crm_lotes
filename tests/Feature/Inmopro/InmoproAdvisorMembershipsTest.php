@@ -6,6 +6,8 @@ use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorMembership;
 use App\Models\Inmopro\MembershipType;
 use App\Models\User;
+use Database\Seeders\Inmopro\AdvisorLevelSeeder;
+use Database\Seeders\Inmopro\AdvisorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -17,8 +19,8 @@ class InmoproAdvisorMembershipsTest extends TestCase
     {
         parent::setUp();
         $this->withoutVite();
-        $this->seed(\Database\Seeders\Inmopro\AdvisorLevelSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\AdvisorSeeder::class);
+        $this->seed(AdvisorLevelSeeder::class);
+        $this->seed(AdvisorSeeder::class);
     }
 
     public function test_guests_cannot_visit_memberships_index(): void
@@ -38,7 +40,8 @@ class InmoproAdvisorMembershipsTest extends TestCase
             ->component('inmopro/advisors/index')
             ->has('advisors')
             ->has('advisorsList')
-            ->has('membershipTypes'));
+            ->has('membershipTypes')
+            ->has('materialTypes'));
     }
 
     public function test_advisor_memberships_index_redirects_to_unified_page(): void

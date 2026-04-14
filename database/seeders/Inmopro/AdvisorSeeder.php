@@ -16,6 +16,8 @@ class AdvisorSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(AdvisorMaterialTypeSeeder::class);
+
         if (! City::query()->exists()) {
             $this->call(CitySeeder::class);
         }
@@ -40,6 +42,9 @@ class AdvisorSeeder extends Seeder
             $level4Advisors[] = Advisor::updateOrCreate(
                 ['email' => "director{$i}@inmopro.com"],
                 [
+                    'dni' => str_pad((string) (20000000 + $i), 8, '0', STR_PAD_LEFT),
+                    'first_name' => "DIRECTOR EJECUTIVO {$i}",
+                    'last_name' => null,
                     'name' => "DIRECTOR EJECUTIVO {$i}",
                     'phone' => '90040000'.$i,
                     'username' => "director{$i}",
@@ -60,6 +65,9 @@ class AdvisorSeeder extends Seeder
             $level3Advisors[] = Advisor::updateOrCreate(
                 ['email' => "gerente{$i}@inmopro.com"],
                 [
+                    'dni' => str_pad((string) (30000000 + $i), 8, '0', STR_PAD_LEFT),
+                    'first_name' => "GERENTE COMERCIAL {$i}",
+                    'last_name' => null,
                     'name' => "GERENTE COMERCIAL {$i}",
                     'phone' => '9003000'.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
                     'username' => "gerente{$i}",
@@ -80,6 +88,9 @@ class AdvisorSeeder extends Seeder
             $level2Advisors[] = Advisor::updateOrCreate(
                 ['email' => "senior{$i}@inmopro.com"],
                 [
+                    'dni' => str_pad((string) (40000000 + $i), 8, '0', STR_PAD_LEFT),
+                    'first_name' => "ASESOR SENIOR {$i}",
+                    'last_name' => null,
                     'name' => "ASESOR SENIOR {$i}",
                     'phone' => '9002000'.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
                     'username' => "senior{$i}",
@@ -99,6 +110,9 @@ class AdvisorSeeder extends Seeder
             Advisor::updateOrCreate(
                 ['email' => "asesor{$i}@inmopro.com"],
                 [
+                    'dni' => str_pad((string) (50000000 + $i), 8, '0', STR_PAD_LEFT),
+                    'first_name' => "ASESOR NIVEL 1 - {$i}",
+                    'last_name' => null,
                     'name' => "ASESOR NIVEL 1 - {$i}",
                     'phone' => '9001000'.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
                     'username' => "asesor{$i}",

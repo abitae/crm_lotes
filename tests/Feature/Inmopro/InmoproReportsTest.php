@@ -198,6 +198,7 @@ class InmoproReportsTest extends TestCase
         ]);
 
         $advisor = Advisor::create([
+            'dni' => '11111111',
             'name' => 'Asesor Uno',
             'phone' => '999111222',
             'email' => 'asesor@example.com',

@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Hash;
 
+/**
+ * @property-read string $name Nombre para mostrar consolidado (nombres + apellidos).
+ */
 class Advisor extends Model
 {
     /**
@@ -22,6 +25,7 @@ class Advisor extends Model
      */
     protected $fillable = [
         'name',
+        'dni',
         'phone',
         'email',
         'city_id',
@@ -33,6 +37,12 @@ class Advisor extends Model
         'advisor_level_id',
         'superior_id',
         'personal_quota',
+        'birth_date',
+        'first_name',
+        'last_name',
+        'bank_name',
+        'bank_account_number',
+        'bank_cci',
     ];
 
     /**
@@ -44,7 +54,20 @@ class Advisor extends Model
             'personal_quota' => 'decimal:2',
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
+            'birth_date' => 'date',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Advisor $advisor): void {
+            $first = trim((string) ($advisor->first_name ?? ''));
+            $last = trim((string) ($advisor->last_name ?? ''));
+            $parts = array_filter([$first, $last], static fn (string $p): bool => $p !== '');
+            if ($parts !== []) {
+                $advisor->name = implode(' ', $parts);
+            }
+        });
     }
 
     /**
@@ -181,5 +204,13 @@ class Advisor extends Model
     public function dateros(): HasMany
     {
         return $this->hasMany(Datero::class, 'advisor_id');
+    }
+
+    /**
+     * @return HasMany<AdvisorMaterialItem, $this>
+     */
+    public function materialItems(): HasMany
+    {
+        return $this->hasMany(AdvisorMaterialItem::class);
     }
 }

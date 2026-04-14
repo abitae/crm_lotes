@@ -1,7 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Search, UserPlus, ChevronRight, Plus, Pencil, Receipt, KeyRound } from 'lucide-react';
+import { Download, FileSpreadsheet, KeyRound, Pencil, Plus, Receipt, Search, UserPlus, ChevronRight } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import Pagination, { type PaginationLink } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
@@ -22,9 +24,18 @@ import type { BreadcrumbItem } from '@/types';
 type AdvisorLevel = { id: number; name: string };
 type Team = { id: number; name: string; color?: string };
 type CityOption = { id: number; name: string; department?: string | null };
+type MaterialTypeRow = { id: number; code: string; name: string };
+type MaterialFormRow = { advisor_material_type_id: number; delivered_at: string; notes: string };
 type Advisor = {
     id: number;
     name: string;
+    dni?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    birth_date?: string | null;
+    bank_name?: string | null;
+    bank_account_number?: string | null;
+    bank_cci?: string | null;
     username?: string;
     email: string;
     phone: string;
@@ -39,6 +50,13 @@ type Advisor = {
     superior?: { name: string };
     city?: { id: number; name: string; department?: string | null };
     memberships?: Membership[];
+    material_items?: Array<{
+        id: number;
+        advisor_material_type_id: number;
+        delivered_at: string | null;
+        notes?: string | null;
+        type?: { id: number; name: string; code: string };
+    }>;
 };
 type Payment = { id: number; amount: string; paid_at: string; notes?: string | null };
 type MembershipTypeOption = { id: number; name: string; months: number; amount: string };
@@ -77,6 +95,7 @@ type PageProps = {
     teams: Team[];
     cities: CityOption[];
     membershipTypes: MembershipTypeOption[];
+    materialTypes: MaterialTypeRow[];
     membershipDetail: MembershipDetail | null;
     advisorForModal: Advisor | null;
     openModal: string | null;
@@ -92,6 +111,20 @@ function membershipToDetail(m: Membership, advisor?: { id: number; name: string 
     return { membership, totalPaid, balanceDue, isPaid: balanceDue <= 0 };
 }
 
+function buildMaterialFormRows(types: MaterialTypeRow[], existing?: Advisor['material_items']): MaterialFormRow[] {
+    const map = new Map((existing ?? []).map((m) => [m.advisor_material_type_id, m]));
+    return types.map((t) => {
+        const row = map.get(t.id);
+        const d = row?.delivered_at;
+        const dateStr = d ? String(d).slice(0, 10) : '';
+        return {
+            advisor_material_type_id: t.id,
+            delivered_at: dateStr,
+            notes: row?.notes ?? '',
+        };
+    });
+}
+
 export default function AdvisorsIndex({
     advisors,
     advisorLevels,
@@ -99,6 +132,7 @@ export default function AdvisorsIndex({
     teams,
     cities,
     membershipTypes,
+    materialTypes,
     membershipDetail,
     advisorForModal,
     openModal,
@@ -109,6 +143,8 @@ export default function AdvisorsIndex({
     const [modalCazadorAccess, setModalCazadorAccess] = useState<Advisor | null>(null);
     const [modalCreateMembership, setModalCreateMembership] = useState(false);
     const [modalMembershipDetail, setModalMembershipDetail] = useState<MembershipDetail | null>(null);
+    const [modalAdvisorTemplate, setModalAdvisorTemplate] = useState(false);
+    const [modalAdvisorImport, setModalAdvisorImport] = useState(false);
 
     /* eslint-disable react-hooks/set-state-in-effect -- abrir modales desde ?modal= en la URL */
     useEffect(() => {
@@ -144,6 +180,14 @@ export default function AdvisorsIndex({
         router.get('/inmopro/advisors', { ...filters, search: q || undefined }, { preserveState: true });
     };
 
+    const advisorsExportQuery = new URLSearchParams();
+
+    if (filters.search) {
+        advisorsExportQuery.set('search', String(filters.search));
+    }
+
+    const advisorsExportHref = `/inmopro/advisors/export-excel${advisorsExportQuery.toString() ? `?${advisorsExportQuery.toString()}` : ''}`;
+
     const totalPaid = (m: Membership) => (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
     const balanceDue = (m: Membership) => Math.max(0, Number(m.amount) - totalPaid(m));
     const isPaid = (m: Membership) => balanceDue(m) <= 0;
@@ -166,6 +210,26 @@ export default function AdvisorsIndex({
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setModalAdvisorTemplate(true)}>
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Plantilla
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <a href={advisorsExportHref}>
+                                <Download className="h-4 w-4" />
+                                Exportar Excel
+                            </a>
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            onClick={() => setModalAdvisorImport(true)}
+                        >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Importar Excel
+                        </Button>
                         <Button onClick={() => setModalCreateAdvisor(true)} className="flex items-center gap-2">
                             <UserPlus className="h-5 w-5" />
                             Nuevo vendedor
@@ -313,6 +377,10 @@ export default function AdvisorsIndex({
                     )}
                 </div>
 
+                <AdvisorTemplateModal open={modalAdvisorTemplate} onOpenChange={setModalAdvisorTemplate} />
+
+                <AdvisorExcelImportModal open={modalAdvisorImport} onOpenChange={setModalAdvisorImport} />
+
                 {/* Modal: Crear vendedor */}
                 <CreateAdvisorModal
                     open={modalCreateAdvisor}
@@ -321,11 +389,13 @@ export default function AdvisorsIndex({
                     advisorsList={advisorsList}
                     teams={teams}
                     cities={cities}
+                    materialTypes={materialTypes}
                 />
 
                 {/* Modal: Editar vendedor */}
                 {modalEditAdvisor && (
                     <EditAdvisorModal
+                        key={modalEditAdvisor.id}
                         open={!!modalEditAdvisor}
                         onOpenChange={(open) => !open && setModalEditAdvisor(null)}
                         advisor={modalEditAdvisor}
@@ -333,6 +403,7 @@ export default function AdvisorsIndex({
                         advisorsList={advisorsList.filter((a) => a.id !== modalEditAdvisor.id)}
                         teams={teams}
                         cities={cities}
+                        materialTypes={materialTypes}
                     />
                 )}
 
@@ -371,6 +442,257 @@ export default function AdvisorsIndex({
     );
 }
 
+function getXsrfTokenFromCookie(): string {
+    const m = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+
+    return m ? decodeURIComponent(m[1]) : '';
+}
+
+type AdvisorImportPreviewRow = {
+    excel_row: number;
+    dni: string | null;
+    status: 'valid' | 'invalid';
+    action: 'create' | 'update' | null;
+    errors: string[];
+};
+
+type AdvisorImportPreviewResponse = {
+    rows: AdvisorImportPreviewRow[];
+    summary: { valid: number; invalid: number };
+    token: string | null;
+    can_confirm: boolean;
+};
+
+function AdvisorTemplateModal({
+    open,
+    onOpenChange,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Plantilla Excel — vendedores</DialogTitle>
+                    <DialogDescription>
+                        Descargue la plantilla con las columnas requeridas (incluye DNI en la primera columna). Complétela y
+                        utilice &quot;Importar Excel&quot; para validar fila por fila antes de confirmar.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:justify-between">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                    <Button type="button" asChild>
+                        <a href="/inmopro/advisors/excel-template" download>
+                            <Download className="mr-2 h-4 w-4" />
+                            Descargar plantilla
+                        </a>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function AdvisorExcelImportModal({
+    open,
+    onOpenChange,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const fileRef = useRef<HTMLInputElement>(null);
+    const [loadingPreview, setLoadingPreview] = useState(false);
+    const [confirming, setConfirming] = useState(false);
+    const [preview, setPreview] = useState<AdvisorImportPreviewResponse | null>(null);
+    const [fetchError, setFetchError] = useState<string | null>(null);
+
+    const reset = (): void => {
+        setPreview(null);
+        setFetchError(null);
+        if (fileRef.current) {
+            fileRef.current.value = '';
+        }
+    };
+
+    useEffect(() => {
+        if (!open) {
+            reset();
+        }
+    }, [open]);
+
+    const runPreview = async (): Promise<void> => {
+        const input = fileRef.current;
+        if (!input?.files?.length) {
+            setFetchError('Seleccione un archivo Excel (.xlsx o .xls).');
+
+            return;
+        }
+
+        setLoadingPreview(true);
+        setFetchError(null);
+
+        const fd = new FormData();
+        fd.append('file', input.files[0]);
+
+        try {
+            const res = await fetch('/inmopro/advisors/import-preview', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
+                },
+                body: fd,
+                credentials: 'same-origin',
+            });
+
+            const body = (await res.json()) as AdvisorImportPreviewResponse & {
+                message?: string;
+                errors?: { file?: string[] };
+            };
+
+            if (!res.ok) {
+                const fileErr = body.errors?.file?.[0];
+                setFetchError(fileErr ?? body.message ?? 'No se pudo validar el archivo.');
+
+                return;
+            }
+
+            setPreview(body);
+        } catch {
+            setFetchError('Error de red al validar el archivo. Intente de nuevo.');
+        } finally {
+            setLoadingPreview(false);
+        }
+    };
+
+    const confirmImport = (): void => {
+        if (!preview?.token) {
+            return;
+        }
+
+        setConfirming(true);
+        router.post(
+            '/inmopro/advisors/import-confirm',
+            { token: preview.token },
+            {
+                onFinish: () => setConfirming(false),
+                onSuccess: () => onOpenChange(false),
+            }
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
+                <DialogHeader>
+                    <DialogTitle>Importar vendedores desde Excel</DialogTitle>
+                    <DialogDescription>
+                        Se validará cada fila del archivo. Solo podrá confirmar la importación si no hay errores. Los
+                        registros existentes se identifican por DNI y se actualizan.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+                    <div className="flex flex-wrap items-end gap-3">
+                        <div className="min-w-[200px] flex-1">
+                            <Label htmlFor="advisor-import-file">Archivo</Label>
+                            <input
+                                id="advisor-import-file"
+                                ref={fileRef}
+                                type="file"
+                                accept=".xlsx,.xls"
+                                className="mt-1 block w-full cursor-pointer rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:text-sm"
+                                onChange={() => setFetchError(null)}
+                            />
+                        </div>
+                        <Button type="button" variant="secondary" disabled={loadingPreview} onClick={() => void runPreview()}>
+                            {loadingPreview ? 'Validando…' : 'Validar archivo'}
+                        </Button>
+                    </div>
+
+                    {fetchError ? <p className="text-sm font-medium text-red-600">{fetchError}</p> : null}
+
+                    {preview ? (
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-600">
+                                Filas válidas: <strong>{preview.summary.valid}</strong> · Con error:{' '}
+                                <strong>{preview.summary.invalid}</strong>
+                            </p>
+
+                            <div className="max-h-[min(50vh,420px)] overflow-auto rounded-lg border border-slate-200">
+                                <table className="w-full border-collapse text-left text-xs">
+                                    <thead className="sticky top-0 bg-slate-50">
+                                        <tr className="border-b border-slate-200">
+                                            <th className="px-2 py-2 font-semibold">Fila Excel</th>
+                                            <th className="px-2 py-2 font-semibold">DNI</th>
+                                            <th className="px-2 py-2 font-semibold">Estado</th>
+                                            <th className="px-2 py-2 font-semibold">Acción</th>
+                                            <th className="px-2 py-2 font-semibold">Detalle</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {preview.rows.map((row) => (
+                                            <tr key={row.excel_row}>
+                                                <td className="px-2 py-1.5 tabular-nums">{row.excel_row}</td>
+                                                <td className="px-2 py-1.5">{row.dni ?? '—'}</td>
+                                                <td className="px-2 py-1.5">
+                                                    {row.status === 'valid' ? (
+                                                        <span className="text-emerald-700">Válida</span>
+                                                    ) : (
+                                                        <span className="text-red-600">Error</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-2 py-1.5">
+                                                    {row.action === 'create'
+                                                        ? 'Crear'
+                                                        : row.action === 'update'
+                                                          ? 'Actualizar'
+                                                          : '—'}
+                                                </td>
+                                                <td className="px-2 py-1.5 text-slate-600">
+                                                    {row.errors.length ? row.errors.join(' ') : '—'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {preview.can_confirm && preview.token ? (
+                                <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+                                    <Button type="button" variant="outline" onClick={reset}>
+                                        Otro archivo
+                                    </Button>
+                                    <Button type="button" disabled={confirming} onClick={confirmImport}>
+                                        {confirming ? 'Importando…' : 'Confirmar importación'}
+                                    </Button>
+                                </DialogFooter>
+                            ) : preview.rows.length > 0 ? (
+                                <p className="text-sm text-amber-700">
+                                    Corrija los errores en el archivo o cargue otra versión; no se puede confirmar mientras
+                                    haya filas inválidas o sin datos procesables.
+                                </p>
+                            ) : (
+                                <p className="text-sm text-slate-500">No se encontraron filas de datos en el archivo.</p>
+                            )}
+                        </div>
+                    ) : null}
+                </div>
+
+                <DialogFooter className="border-t border-slate-100 pt-3">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function AdvisorMetric({
     label,
     value,
@@ -401,6 +723,7 @@ function CreateAdvisorModal({
     advisorsList,
     teams,
     cities,
+    materialTypes,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -408,9 +731,13 @@ function CreateAdvisorModal({
     advisorsList: { id: number; name: string }[];
     teams: Team[];
     cities: CityOption[];
+    materialTypes: MaterialTypeRow[];
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
+        dni: '',
+        first_name: '',
+        last_name: '',
+        birth_date: '',
         phone: '',
         email: '',
         city_id: cities[0]?.id ?? 0,
@@ -418,6 +745,10 @@ function CreateAdvisorModal({
         advisor_level_id: advisorLevels[0]?.id ?? 0,
         superior_id: null as number | null,
         personal_quota: 0,
+        bank_name: '',
+        bank_account_number: '',
+        bank_cci: '',
+        material_items: buildMaterialFormRows(materialTypes),
     });
 
     const submit = (e: FormEvent) => {
@@ -425,18 +756,49 @@ function CreateAdvisorModal({
         post('/inmopro/advisors', { onSuccess: () => { reset(); onOpenChange(false); } });
     };
 
+    const updateMaterialRow = (index: number, patch: Partial<MaterialFormRow>) => {
+        const next = [...data.material_items];
+        next[index] = { ...next[index], ...patch };
+        setData('material_items', next);
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Nuevo vendedor</DialogTitle>
                     <DialogDescription>Registre los datos del asesor.</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={submit} className="space-y-4">
+                <form onSubmit={submit} className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
                     <div>
-                        <Label htmlFor="name">Nombre</Label>
-                        <Input id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} className="mt-1" />
-                        <InputError message={errors.name} />
+                        <Label htmlFor="dni">DNI (8 dígitos)</Label>
+                        <Input
+                            id="dni"
+                            inputMode="numeric"
+                            maxLength={8}
+                            autoComplete="off"
+                            value={data.dni}
+                            onChange={(e) => setData('dni', e.target.value.replace(/\D/g, '').slice(0, 8))}
+                            className="mt-1"
+                        />
+                        <InputError message={errors.dni} />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <Label htmlFor="first_name">Nombres</Label>
+                            <Input id="first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className="mt-1" />
+                            <InputError message={errors.first_name} />
+                        </div>
+                        <div>
+                            <Label htmlFor="last_name">Apellidos</Label>
+                            <Input id="last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className="mt-1" />
+                            <InputError message={errors.last_name} />
+                        </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="birth_date">Fecha de nacimiento</Label>
+                        <Input id="birth_date" type="date" value={data.birth_date} onChange={(e) => setData('birth_date', e.target.value)} className="mt-1" />
+                        <InputError message={errors.birth_date} />
                     </div>
                     <div>
                         <Label htmlFor="phone">Teléfono</Label>
@@ -519,7 +881,70 @@ function CreateAdvisorModal({
                         />
                         <InputError message={errors.personal_quota} />
                     </div>
-                    <DialogFooter>
+                    <Separator />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Datos bancarios</p>
+                    <div>
+                        <Label htmlFor="bank_name">Banco</Label>
+                        <Input id="bank_name" value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} className="mt-1" />
+                        <InputError message={errors.bank_name} />
+                    </div>
+                    <div>
+                        <Label htmlFor="bank_account_number">Número de cuenta</Label>
+                        <Input id="bank_account_number" value={data.bank_account_number} onChange={(e) => setData('bank_account_number', e.target.value)} className="mt-1" />
+                        <InputError message={errors.bank_account_number} />
+                    </div>
+                    <div>
+                        <Label htmlFor="bank_cci">CCI (20 dígitos)</Label>
+                        <Input id="bank_cci" inputMode="numeric" maxLength={20} value={data.bank_cci} onChange={(e) => setData('bank_cci', e.target.value)} className="mt-1" />
+                        <InputError message={errors.bank_cci} />
+                    </div>
+                    <Separator />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Material corporativo</p>
+                    <div className="space-y-3">
+                        {data.material_items.map((row, index) => (
+                            <div key={row.advisor_material_type_id} className="rounded-lg border border-slate-200 p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-medium text-slate-800">
+                                        {materialTypes.find((t) => t.id === row.advisor_material_type_id)?.name ?? 'Material'}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            id={`m-new-${row.advisor_material_type_id}`}
+                                            checked={Boolean(row.delivered_at)}
+                                            onCheckedChange={(checked) => {
+                                                updateMaterialRow(index, {
+                                                    delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
+                                                });
+                                            }}
+                                        />
+                                        <Label htmlFor={`m-new-${row.advisor_material_type_id}`} className="text-sm font-normal">
+                                            Entregado
+                                        </Label>
+                                    </div>
+                                </div>
+                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                    <div>
+                                        <Label className="text-xs text-slate-500">Fecha entrega</Label>
+                                        <Input
+                                            type="date"
+                                            value={row.delivered_at}
+                                            onChange={(e) => updateMaterialRow(index, { delivered_at: e.target.value })}
+                                            className="mt-0.5"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs text-slate-500">Notas</Label>
+                                        <Input
+                                            value={row.notes}
+                                            onChange={(e) => updateMaterialRow(index, { notes: e.target.value })}
+                                            className="mt-0.5"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter className="sticky bottom-0 bg-white pt-2">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
                         <Button type="submit" disabled={processing}>Guardar</Button>
                     </DialogFooter>
@@ -537,6 +962,7 @@ function EditAdvisorModal({
     advisorsList,
     teams,
     cities,
+    materialTypes,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -545,9 +971,13 @@ function EditAdvisorModal({
     advisorsList: { id: number; name: string }[];
     teams: Team[];
     cities: CityOption[];
+    materialTypes: MaterialTypeRow[];
 }) {
     const { data, setData, put, processing, errors } = useForm({
-        name: advisor.name,
+        dni: advisor.dni ?? '',
+        first_name: advisor.first_name ?? advisor.name,
+        last_name: advisor.last_name ?? '',
+        birth_date: advisor.birth_date ? String(advisor.birth_date).slice(0, 10) : '',
         phone: advisor.phone,
         email: advisor.email,
         city_id: advisor.city_id ?? cities[0]?.id ?? 0,
@@ -555,6 +985,10 @@ function EditAdvisorModal({
         advisor_level_id: advisor.advisor_level_id ?? advisorLevels[0]?.id ?? 0,
         superior_id: advisor.superior_id ?? (null as number | null),
         personal_quota: Number(advisor.personal_quota),
+        bank_name: advisor.bank_name ?? '',
+        bank_account_number: advisor.bank_account_number ?? '',
+        bank_cci: advisor.bank_cci ?? '',
+        material_items: buildMaterialFormRows(materialTypes, advisor.material_items),
     });
 
     const submit = (e: FormEvent) => {
@@ -562,18 +996,49 @@ function EditAdvisorModal({
         put(`/inmopro/advisors/${advisor.id}`, { onSuccess: () => onOpenChange(false) });
     };
 
+    const updateMaterialRow = (index: number, patch: Partial<MaterialFormRow>) => {
+        const next = [...data.material_items];
+        next[index] = { ...next[index], ...patch };
+        setData('material_items', next);
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Editar vendedor</DialogTitle>
                     <DialogDescription>Modifique los datos del asesor.</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={submit} className="space-y-4">
+                <form onSubmit={submit} className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
                     <div>
-                        <Label htmlFor="edit-name">Nombre</Label>
-                        <Input id="edit-name" value={data.name} onChange={(e) => setData('name', e.target.value)} className="mt-1" />
-                        <InputError message={errors.name} />
+                        <Label htmlFor="edit-dni">DNI (8 dígitos)</Label>
+                        <Input
+                            id="edit-dni"
+                            inputMode="numeric"
+                            maxLength={8}
+                            autoComplete="off"
+                            value={data.dni}
+                            onChange={(e) => setData('dni', e.target.value.replace(/\D/g, '').slice(0, 8))}
+                            className="mt-1"
+                        />
+                        <InputError message={errors.dni} />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <Label htmlFor="edit-first_name">Nombres</Label>
+                            <Input id="edit-first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className="mt-1" />
+                            <InputError message={errors.first_name} />
+                        </div>
+                        <div>
+                            <Label htmlFor="edit-last_name">Apellidos</Label>
+                            <Input id="edit-last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className="mt-1" />
+                            <InputError message={errors.last_name} />
+                        </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-birth_date">Fecha de nacimiento</Label>
+                        <Input id="edit-birth_date" type="date" value={data.birth_date} onChange={(e) => setData('birth_date', e.target.value)} className="mt-1" />
+                        <InputError message={errors.birth_date} />
                     </div>
                     <div>
                         <Label htmlFor="edit-phone">Teléfono</Label>
@@ -656,7 +1121,70 @@ function EditAdvisorModal({
                         />
                         <InputError message={errors.personal_quota} />
                     </div>
-                    <DialogFooter>
+                    <Separator />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Datos bancarios</p>
+                    <div>
+                        <Label htmlFor="edit-bank_name">Banco</Label>
+                        <Input id="edit-bank_name" value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} className="mt-1" />
+                        <InputError message={errors.bank_name} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-bank_account_number">Número de cuenta</Label>
+                        <Input id="edit-bank_account_number" value={data.bank_account_number} onChange={(e) => setData('bank_account_number', e.target.value)} className="mt-1" />
+                        <InputError message={errors.bank_account_number} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-bank_cci">CCI (20 dígitos)</Label>
+                        <Input id="edit-bank_cci" inputMode="numeric" maxLength={20} value={data.bank_cci} onChange={(e) => setData('bank_cci', e.target.value)} className="mt-1" />
+                        <InputError message={errors.bank_cci} />
+                    </div>
+                    <Separator />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Material corporativo</p>
+                    <div className="space-y-3">
+                        {data.material_items.map((row, index) => (
+                            <div key={row.advisor_material_type_id} className="rounded-lg border border-slate-200 p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-medium text-slate-800">
+                                        {materialTypes.find((t) => t.id === row.advisor_material_type_id)?.name ?? 'Material'}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            id={`m-edit-${row.advisor_material_type_id}`}
+                                            checked={Boolean(row.delivered_at)}
+                                            onCheckedChange={(checked) => {
+                                                updateMaterialRow(index, {
+                                                    delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
+                                                });
+                                            }}
+                                        />
+                                        <Label htmlFor={`m-edit-${row.advisor_material_type_id}`} className="text-sm font-normal">
+                                            Entregado
+                                        </Label>
+                                    </div>
+                                </div>
+                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                    <div>
+                                        <Label className="text-xs text-slate-500">Fecha entrega</Label>
+                                        <Input
+                                            type="date"
+                                            value={row.delivered_at}
+                                            onChange={(e) => updateMaterialRow(index, { delivered_at: e.target.value })}
+                                            className="mt-0.5"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs text-slate-500">Notas</Label>
+                                        <Input
+                                            value={row.notes}
+                                            onChange={(e) => updateMaterialRow(index, { notes: e.target.value })}
+                                            className="mt-0.5"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <DialogFooter className="sticky bottom-0 bg-white pt-2">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
                         <Button type="submit" disabled={processing}>Actualizar</Button>
                     </DialogFooter>
