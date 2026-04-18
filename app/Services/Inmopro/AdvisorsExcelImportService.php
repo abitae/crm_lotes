@@ -7,11 +7,13 @@ use App\Models\Inmopro\AdvisorLevel;
 use App\Models\Inmopro\City;
 use App\Models\Inmopro\Team;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use RuntimeException;
 
 class AdvisorsExcelImportService
@@ -19,8 +21,7 @@ class AdvisorsExcelImportService
     private const CACHE_TTL_MINUTES = 20;
 
     /**
-     * Columnas: DNI, Nombres, Apellidos, Fecha nacimiento, Telefono, Email, Ciudad, Departamento,
-     * Codigo equipo, Codigo nivel, Cuota personal, Activo, Username, Email superior, Banco, Cuenta, CCI.
+     * Columnas: … CCI, Fecha ingreso (última columna; compatible con archivos de 17 columnas sin esta fecha).
      */
     private const COL_DNI = 0;
 
@@ -55,6 +56,8 @@ class AdvisorsExcelImportService
     private const COL_ACCOUNT = 15;
 
     private const COL_CCI = 16;
+
+    private const COL_JOINED = 17;
 
     /**
      * @return array{rows: list<array<string, mixed>>, summary: array{valid: int, invalid: int}, token: string|null, can_confirm: bool}
@@ -130,6 +133,22 @@ class AdvisorsExcelImportService
                 $rowResult['errors'][] = 'Código de nivel no válido.';
             }
 
+            $birthParsed = $this->parseCellDate($cells, self::COL_BIRTH);
+            $joinedKeyExists = array_key_exists(self::COL_JOINED, $cells);
+            $joinedParsed = $joinedKeyExists ? $this->parseCellDate($cells, self::COL_JOINED) : null;
+            if ($this->cellHasExcelOrTextDate($cells, self::COL_BIRTH) && $birthParsed === null) {
+                $rowResult['errors'][] = 'Fecha de nacimiento no válida.';
+            }
+            if ($joinedKeyExists) {
+                if ($joinedParsed === null) {
+                    if ($this->cellHasExcelOrTextDate($cells, self::COL_JOINED)) {
+                        $rowResult['errors'][] = 'Fecha de ingreso no válida (AAAA-MM-DD o fecha de Excel).';
+                    } else {
+                        $rowResult['errors'][] = 'La fecha de ingreso en la última columna es obligatoria.';
+                    }
+                }
+            }
+
             $cci = $this->cellString($cells, self::COL_CCI);
             if ($cci !== null && $cci !== '' && ! preg_match('/^[0-9]{20}$/', $cci)) {
                 $rowResult['errors'][] = 'El CCI debe tener exactamente 20 dígitos.';
@@ -152,7 +171,6 @@ class AdvisorsExcelImportService
                 continue;
             }
 
-            $birth = $this->cellString($cells, self::COL_BIRTH);
             $quota = $this->parseDecimal($cells, self::COL_QUOTA);
             $isActive = $this->parseBool($cells, self::COL_ACTIVE, true);
             $username = $this->cellString($cells, self::COL_USERNAME);
@@ -161,7 +179,7 @@ class AdvisorsExcelImportService
             $payload = [
                 'first_name' => $firstName,
                 'last_name' => $this->cellString($cells, self::COL_LAST_NAME),
-                'birth_date' => $birth !== null && $birth !== '' ? $birth : null,
+                'birth_date' => $birthParsed,
                 'phone' => $phone,
                 'email' => $email,
                 'city_id' => $cityId,
@@ -175,6 +193,9 @@ class AdvisorsExcelImportService
                 'bank_cci' => ($cci !== null && $cci !== '') ? $cci : null,
                 'dni' => $dniNorm,
             ];
+            if ($joinedKeyExists) {
+                $payload['joined_at'] = $joinedParsed;
+            }
 
             $action = $existingByDni !== null ? 'update' : 'create';
 
@@ -371,6 +392,55 @@ class AdvisorsExcelImportService
             'no', '0', 'false', 'inactivo' => false,
             default => $default,
         };
+    }
+
+    /**
+     * @param  array<int, mixed>  $cells
+     */
+    private function cellHasExcelOrTextDate(array $cells, int $index): bool
+    {
+        if (! array_key_exists($index, $cells)) {
+            return false;
+        }
+        $v = $cells[$index];
+        if ($v === null) {
+            return false;
+        }
+        if (is_numeric($v)) {
+            return true;
+        }
+
+        return trim((string) $v) !== '';
+    }
+
+    /**
+     * @param  array<int, mixed>  $cells
+     */
+    private function parseCellDate(array $cells, int $index): ?string
+    {
+        if (! array_key_exists($index, $cells)) {
+            return null;
+        }
+        $v = $cells[$index];
+        if ($v === null) {
+            return null;
+        }
+        if (is_numeric($v) && (float) $v > 0) {
+            try {
+                return ExcelDate::excelToDateTimeObject((float) $v)->format('Y-m-d');
+            } catch (\Throwable) {
+                // intentar como texto
+            }
+        }
+        $text = trim((string) $v);
+        if ($text === '') {
+            return null;
+        }
+        try {
+            return Carbon::parse($text)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function normalizeDni(?string $value): ?string

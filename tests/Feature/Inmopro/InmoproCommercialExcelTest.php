@@ -135,7 +135,7 @@ class InmoproCommercialExcelTest extends TestCase
             [
                 'DNI', 'Nombres', 'Apellidos', 'Fecha nacimiento', 'Telefono', 'Email', 'Ciudad', 'Departamento',
                 'Codigo equipo', 'Codigo nivel', 'Cuota personal', 'Activo', 'Username', 'Email superior',
-                'Banco', 'Cuenta', 'CCI',
+                'Banco', 'Cuenta', 'CCI', 'Fecha ingreso',
             ],
             [
                 '87654321',
@@ -155,6 +155,7 @@ class InmoproCommercialExcelTest extends TestCase
                 '',
                 '',
                 '',
+                '2024-03-01',
             ],
         ]);
 
@@ -180,6 +181,12 @@ class InmoproCommercialExcelTest extends TestCase
             'advisor_level_id' => $level->id,
             'city_id' => $city->id,
         ]);
+        $this->assertTrue(
+            Advisor::query()
+                ->where('email', 'vendedor_import@test.com')
+                ->whereDate('joined_at', '2024-03-01')
+                ->exists()
+        );
     }
 
     public function test_advisors_import_sets_superior_in_second_pass(): void
@@ -197,7 +204,7 @@ class InmoproCommercialExcelTest extends TestCase
             [
                 'DNI', 'Nombres', 'Apellidos', 'Fecha nacimiento', 'Telefono', 'Email', 'Ciudad', 'Departamento',
                 'Codigo equipo', 'Codigo nivel', 'Cuota personal', 'Activo', 'Username', 'Email superior',
-                'Banco', 'Cuenta', 'CCI',
+                'Banco', 'Cuenta', 'CCI', 'Fecha ingreso',
             ],
             [
                 '87654322',
@@ -217,6 +224,7 @@ class InmoproCommercialExcelTest extends TestCase
                 '',
                 '',
                 '',
+                '2025-01-10',
             ],
         ]);
 

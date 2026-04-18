@@ -26,6 +26,7 @@ class StoreAdvisorRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:120'],
             'last_name' => ['nullable', 'string', 'max:120'],
             'birth_date' => ['nullable', 'date'],
+            'joined_at' => ['nullable', 'date'],
             'phone' => ['required', 'string', 'max:50'],
             'email' => ['required', 'email', 'max:255'],
             'city_id' => ['required', Rule::exists('cities', 'id')->where('is_active', true)],
@@ -74,6 +75,11 @@ class StoreAdvisorRequest extends FormRequest
         $birth = $this->input('birth_date');
         if ($birth === '' || $birth === null) {
             $this->merge(['birth_date' => null]);
+        }
+
+        $joined = $this->input('joined_at');
+        if ($joined === '' || $joined === null) {
+            $this->merge(['joined_at' => null]);
         }
     }
 }

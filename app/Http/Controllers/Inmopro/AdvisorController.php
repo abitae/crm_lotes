@@ -33,7 +33,7 @@ class AdvisorController extends Controller
     public function excelTemplate(): BinaryFileResponse
     {
         return Excel::download(
-            new AdvisorsExport(collect()),
+            new AdvisorsExport(collect(), true),
             'plantilla_vendedores.xlsx'
         );
     }

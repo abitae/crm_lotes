@@ -38,6 +38,7 @@ class Advisor extends Model
         'superior_id',
         'personal_quota',
         'birth_date',
+        'joined_at',
         'first_name',
         'last_name',
         'bank_name',
@@ -55,6 +56,7 @@ class Advisor extends Model
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
             'birth_date' => 'date',
+            'joined_at' => 'date',
         ];
     }
 

@@ -8,6 +8,7 @@ type Advisor = {
     email: string;
     phone: string;
     personal_quota: string;
+    joined_at?: string | null;
     level?: { name: string };
     superior?: { name: string };
     lots?: Array<{ id: number; block: string; number: number; project?: { name: string } }>;
@@ -39,6 +40,16 @@ export default function AdvisorsShow({ advisor }: { advisor: Advisor }) {
                     <p>Email: {advisor.email}</p>
                     <p>Teléfono: {advisor.phone}</p>
                     <p>Cuota: S/ {Number(advisor.personal_quota).toLocaleString()}</p>
+                    <p>
+                        Fecha de ingreso:{' '}
+                        {advisor.joined_at
+                            ? new Date(String(advisor.joined_at).slice(0, 10)).toLocaleDateString('es-PE', {
+                                  day: '2-digit',
+                                  month: 'long',
+                                  year: 'numeric',
+                              })
+                            : '—'}
+                    </p>
                 </div>
                 {advisor.lots && advisor.lots.length > 0 && (
                     <div className="mt-8">

@@ -10,10 +10,37 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 class AdvisorsExport implements FromCollection, WithHeadings
 {
     /**
+     * Fila de ejemplo en la plantilla (sustituir por datos reales). Ajuste ciudad y códigos a su catálogo.
+     *
+     * @var list<int|float|string>
+     */
+    private const TEMPLATE_EXAMPLE_ROW = [
+        '12345678',
+        'Juan Carlos',
+        'Pérez López',
+        '1985-06-15',
+        '987654321',
+        'juan.perez@ejemplo.com',
+        'Lima',
+        'Lima',
+        'TEAM_NORTE',
+        'NIVEL_1',
+        25000,
+        'Si',
+        'jperez_ejemplo',
+        '',
+        'BCP',
+        '',
+        '',
+        '2024-01-15',
+    ];
+
+    /**
      * @param  Collection<int, Advisor>  $advisors
      */
     public function __construct(
-        private Collection $advisors
+        private Collection $advisors,
+        private bool $forTemplate = false,
     ) {}
 
     /**
@@ -21,6 +48,29 @@ class AdvisorsExport implements FromCollection, WithHeadings
      */
     public function headings(): array
     {
+        if ($this->forTemplate) {
+            return [
+                'DNI (*)',
+                'Nombres (*)',
+                'Apellidos',
+                'Fecha nacimiento (AAAA-MM-DD)',
+                'Telefono (*)',
+                'Email (*)',
+                'Ciudad (*)',
+                'Departamento (*)',
+                'Codigo equipo (*)',
+                'Codigo nivel (*)',
+                'Cuota personal (*)',
+                'Activo',
+                'Username',
+                'Email superior',
+                'Banco',
+                'Cuenta',
+                'CCI (20 digitos)',
+                'Fecha ingreso (AAAA-MM-DD) (*)',
+            ];
+        }
+
         return [
             'DNI',
             'Nombres',
@@ -39,6 +89,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
             'Banco',
             'Cuenta',
             'CCI',
+            'Fecha ingreso',
         ];
     }
 
@@ -47,6 +98,14 @@ class AdvisorsExport implements FromCollection, WithHeadings
      */
     public function collection(): Collection
     {
+        if ($this->advisors->isEmpty()) {
+            if ($this->forTemplate) {
+                return collect([self::TEMPLATE_EXAMPLE_ROW]);
+            }
+
+            return collect([]);
+        }
+
         return $this->advisors->map(static function (Advisor $advisor): array {
             return [
                 $advisor->dni ?? '',
@@ -66,6 +125,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
                 $advisor->bank_name ?? '',
                 $advisor->bank_account_number ?? '',
                 $advisor->bank_cci ?? '',
+                $advisor->joined_at?->toDateString() ?? '',
             ];
         });
     }

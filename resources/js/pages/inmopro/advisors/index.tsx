@@ -34,6 +34,7 @@ type Advisor = {
     first_name?: string | null;
     last_name?: string | null;
     birth_date?: string | null;
+    joined_at?: string | null;
     bank_name?: string | null;
     bank_account_number?: string | null;
     bank_cci?: string | null;
@@ -290,6 +291,7 @@ export default function AdvisorsIndex({
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Team</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Ciudad</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Superior</th>
+                                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Ingreso</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Cuota</th>
                                     <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
                                         Última suscripción anual
@@ -329,6 +331,15 @@ export default function AdvisorsIndex({
                                             ) : null}
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{adv.superior?.name ?? 'Alta Gerencia'}</td>
+                                        <td className="px-4 py-3 text-xs text-slate-600 tabular-nums">
+                                            {adv.joined_at
+                                                ? new Date(String(adv.joined_at).slice(0, 10)).toLocaleDateString('es-PE', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                  })
+                                                : '—'}
+                                        </td>
                                         <td className="px-4 py-3 font-medium text-slate-700">S/ {Number(adv.personal_quota).toLocaleString()}</td>
                                         <td className="px-2 py-2 text-center">
                                             {(() => {
@@ -494,9 +505,22 @@ function AdvisorTemplateModal({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Plantilla Excel — vendedores</DialogTitle>
-                    <DialogDescription>
-                        Descargue la plantilla con las columnas requeridas (incluye DNI en la primera columna). Complétela y
-                        utilice &quot;Importar Excel&quot; para validar fila por fila antes de confirmar.
+                    <DialogDescription asChild>
+                        <div className="space-y-3 text-sm text-slate-600">
+                            <p>
+                                El archivo incluye la fila de encabezados y una <strong>fila de ejemplo</strong> con el formato
+                                esperado; bórrela o sustitúyala por sus vendedores reales.
+                            </p>
+                            <p className="font-medium text-slate-800">Datos obligatorios (marcados con * en la plantilla)</p>
+                            <ul className="list-inside list-disc space-y-1 text-slate-600">
+                                <li>DNI (8 dígitos), nombres, teléfono, email</li>
+                                <li>Ciudad y departamento (como figuran en el sistema)</li>
+                                <li>Código de equipo y código de nivel</li>
+                                <li>Cuota personal</li>
+                                <li>Fecha de ingreso (última columna, formato AAAA-MM-DD o fecha de Excel)</li>
+                            </ul>
+                            <p>Luego use &quot;Importar Excel&quot; para validar y confirmar.</p>
+                        </div>
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="gap-2 sm:justify-between">
@@ -702,7 +726,9 @@ function AdvisorExcelImportModal({
                                 Arrastre el archivo aquí o{' '}
                                 <span className="text-emerald-700 underline decoration-emerald-300 underline-offset-2">elija desde su equipo</span>
                             </span>
-                            <span className="text-xs text-slate-500">Formatos: .xlsx, .xls · primera columna DNI</span>
+                            <span className="text-xs text-slate-500">
+                                Formatos: .xlsx, .xls · columna A: DNI · última columna: fecha de ingreso (plantilla nueva)
+                            </span>
                             {fileName ? <span className="mt-1 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-800 shadow-sm">{fileName}</span> : null}
                         </button>
                     </div>
@@ -844,6 +870,7 @@ function CreateAdvisorModal({
         first_name: '',
         last_name: '',
         birth_date: '',
+        joined_at: '',
         phone: '',
         email: '',
         city_id: cities[0]?.id ?? 0,
@@ -905,6 +932,11 @@ function CreateAdvisorModal({
                         <Label htmlFor="birth_date">Fecha de nacimiento</Label>
                         <Input id="birth_date" type="date" value={data.birth_date} onChange={(e) => setData('birth_date', e.target.value)} className="mt-1" />
                         <InputError message={errors.birth_date} />
+                    </div>
+                    <div>
+                        <Label htmlFor="joined_at">Fecha de ingreso</Label>
+                        <Input id="joined_at" type="date" value={data.joined_at} onChange={(e) => setData('joined_at', e.target.value)} className="mt-1" />
+                        <InputError message={errors.joined_at} />
                     </div>
                     <div>
                         <Label htmlFor="phone">Teléfono</Label>
@@ -1084,6 +1116,7 @@ function EditAdvisorModal({
         first_name: advisor.first_name ?? advisor.name,
         last_name: advisor.last_name ?? '',
         birth_date: advisor.birth_date ? String(advisor.birth_date).slice(0, 10) : '',
+        joined_at: advisor.joined_at ? String(advisor.joined_at).slice(0, 10) : '',
         phone: advisor.phone,
         email: advisor.email,
         city_id: advisor.city_id ?? cities[0]?.id ?? 0,
@@ -1145,6 +1178,11 @@ function EditAdvisorModal({
                         <Label htmlFor="edit-birth_date">Fecha de nacimiento</Label>
                         <Input id="edit-birth_date" type="date" value={data.birth_date} onChange={(e) => setData('birth_date', e.target.value)} className="mt-1" />
                         <InputError message={errors.birth_date} />
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-joined_at">Fecha de ingreso</Label>
+                        <Input id="edit-joined_at" type="date" value={data.joined_at} onChange={(e) => setData('joined_at', e.target.value)} className="mt-1" />
+                        <InputError message={errors.joined_at} />
                     </div>
                     <div>
                         <Label htmlFor="edit-phone">Teléfono</Label>
