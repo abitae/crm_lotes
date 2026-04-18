@@ -22,6 +22,7 @@ class AdvisorsExcelImportService
 
     /**
      * Columnas: … CCI, Fecha ingreso (última columna; compatible con archivos de 17 columnas sin esta fecha).
+     * Fechas en texto: preferente DD/MM/AAAA; también AAAA-MM-DD; o número serial de fecha de Excel.
      */
     private const COL_DNI = 0;
 
@@ -137,12 +138,12 @@ class AdvisorsExcelImportService
             $joinedKeyExists = array_key_exists(self::COL_JOINED, $cells);
             $joinedParsed = $joinedKeyExists ? $this->parseCellDate($cells, self::COL_JOINED) : null;
             if ($this->cellHasExcelOrTextDate($cells, self::COL_BIRTH) && $birthParsed === null) {
-                $rowResult['errors'][] = 'Fecha de nacimiento no válida.';
+                $rowResult['errors'][] = 'Fecha de nacimiento no válida (use DD/MM/AAAA, AAAA-MM-DD o celda de fecha Excel).';
             }
             if ($joinedKeyExists) {
                 if ($joinedParsed === null) {
                     if ($this->cellHasExcelOrTextDate($cells, self::COL_JOINED)) {
-                        $rowResult['errors'][] = 'Fecha de ingreso no válida (AAAA-MM-DD o fecha de Excel).';
+                        $rowResult['errors'][] = 'Fecha de ingreso no válida (use DD/MM/AAAA, AAAA-MM-DD o celda de fecha Excel).';
                     } else {
                         $rowResult['errors'][] = 'La fecha de ingreso en la última columna es obligatoria.';
                     }
@@ -414,6 +415,45 @@ class AdvisorsExcelImportService
     }
 
     /**
+     * Convierte texto a Y-m-d: prioridad DD/MM/AAAA (formato Excel típico en Perú), luego AAAA-MM-DD, luego otros parseables.
+     */
+    private function parseDateStringToYmd(string $text): ?string
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return null;
+        }
+
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $text, $m)) {
+            $day = (int) $m[1];
+            $month = (int) $m[2];
+            $year = (int) $m[3];
+            if (! checkdate($month, $day, $year)) {
+                return null;
+            }
+
+            return sprintf('%04d-%02d-%02d', $year, $month, $day);
+        }
+
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $text, $m)) {
+            $year = (int) $m[1];
+            $month = (int) $m[2];
+            $day = (int) $m[3];
+            if (! checkdate($month, $day, $year)) {
+                return null;
+            }
+
+            return sprintf('%04d-%02d-%02d', $year, $month, $day);
+        }
+
+        try {
+            return Carbon::parse($text)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * @param  array<int, mixed>  $cells
      */
     private function parseCellDate(array $cells, int $index): ?string
@@ -436,11 +476,8 @@ class AdvisorsExcelImportService
         if ($text === '') {
             return null;
         }
-        try {
-            return Carbon::parse($text)->format('Y-m-d');
-        } catch (\Throwable) {
-            return null;
-        }
+
+        return $this->parseDateStringToYmd($text);
     }
 
     private function normalizeDni(?string $value): ?string

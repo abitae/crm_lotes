@@ -18,7 +18,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
         '12345678',
         'Juan Carlos',
         'Pérez López',
-        '1985-06-15',
+        '15/06/1985',
         '987654321',
         'juan.perez@ejemplo.com',
         'Lima',
@@ -32,7 +32,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
         'BCP',
         '',
         '',
-        '2024-01-15',
+        '15/01/2024',
     ];
 
     /**
@@ -53,7 +53,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
                 'DNI (*)',
                 'Nombres (*)',
                 'Apellidos',
-                'Fecha nacimiento (AAAA-MM-DD)',
+                'Fecha nacimiento (DD/MM/AAAA)',
                 'Telefono (*)',
                 'Email (*)',
                 'Ciudad (*)',
@@ -67,7 +67,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
                 'Banco',
                 'Cuenta',
                 'CCI (20 digitos)',
-                'Fecha ingreso (AAAA-MM-DD) (*)',
+                'Fecha ingreso (DD/MM/AAAA) (*)',
             ];
         }
 
@@ -75,7 +75,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
             'DNI',
             'Nombres',
             'Apellidos',
-            'Fecha nacimiento',
+            'Fecha nacimiento (DD/MM/AAAA)',
             'Telefono',
             'Email',
             'Ciudad',
@@ -89,7 +89,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
             'Banco',
             'Cuenta',
             'CCI',
-            'Fecha ingreso',
+            'Fecha ingreso (DD/MM/AAAA)',
         ];
     }
 
@@ -111,7 +111,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
                 $advisor->dni ?? '',
                 $advisor->first_name ?? $advisor->name,
                 $advisor->last_name ?? '',
-                $advisor->birth_date?->toDateString() ?? '',
+                $advisor->birth_date?->format('d/m/Y') ?? '',
                 $advisor->phone,
                 $advisor->email,
                 $advisor->city?->name ?? '',
@@ -125,7 +125,7 @@ class AdvisorsExport implements FromCollection, WithHeadings
                 $advisor->bank_name ?? '',
                 $advisor->bank_account_number ?? '',
                 $advisor->bank_cci ?? '',
-                $advisor->joined_at?->toDateString() ?? '',
+                $advisor->joined_at?->format('d/m/Y') ?? '',
             ];
         });
     }

@@ -155,7 +155,7 @@ class InmoproCommercialExcelTest extends TestCase
                 '',
                 '',
                 '',
-                '2024-03-01',
+                '01/03/2024',
             ],
         ]);
 
@@ -224,7 +224,7 @@ class InmoproCommercialExcelTest extends TestCase
                 '',
                 '',
                 '',
-                '2025-01-10',
+                '10/01/2025',
             ],
         ]);
 

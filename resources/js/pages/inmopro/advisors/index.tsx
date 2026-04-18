@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Download, FileSpreadsheet, KeyRound, Pencil, Plus, Receipt, Search, Upload, UserPlus, ChevronRight } from 'lucide-react';
+import { CalendarDays, Download, FileSpreadsheet, KeyRound, Pencil, Plus, Receipt, Search, Upload, UserPlus, ChevronRight } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
@@ -162,6 +162,8 @@ export default function AdvisorsIndex({
     const [modalEditAdvisor, setModalEditAdvisor] = useState<Advisor | null>(null);
     const [modalCazadorAccess, setModalCazadorAccess] = useState<Advisor | null>(null);
     const [modalCreateMembership, setModalCreateMembership] = useState(false);
+    /** null = abrir “Nueva membresía” genérica (primer vendedor de la lista); id = preseleccionar ese vendedor */
+    const [membershipModalAdvisorId, setMembershipModalAdvisorId] = useState<number | null>(null);
     const [modalMembershipDetail, setModalMembershipDetail] = useState<MembershipDetail | null>(null);
     const [modalAdvisorTemplate, setModalAdvisorTemplate] = useState(false);
     const [modalAdvisorImport, setModalAdvisorImport] = useState(false);
@@ -217,6 +219,16 @@ export default function AdvisorsIndex({
         setModalMembershipDetail(membershipToDetail(m, advisor));
     };
 
+    const openMembershipForAdvisorRow = (adv: Advisor) => {
+        const latest = getLatestAnnualMembership(adv.memberships);
+        if (latest) {
+            openMembershipDetailFromRow(latest, { id: adv.id, name: adv.name });
+        } else {
+            setMembershipModalAdvisorId(adv.id);
+            setModalCreateMembership(true);
+        }
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Vendedores - Inmopro" />
@@ -255,7 +267,14 @@ export default function AdvisorsIndex({
                             <UserPlus className="h-5 w-5" />
                             Nuevo vendedor
                         </Button>
-                        <Button onClick={() => setModalCreateMembership(true)} variant="outline" className="flex items-center gap-2">
+                        <Button
+                            onClick={() => {
+                                setMembershipModalAdvisorId(null);
+                                setModalCreateMembership(true);
+                            }}
+                            variant="outline"
+                            className="flex items-center gap-2"
+                        >
                             <Plus className="h-5 w-5" />
                             Nueva membresía
                         </Button>
@@ -378,9 +397,22 @@ export default function AdvisorsIndex({
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
+                                                className="h-8 w-8 text-slate-400 hover:text-emerald-700"
+                                                title={
+                                                    getLatestAnnualMembership(adv.memberships)
+                                                        ? 'Editar membresía anual (última)'
+                                                        : 'Agregar membresía'
+                                                }
+                                                onClick={() => openMembershipForAdvisorRow(adv)}
+                                            >
+                                                <CalendarDays className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 className="h-8 w-8 text-slate-400 hover:text-slate-900"
                                                 onClick={() => setModalEditAdvisor(adv)}
-                                                title="Editar"
+                                                title="Editar vendedor"
                                             >
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
@@ -449,9 +481,15 @@ export default function AdvisorsIndex({
                 {/* Modal: Nueva membresía */}
                 <CreateMembershipModal
                     open={modalCreateMembership}
-                    onOpenChange={setModalCreateMembership}
+                    onOpenChange={(open) => {
+                        setModalCreateMembership(open);
+                        if (!open) {
+                            setMembershipModalAdvisorId(null);
+                        }
+                    }}
                     advisorsList={advisorsList}
                     membershipTypes={membershipTypes}
+                    preselectedAdvisorId={membershipModalAdvisorId}
                 />
 
                 {/* Modal: Detalle membresía + abonos */}
@@ -517,7 +555,10 @@ function AdvisorTemplateModal({
                                 <li>Ciudad y departamento (como figuran en el sistema)</li>
                                 <li>Código de equipo y código de nivel</li>
                                 <li>Cuota personal</li>
-                                <li>Fecha de ingreso (última columna, formato AAAA-MM-DD o fecha de Excel)</li>
+                                <li>
+                                    Fecha de nacimiento y fecha de ingreso en formato <strong>DD/MM/AAAA</strong> (o celda de
+                                    fecha de Excel); la fecha de ingreso va en la última columna.
+                                </li>
                             </ul>
                             <p>Luego use &quot;Importar Excel&quot; para validar y confirmar.</p>
                         </div>
@@ -673,7 +714,9 @@ function AdvisorExcelImportModal({
                         <DialogTitle>Importar vendedores desde Excel</DialogTitle>
                         <DialogDescription className="text-left">
                             Todo el flujo ocurre en este modal: elija o arrastre el archivo, valide fila por fila y confirme
-                            solo si no hay errores. Los registros existentes se identifican por DNI y se actualizan.
+                            solo si no hay errores. Los registros existentes se identifican por DNI y se actualizan. Las fechas
+                            del Excel deben ir en formato <strong>DD/MM/AAAA</strong> (también se aceptan celdas con formato de
+                            fecha de Excel y, por compatibilidad, <strong>AAAA-MM-DD</strong>).
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -727,7 +770,7 @@ function AdvisorExcelImportModal({
                                 <span className="text-emerald-700 underline decoration-emerald-300 underline-offset-2">elija desde su equipo</span>
                             </span>
                             <span className="text-xs text-slate-500">
-                                Formatos: .xlsx, .xls · columna A: DNI · última columna: fecha de ingreso (plantilla nueva)
+                                .xlsx / .xls · fechas como <strong>DD/MM/AAAA</strong> o celda fecha Excel · última columna: ingreso
                             </span>
                             {fileName ? <span className="mt-1 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-800 shadow-sm">{fileName}</span> : null}
                         </button>
@@ -895,197 +938,218 @@ function CreateAdvisorModal({
         setData('material_items', next);
     };
 
+    const selectClass = 'mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-sm shadow-sm';
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-lg">
-                <DialogHeader>
+            <DialogContent className="flex w-[min(100vw-1.5rem,56rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:w-[min(100vw-2rem,56rem)]">
+                <DialogHeader className="shrink-0 space-y-1 border-b border-slate-100 px-6 py-4 text-left">
                     <DialogTitle>Nuevo vendedor</DialogTitle>
-                    <DialogDescription>Registre los datos del asesor.</DialogDescription>
+                    <DialogDescription>Complete los campos; el formulario está en dos columnas.</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={submit} className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-                    <div>
-                        <Label htmlFor="dni">DNI (8 dígitos)</Label>
-                        <Input
-                            id="dni"
-                            inputMode="numeric"
-                            maxLength={8}
-                            autoComplete="off"
-                            value={data.dni}
-                            onChange={(e) => setData('dni', e.target.value.replace(/\D/g, '').slice(0, 8))}
-                            className="mt-1"
-                        />
-                        <InputError message={errors.dni} />
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <Label htmlFor="first_name">Nombres</Label>
-                            <Input id="first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className="mt-1" />
-                            <InputError message={errors.first_name} />
-                        </div>
-                        <div>
-                            <Label htmlFor="last_name">Apellidos</Label>
-                            <Input id="last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className="mt-1" />
-                            <InputError message={errors.last_name} />
-                        </div>
-                    </div>
-                    <div>
-                        <Label htmlFor="birth_date">Fecha de nacimiento</Label>
-                        <Input id="birth_date" type="date" value={data.birth_date} onChange={(e) => setData('birth_date', e.target.value)} className="mt-1" />
-                        <InputError message={errors.birth_date} />
-                    </div>
-                    <div>
-                        <Label htmlFor="joined_at">Fecha de ingreso</Label>
-                        <Input id="joined_at" type="date" value={data.joined_at} onChange={(e) => setData('joined_at', e.target.value)} className="mt-1" />
-                        <InputError message={errors.joined_at} />
-                    </div>
-                    <div>
-                        <Label htmlFor="phone">Teléfono</Label>
-                        <Input id="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className="mt-1" />
-                        <InputError message={errors.phone} />
-                    </div>
-                    <div>
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
-                        <InputError message={errors.email} />
-                    </div>
-                    <div>
-                        <Label htmlFor="city_id">Ciudad</Label>
-                        <select
-                            id="city_id"
-                            value={data.city_id}
-                            onChange={(e) => setData('city_id', Number(e.target.value))}
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                        >
-                            {cities.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name}
-                                    {c.department ? ` · ${c.department}` : ''}
-                                </option>
-                            ))}
-                        </select>
-                        <InputError message={errors.city_id} />
-                    </div>
-                    <div>
-                        <Label htmlFor="team_id">Team</Label>
-                        <select
-                            id="team_id"
-                            value={data.team_id}
-                            onChange={(e) => setData('team_id', Number(e.target.value))}
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                        >
-                            {teams.map((team) => (
-                                <option key={team.id} value={team.id}>{team.name}</option>
-                            ))}
-                        </select>
-                        <InputError message={errors.team_id} />
-                    </div>
-                    <div>
-                        <Label htmlFor="advisor_level_id">Nivel</Label>
-                        <select
-                            id="advisor_level_id"
-                            value={data.advisor_level_id}
-                            onChange={(e) => setData('advisor_level_id', Number(e.target.value))}
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                        >
-                            {advisorLevels.map((l) => (
-                                <option key={l.id} value={l.id}>{l.name}</option>
-                            ))}
-                        </select>
-                        <InputError message={errors.advisor_level_id} />
-                    </div>
-                    <div>
-                        <Label htmlFor="superior_id">Superior</Label>
-                        <select
-                            id="superior_id"
-                            value={data.superior_id ?? ''}
-                            onChange={(e) => setData('superior_id', e.target.value ? Number(e.target.value) : null)}
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                        >
-                            <option value="">— Ninguno —</option>
-                            {advisorsList.map((a) => (
-                                <option key={a.id} value={a.id}>{a.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <Label htmlFor="personal_quota">Cuota personal</Label>
-                        <Input
-                            id="personal_quota"
-                            type="number"
-                            min={0}
-                            value={data.personal_quota}
-                            onChange={(e) => setData('personal_quota', Number(e.target.value))}
-                            className="mt-1"
-                        />
-                        <InputError message={errors.personal_quota} />
-                    </div>
-                    <Separator />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Datos bancarios</p>
-                    <div>
-                        <Label htmlFor="bank_name">Banco</Label>
-                        <Input id="bank_name" value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} className="mt-1" />
-                        <InputError message={errors.bank_name} />
-                    </div>
-                    <div>
-                        <Label htmlFor="bank_account_number">Número de cuenta</Label>
-                        <Input id="bank_account_number" value={data.bank_account_number} onChange={(e) => setData('bank_account_number', e.target.value)} className="mt-1" />
-                        <InputError message={errors.bank_account_number} />
-                    </div>
-                    <div>
-                        <Label htmlFor="bank_cci">CCI (20 dígitos)</Label>
-                        <Input id="bank_cci" inputMode="numeric" maxLength={20} value={data.bank_cci} onChange={(e) => setData('bank_cci', e.target.value)} className="mt-1" />
-                        <InputError message={errors.bank_cci} />
-                    </div>
-                    <Separator />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Material corporativo</p>
-                    <div className="space-y-3">
-                        {data.material_items.map((row, index) => (
-                            <div key={row.advisor_material_type_id} className="rounded-lg border border-slate-200 p-3">
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="text-sm font-medium text-slate-800">
-                                        {materialTypes.find((t) => t.id === row.advisor_material_type_id)?.name ?? 'Material'}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id={`m-new-${row.advisor_material_type_id}`}
-                                            checked={Boolean(row.delivered_at)}
-                                            onCheckedChange={(checked) => {
-                                                updateMaterialRow(index, {
-                                                    delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
-                                                });
-                                            }}
-                                        />
-                                        <Label htmlFor={`m-new-${row.advisor_material_type_id}`} className="text-sm font-normal">
-                                            Entregado
-                                        </Label>
+                <form onSubmit={submit} className="flex flex-col">
+                    <div className="px-6 py-4">
+                        <div className="grid gap-6 md:grid-cols-2 md:items-start">
+                            <div className="space-y-3">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Identidad y contacto</p>
+                                <div>
+                                    <Label htmlFor="dni">DNI (8 dígitos)</Label>
+                                    <Input
+                                        id="dni"
+                                        inputMode="numeric"
+                                        maxLength={8}
+                                        autoComplete="off"
+                                        value={data.dni}
+                                        onChange={(e) => setData('dni', e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                        className="mt-1 h-9"
+                                    />
+                                    <InputError message={errors.dni} />
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="first_name">Nombres</Label>
+                                        <Input id="first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.first_name} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="last_name">Apellidos</Label>
+                                        <Input id="last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.last_name} />
                                     </div>
                                 </div>
-                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     <div>
-                                        <Label className="text-xs text-slate-500">Fecha entrega</Label>
-                                        <Input
-                                            type="date"
-                                            value={row.delivered_at}
-                                            onChange={(e) => updateMaterialRow(index, { delivered_at: e.target.value })}
-                                            className="mt-0.5"
-                                        />
+                                        <Label htmlFor="birth_date">Nacimiento</Label>
+                                        <Input id="birth_date" type="date" value={data.birth_date} onChange={(e) => setData('birth_date', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.birth_date} />
                                     </div>
                                     <div>
-                                        <Label className="text-xs text-slate-500">Notas</Label>
-                                        <Input
-                                            value={row.notes}
-                                            onChange={(e) => updateMaterialRow(index, { notes: e.target.value })}
-                                            className="mt-0.5"
-                                        />
+                                        <Label htmlFor="joined_at">Ingreso</Label>
+                                        <Input id="joined_at" type="date" value={data.joined_at} onChange={(e) => setData('joined_at', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.joined_at} />
+                                    </div>
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="phone">Teléfono</Label>
+                                        <Input id="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.phone} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="email">Email</Label>
+                                        <Input id="email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.email} />
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                            <div className="space-y-3">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Estructura y meta</p>
+                                <div>
+                                    <Label htmlFor="city_id">Ciudad</Label>
+                                    <select
+                                        id="city_id"
+                                        value={data.city_id}
+                                        onChange={(e) => setData('city_id', Number(e.target.value))}
+                                        className={selectClass}
+                                    >
+                                        {cities.map((c) => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.name}
+                                                {c.department ? ` · ${c.department}` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError message={errors.city_id} />
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="team_id">Team</Label>
+                                        <select id="team_id" value={data.team_id} onChange={(e) => setData('team_id', Number(e.target.value))} className={selectClass}>
+                                            {teams.map((team) => (
+                                                <option key={team.id} value={team.id}>{team.name}</option>
+                                            ))}
+                                        </select>
+                                        <InputError message={errors.team_id} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="advisor_level_id">Nivel</Label>
+                                        <select
+                                            id="advisor_level_id"
+                                            value={data.advisor_level_id}
+                                            onChange={(e) => setData('advisor_level_id', Number(e.target.value))}
+                                            className={selectClass}
+                                        >
+                                            {advisorLevels.map((l) => (
+                                                <option key={l.id} value={l.id}>{l.name}</option>
+                                            ))}
+                                        </select>
+                                        <InputError message={errors.advisor_level_id} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label htmlFor="superior_id">Superior</Label>
+                                    <select
+                                        id="superior_id"
+                                        value={data.superior_id ?? ''}
+                                        onChange={(e) => setData('superior_id', e.target.value ? Number(e.target.value) : null)}
+                                        className={selectClass}
+                                    >
+                                        <option value="">— Ninguno —</option>
+                                        {advisorsList.map((a) => (
+                                            <option key={a.id} value={a.id}>{a.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <Label htmlFor="personal_quota">Cuota personal (S/)</Label>
+                                    <Input
+                                        id="personal_quota"
+                                        type="number"
+                                        min={0}
+                                        value={data.personal_quota}
+                                        onChange={(e) => setData('personal_quota', Number(e.target.value))}
+                                        className="mt-1 h-9"
+                                    />
+                                    <InputError message={errors.personal_quota} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <Separator className="my-5" />
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Datos bancarios</p>
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <div>
+                                <Label htmlFor="bank_name">Banco</Label>
+                                <Input id="bank_name" value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} className="mt-1 h-9" />
+                                <InputError message={errors.bank_name} />
+                            </div>
+                            <div>
+                                <Label htmlFor="bank_account_number">Nº cuenta</Label>
+                                <Input id="bank_account_number" value={data.bank_account_number} onChange={(e) => setData('bank_account_number', e.target.value)} className="mt-1 h-9" />
+                                <InputError message={errors.bank_account_number} />
+                            </div>
+                            <div>
+                                <Label htmlFor="bank_cci">CCI (20 dígitos)</Label>
+                                <Input id="bank_cci" inputMode="numeric" maxLength={20} value={data.bank_cci} onChange={(e) => setData('bank_cci', e.target.value)} className="mt-1 h-9" />
+                                <InputError message={errors.bank_cci} />
+                            </div>
+                        </div>
+
+                        <Separator className="my-5" />
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Material corporativo</p>
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {data.material_items.map((row, index) => (
+                                <div key={row.advisor_material_type_id} className="rounded-lg border border-slate-200 bg-slate-50/40 p-3">
+                                    <div className="mb-2 flex items-start justify-between gap-2">
+                                        <span className="text-xs font-bold leading-tight text-slate-800">
+                                            {materialTypes.find((t) => t.id === row.advisor_material_type_id)?.name ?? 'Material'}
+                                        </span>
+                                        <div className="flex shrink-0 items-center gap-1.5">
+                                            <Checkbox
+                                                id={`m-new-${row.advisor_material_type_id}`}
+                                                checked={Boolean(row.delivered_at)}
+                                                onCheckedChange={(checked) => {
+                                                    updateMaterialRow(index, {
+                                                        delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
+                                                    });
+                                                }}
+                                            />
+                                            <Label htmlFor={`m-new-${row.advisor_material_type_id}`} className="text-xs font-normal whitespace-nowrap">
+                                                Entreg.
+                                            </Label>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <Label className="text-[10px] text-slate-500">Fecha</Label>
+                                            <Input
+                                                type="date"
+                                                value={row.delivered_at}
+                                                onChange={(e) => updateMaterialRow(index, { delivered_at: e.target.value })}
+                                                className="mt-0.5 h-8 text-xs"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[10px] text-slate-500">Notas</Label>
+                                            <Input
+                                                value={row.notes}
+                                                onChange={(e) => updateMaterialRow(index, { notes: e.target.value })}
+                                                className="mt-0.5 h-8 text-xs"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <DialogFooter className="sticky bottom-0 bg-white pt-2">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                        <Button type="submit" disabled={processing}>Guardar</Button>
-                    </DialogFooter>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50/80 px-6 py-3">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={processing}>
+                            Guardar
+                        </Button>
+                    </div>
                 </form>
             </DialogContent>
         </Dialog>
@@ -1141,197 +1205,218 @@ function EditAdvisorModal({
         setData('material_items', next);
     };
 
+    const selectClass = 'mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-sm shadow-sm';
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-lg">
-                <DialogHeader>
+            <DialogContent className="flex w-[min(100vw-1.5rem,56rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:w-[min(100vw-2rem,56rem)]">
+                <DialogHeader className="shrink-0 space-y-1 border-b border-slate-100 px-6 py-4 text-left">
                     <DialogTitle>Editar vendedor</DialogTitle>
-                    <DialogDescription>Modifique los datos del asesor.</DialogDescription>
+                    <DialogDescription>Modifique los datos; el formulario está en dos columnas.</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={submit} className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-                    <div>
-                        <Label htmlFor="edit-dni">DNI (8 dígitos)</Label>
-                        <Input
-                            id="edit-dni"
-                            inputMode="numeric"
-                            maxLength={8}
-                            autoComplete="off"
-                            value={data.dni}
-                            onChange={(e) => setData('dni', e.target.value.replace(/\D/g, '').slice(0, 8))}
-                            className="mt-1"
-                        />
-                        <InputError message={errors.dni} />
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <Label htmlFor="edit-first_name">Nombres</Label>
-                            <Input id="edit-first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className="mt-1" />
-                            <InputError message={errors.first_name} />
-                        </div>
-                        <div>
-                            <Label htmlFor="edit-last_name">Apellidos</Label>
-                            <Input id="edit-last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className="mt-1" />
-                            <InputError message={errors.last_name} />
-                        </div>
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-birth_date">Fecha de nacimiento</Label>
-                        <Input id="edit-birth_date" type="date" value={data.birth_date} onChange={(e) => setData('birth_date', e.target.value)} className="mt-1" />
-                        <InputError message={errors.birth_date} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-joined_at">Fecha de ingreso</Label>
-                        <Input id="edit-joined_at" type="date" value={data.joined_at} onChange={(e) => setData('joined_at', e.target.value)} className="mt-1" />
-                        <InputError message={errors.joined_at} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-phone">Teléfono</Label>
-                        <Input id="edit-phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className="mt-1" />
-                        <InputError message={errors.phone} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-email">Email</Label>
-                        <Input id="edit-email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1" />
-                        <InputError message={errors.email} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-city">Ciudad</Label>
-                        <select
-                            id="edit-city"
-                            value={data.city_id}
-                            onChange={(e) => setData('city_id', Number(e.target.value))}
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                        >
-                            {cities.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name}
-                                    {c.department ? ` · ${c.department}` : ''}
-                                </option>
-                            ))}
-                        </select>
-                        <InputError message={errors.city_id} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-team">Team</Label>
-                        <select
-                            id="edit-team"
-                            value={data.team_id}
-                            onChange={(e) => setData('team_id', Number(e.target.value))}
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                        >
-                            {teams.map((team) => (
-                                <option key={team.id} value={team.id}>{team.name}</option>
-                            ))}
-                        </select>
-                        <InputError message={errors.team_id} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-level">Nivel</Label>
-                        <select
-                            id="edit-level"
-                            value={data.advisor_level_id}
-                            onChange={(e) => setData('advisor_level_id', Number(e.target.value))}
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                        >
-                            {advisorLevels.map((l) => (
-                                <option key={l.id} value={l.id}>{l.name}</option>
-                            ))}
-                        </select>
-                        <InputError message={errors.advisor_level_id} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-superior">Superior</Label>
-                        <select
-                            id="edit-superior"
-                            value={data.superior_id ?? ''}
-                            onChange={(e) => setData('superior_id', e.target.value ? Number(e.target.value) : null)}
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                        >
-                            <option value="">— Ninguno —</option>
-                            {advisorsList.map((a) => (
-                                <option key={a.id} value={a.id}>{a.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-quota">Cuota personal</Label>
-                        <Input
-                            id="edit-quota"
-                            type="number"
-                            min={0}
-                            value={data.personal_quota}
-                            onChange={(e) => setData('personal_quota', Number(e.target.value))}
-                            className="mt-1"
-                        />
-                        <InputError message={errors.personal_quota} />
-                    </div>
-                    <Separator />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Datos bancarios</p>
-                    <div>
-                        <Label htmlFor="edit-bank_name">Banco</Label>
-                        <Input id="edit-bank_name" value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} className="mt-1" />
-                        <InputError message={errors.bank_name} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-bank_account_number">Número de cuenta</Label>
-                        <Input id="edit-bank_account_number" value={data.bank_account_number} onChange={(e) => setData('bank_account_number', e.target.value)} className="mt-1" />
-                        <InputError message={errors.bank_account_number} />
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-bank_cci">CCI (20 dígitos)</Label>
-                        <Input id="edit-bank_cci" inputMode="numeric" maxLength={20} value={data.bank_cci} onChange={(e) => setData('bank_cci', e.target.value)} className="mt-1" />
-                        <InputError message={errors.bank_cci} />
-                    </div>
-                    <Separator />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Material corporativo</p>
-                    <div className="space-y-3">
-                        {data.material_items.map((row, index) => (
-                            <div key={row.advisor_material_type_id} className="rounded-lg border border-slate-200 p-3">
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="text-sm font-medium text-slate-800">
-                                        {materialTypes.find((t) => t.id === row.advisor_material_type_id)?.name ?? 'Material'}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id={`m-edit-${row.advisor_material_type_id}`}
-                                            checked={Boolean(row.delivered_at)}
-                                            onCheckedChange={(checked) => {
-                                                updateMaterialRow(index, {
-                                                    delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
-                                                });
-                                            }}
-                                        />
-                                        <Label htmlFor={`m-edit-${row.advisor_material_type_id}`} className="text-sm font-normal">
-                                            Entregado
-                                        </Label>
+                <form onSubmit={submit} className="flex flex-col">
+                    <div className="px-6 py-4">
+                        <div className="grid gap-6 md:grid-cols-2 md:items-start">
+                            <div className="space-y-3">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Identidad y contacto</p>
+                                <div>
+                                    <Label htmlFor="edit-dni">DNI (8 dígitos)</Label>
+                                    <Input
+                                        id="edit-dni"
+                                        inputMode="numeric"
+                                        maxLength={8}
+                                        autoComplete="off"
+                                        value={data.dni}
+                                        onChange={(e) => setData('dni', e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                        className="mt-1 h-9"
+                                    />
+                                    <InputError message={errors.dni} />
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="edit-first_name">Nombres</Label>
+                                        <Input id="edit-first_name" value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.first_name} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="edit-last_name">Apellidos</Label>
+                                        <Input id="edit-last_name" value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.last_name} />
                                     </div>
                                 </div>
-                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     <div>
-                                        <Label className="text-xs text-slate-500">Fecha entrega</Label>
-                                        <Input
-                                            type="date"
-                                            value={row.delivered_at}
-                                            onChange={(e) => updateMaterialRow(index, { delivered_at: e.target.value })}
-                                            className="mt-0.5"
-                                        />
+                                        <Label htmlFor="edit-birth_date">Nacimiento</Label>
+                                        <Input id="edit-birth_date" type="date" value={data.birth_date} onChange={(e) => setData('birth_date', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.birth_date} />
                                     </div>
                                     <div>
-                                        <Label className="text-xs text-slate-500">Notas</Label>
-                                        <Input
-                                            value={row.notes}
-                                            onChange={(e) => updateMaterialRow(index, { notes: e.target.value })}
-                                            className="mt-0.5"
-                                        />
+                                        <Label htmlFor="edit-joined_at">Ingreso</Label>
+                                        <Input id="edit-joined_at" type="date" value={data.joined_at} onChange={(e) => setData('joined_at', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.joined_at} />
+                                    </div>
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="edit-phone">Teléfono</Label>
+                                        <Input id="edit-phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.phone} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="edit-email">Email</Label>
+                                        <Input id="edit-email" type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} className="mt-1 h-9" />
+                                        <InputError message={errors.email} />
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                            <div className="space-y-3">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Estructura y meta</p>
+                                <div>
+                                    <Label htmlFor="edit-city">Ciudad</Label>
+                                    <select
+                                        id="edit-city"
+                                        value={data.city_id}
+                                        onChange={(e) => setData('city_id', Number(e.target.value))}
+                                        className={selectClass}
+                                    >
+                                        {cities.map((c) => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.name}
+                                                {c.department ? ` · ${c.department}` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError message={errors.city_id} />
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="edit-team">Team</Label>
+                                        <select id="edit-team" value={data.team_id} onChange={(e) => setData('team_id', Number(e.target.value))} className={selectClass}>
+                                            {teams.map((team) => (
+                                                <option key={team.id} value={team.id}>{team.name}</option>
+                                            ))}
+                                        </select>
+                                        <InputError message={errors.team_id} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="edit-level">Nivel</Label>
+                                        <select
+                                            id="edit-level"
+                                            value={data.advisor_level_id}
+                                            onChange={(e) => setData('advisor_level_id', Number(e.target.value))}
+                                            className={selectClass}
+                                        >
+                                            {advisorLevels.map((l) => (
+                                                <option key={l.id} value={l.id}>{l.name}</option>
+                                            ))}
+                                        </select>
+                                        <InputError message={errors.advisor_level_id} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label htmlFor="edit-superior">Superior</Label>
+                                    <select
+                                        id="edit-superior"
+                                        value={data.superior_id ?? ''}
+                                        onChange={(e) => setData('superior_id', e.target.value ? Number(e.target.value) : null)}
+                                        className={selectClass}
+                                    >
+                                        <option value="">— Ninguno —</option>
+                                        {advisorsList.map((a) => (
+                                            <option key={a.id} value={a.id}>{a.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <Label htmlFor="edit-quota">Cuota personal (S/)</Label>
+                                    <Input
+                                        id="edit-quota"
+                                        type="number"
+                                        min={0}
+                                        value={data.personal_quota}
+                                        onChange={(e) => setData('personal_quota', Number(e.target.value))}
+                                        className="mt-1 h-9"
+                                    />
+                                    <InputError message={errors.personal_quota} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <Separator className="my-5" />
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Datos bancarios</p>
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <div>
+                                <Label htmlFor="edit-bank_name">Banco</Label>
+                                <Input id="edit-bank_name" value={data.bank_name} onChange={(e) => setData('bank_name', e.target.value)} className="mt-1 h-9" />
+                                <InputError message={errors.bank_name} />
+                            </div>
+                            <div>
+                                <Label htmlFor="edit-bank_account_number">Nº cuenta</Label>
+                                <Input id="edit-bank_account_number" value={data.bank_account_number} onChange={(e) => setData('bank_account_number', e.target.value)} className="mt-1 h-9" />
+                                <InputError message={errors.bank_account_number} />
+                            </div>
+                            <div>
+                                <Label htmlFor="edit-bank_cci">CCI (20 dígitos)</Label>
+                                <Input id="edit-bank_cci" inputMode="numeric" maxLength={20} value={data.bank_cci} onChange={(e) => setData('bank_cci', e.target.value)} className="mt-1 h-9" />
+                                <InputError message={errors.bank_cci} />
+                            </div>
+                        </div>
+
+                        <Separator className="my-5" />
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Material corporativo</p>
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {data.material_items.map((row, index) => (
+                                <div key={row.advisor_material_type_id} className="rounded-lg border border-slate-200 bg-slate-50/40 p-3">
+                                    <div className="mb-2 flex items-start justify-between gap-2">
+                                        <span className="text-xs font-bold leading-tight text-slate-800">
+                                            {materialTypes.find((t) => t.id === row.advisor_material_type_id)?.name ?? 'Material'}
+                                        </span>
+                                        <div className="flex shrink-0 items-center gap-1.5">
+                                            <Checkbox
+                                                id={`m-edit-${row.advisor_material_type_id}`}
+                                                checked={Boolean(row.delivered_at)}
+                                                onCheckedChange={(checked) => {
+                                                    updateMaterialRow(index, {
+                                                        delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
+                                                    });
+                                                }}
+                                            />
+                                            <Label htmlFor={`m-edit-${row.advisor_material_type_id}`} className="text-xs font-normal whitespace-nowrap">
+                                                Entreg.
+                                            </Label>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <Label className="text-[10px] text-slate-500">Fecha</Label>
+                                            <Input
+                                                type="date"
+                                                value={row.delivered_at}
+                                                onChange={(e) => updateMaterialRow(index, { delivered_at: e.target.value })}
+                                                className="mt-0.5 h-8 text-xs"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[10px] text-slate-500">Notas</Label>
+                                            <Input
+                                                value={row.notes}
+                                                onChange={(e) => updateMaterialRow(index, { notes: e.target.value })}
+                                                className="mt-0.5 h-8 text-xs"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <DialogFooter className="sticky bottom-0 bg-white pt-2">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                        <Button type="submit" disabled={processing}>Actualizar</Button>
-                    </DialogFooter>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50/80 px-6 py-3">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={processing}>
+                            Actualizar
+                        </Button>
+                    </div>
                 </form>
             </DialogContent>
         </Dialog>
@@ -1434,11 +1519,13 @@ function CreateMembershipModal({
     onOpenChange,
     advisorsList,
     membershipTypes,
+    preselectedAdvisorId,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     advisorsList: { id: number; name: string }[];
     membershipTypes: MembershipTypeOption[];
+    preselectedAdvisorId: number | null;
 }) {
     const today = new Date().toISOString().slice(0, 10);
     const [submitting, setSubmitting] = useState(false);
@@ -1450,6 +1537,18 @@ function CreateMembershipModal({
         amount: membershipTypes[0] ? String(membershipTypes[0].amount) : '',
         installments_count: '' as string | number,
     });
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+        const fallback = advisorsList[0]?.id ?? 0;
+        const id =
+            preselectedAdvisorId != null && advisorsList.some((a) => a.id === preselectedAdvisorId)
+                ? preselectedAdvisorId
+                : fallback;
+        setData('advisor_id', id);
+    }, [open, preselectedAdvisorId, advisorsList, setData]);
 
     const page = usePage();
     const pageErrors = ((page.props as { errors?: Record<string, string> }).errors ?? {}) as Record<string, string>;
@@ -1481,12 +1580,19 @@ function CreateMembershipModal({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        const payload: Record<string, unknown> = {
+        const payload: {
+            advisor_id: number;
+            membership_type_id: number;
+            start_date: string;
+            end_date: string;
+            amount: string | null;
+            installments_count?: number;
+        } = {
             advisor_id: Number(data.advisor_id),
             membership_type_id: Number(data.membership_type_id),
             start_date: data.start_date,
             end_date: data.end_date,
-            amount: data.amount === '' ? null : data.amount,
+            amount: data.amount === '' ? null : String(data.amount),
         };
         if (data.installments_count !== '' && data.installments_count != null) {
             payload.installments_count = Number(data.installments_count);
