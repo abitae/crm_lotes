@@ -5,8 +5,11 @@ namespace Tests\Feature\Inmopro;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
+use App\Models\Inmopro\ProjectAsset;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class InmoproProjectsTest extends TestCase
@@ -100,6 +103,7 @@ class InmoproProjectsTest extends TestCase
 
     public function test_authenticated_users_can_create_project(): void
     {
+        Storage::fake('local');
         $user = User::factory()->create();
         $this->actingAs($user);
 
@@ -108,6 +112,8 @@ class InmoproProjectsTest extends TestCase
             'location' => 'Lima',
             'total_lots' => 50,
             'blocks' => ['A', 'B'],
+            'image_files' => [UploadedFile::fake()->image('hero.png')],
+            'document_files' => [UploadedFile::fake()->create('brochure.pdf', 120, 'application/pdf')],
         ]);
 
         $response->assertRedirect(route('inmopro.projects.index'));
@@ -115,10 +121,20 @@ class InmoproProjectsTest extends TestCase
             'name' => 'Proyecto Test',
             'location' => 'Lima',
         ]);
+        $project = Project::query()->where('name', 'Proyecto Test')->firstOrFail();
+        $this->assertDatabaseHas('project_assets', [
+            'project_id' => $project->id,
+            'kind' => 'image',
+        ]);
+        $this->assertDatabaseHas('project_assets', [
+            'project_id' => $project->id,
+            'kind' => 'document',
+        ]);
     }
 
     public function test_authenticated_users_can_update_project(): void
     {
+        Storage::fake('local');
         $user = User::factory()->create();
         $project = Project::first();
         $this->actingAs($user);
@@ -128,6 +144,7 @@ class InmoproProjectsTest extends TestCase
             'location' => $project->location,
             'total_lots' => $project->total_lots,
             'blocks' => $project->blocks ?? [],
+            'document_files' => [UploadedFile::fake()->create('price-list.xlsx', 80, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
         ]);
 
         $response->assertRedirect(route('inmopro.projects.index'));
@@ -135,5 +152,39 @@ class InmoproProjectsTest extends TestCase
             'id' => $project->id,
             'name' => 'Proyecto Actualizado',
         ]);
+        $this->assertDatabaseHas('project_assets', [
+            'project_id' => $project->id,
+            'kind' => 'document',
+        ]);
+    }
+
+    public function test_authenticated_users_can_download_and_delete_project_asset(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        $project = Project::firstOrFail();
+        $path = UploadedFile::fake()->create('memoria.pdf', 100, 'application/pdf')->store("projects/{$project->id}/documents", 'local');
+        $asset = ProjectAsset::create([
+            'project_id' => $project->id,
+            'kind' => 'document',
+            'title' => 'Memoria',
+            'file_name' => 'memoria.pdf',
+            'file_path' => $path,
+            'mime_type' => 'application/pdf',
+            'file_size' => 100 * 1024,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('inmopro.projects.assets.download', [$project, $asset]))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->delete(route('inmopro.projects.assets.destroy', [$project, $asset]))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('project_assets', ['id' => $asset->id]);
     }
 }

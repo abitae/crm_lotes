@@ -43,4 +43,30 @@ class Project extends Model
     {
         return $this->hasMany(AttentionTicket::class, 'project_id');
     }
+
+    /**
+     * @return HasMany<ProjectAsset, $this>
+     */
+    public function assets(): HasMany
+    {
+        return $this->hasMany(ProjectAsset::class, 'project_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<ProjectAsset, $this>
+     */
+    public function images(): HasMany
+    {
+        return $this->assets()->where('kind', 'image');
+    }
+
+    /**
+     * @return HasMany<ProjectAsset, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->assets()->where('kind', 'document');
+    }
 }

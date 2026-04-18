@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\Cazador;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\Project;
+use App\Models\Inmopro\ProjectAsset;
 use Database\Seeders\Inmopro\AdvisorLevelSeeder;
 use Database\Seeders\Inmopro\AdvisorSeeder;
 use Database\Seeders\Inmopro\CitySeeder;
@@ -16,6 +17,8 @@ use Database\Seeders\Inmopro\LotStatusSeeder;
 use Database\Seeders\Inmopro\ProjectSeeder;
 use Database\Seeders\Inmopro\TeamSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CazadorCatalogTest extends TestCase
@@ -63,14 +66,53 @@ class CazadorCatalogTest extends TestCase
     {
         $advisor = Advisor::firstOrFail();
         $project = Project::query()->firstOrFail();
+        Storage::fake('local');
+        $storedPath = UploadedFile::fake()->image('masterplan.png')->store("projects/{$project->id}/images", 'local');
+        ProjectAsset::create([
+            'project_id' => $project->id,
+            'kind' => 'image',
+            'title' => 'Masterplan',
+            'file_name' => 'masterplan.png',
+            'file_path' => $storedPath,
+            'mime_type' => 'image/png',
+            'file_size' => 1234,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
 
         $this->withHeader('Authorization', 'Bearer '.$this->loginToken($advisor))
             ->getJson(route('api.v1.cazador.projects.show', $project))
             ->assertOk()
             ->assertJsonPath('data.id', $project->id)
             ->assertJsonStructure([
-                'data' => ['id', 'name', 'location', 'total_lots', 'lots_count', 'blocks'],
+                'data' => ['id', 'name', 'location', 'total_lots', 'lots_count', 'blocks', 'images', 'documents'],
             ]);
+    }
+
+    public function test_advisor_can_download_project_asset(): void
+    {
+        Storage::fake('local');
+
+        $advisor = Advisor::firstOrFail();
+        $project = Project::query()->firstOrFail();
+        $storedPath = UploadedFile::fake()->create('brochure.pdf', 120, 'application/pdf')->store("projects/{$project->id}/documents", 'local');
+        $asset = ProjectAsset::create([
+            'project_id' => $project->id,
+            'kind' => 'document',
+            'title' => 'Brochure',
+            'file_name' => 'brochure.pdf',
+            'file_path' => $storedPath,
+            'mime_type' => 'application/pdf',
+            'file_size' => 120 * 1024,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$this->loginToken($advisor))
+            ->get(route('api.v1.cazador.projects.assets.download', [$project, $asset]));
+
+        $response->assertOk();
+        $this->assertStringContainsString('attachment', (string) $response->headers->get('Content-Disposition'));
     }
 
     public function test_advisor_can_list_lots_available_by_default(): void

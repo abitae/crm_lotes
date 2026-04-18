@@ -39,12 +39,12 @@ class AttentionTicketController extends Controller
         $client = Client::query()
             ->whereKey($request->integer('client_id'))
             ->where('advisor_id', $advisor->id)
-            ->whereHas('type', fn ($query) => $query->where('code', 'PROPIO'))
+            ->whereHas('type', fn ($query) => $query->whereIn('code', ['PROPIO', 'DATERO']))
             ->first();
 
         if (! $client) {
             return response()->json([
-                'message' => 'El cliente no pertenece al vendedor autenticado.',
+                'message' => 'El cliente debe pertenecer al vendedor y ser PROPIO o DATERO.',
             ], 422);
         }
 

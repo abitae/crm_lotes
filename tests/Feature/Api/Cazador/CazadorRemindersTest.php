@@ -70,6 +70,21 @@ class CazadorRemindersTest extends TestCase
         $this->assertNotNull($reminder->fresh()->completed_at);
     }
 
+    public function test_advisor_can_create_reminder_for_owned_datero_client(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $client = $this->createClientForAdvisor($advisor, 'DATERO');
+
+        $this->withHeader('Authorization', 'Bearer '.$this->loginToken($advisor))
+            ->postJson(route('api.v1.cazador.reminders.store'), [
+                'client_id' => $client->id,
+                'title' => 'Llamar al datero-cliente',
+                'remind_at' => '2026-03-20T09:00:00',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.client.id', $client->id);
+    }
+
     public function test_advisor_cannot_complete_another_advisor_reminder(): void
     {
         $advisor1 = Advisor::firstOrFail();
@@ -117,12 +132,12 @@ class CazadorRemindersTest extends TestCase
                 'remind_at' => '2026-03-20T09:00:00',
             ])
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'El cliente debe pertenecer al vendedor y ser de tipo PROPIO.');
+            ->assertJsonPath('message', 'El cliente debe pertenecer al vendedor y ser PROPIO o DATERO.');
     }
 
-    private function createClientForAdvisor(Advisor $advisor): Client
+    private function createClientForAdvisor(Advisor $advisor, string $typeCode = 'PROPIO'): Client
     {
-        $type = ClientType::query()->where('code', 'PROPIO')->firstOrFail();
+        $type = ClientType::query()->where('code', $typeCode)->firstOrFail();
         $city = City::firstOrFail();
 
         return Client::create([

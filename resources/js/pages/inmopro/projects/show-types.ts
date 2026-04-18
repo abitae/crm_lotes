@@ -1,6 +1,15 @@
 export type LotStatus = { id: number; name: string; code: string; color?: string };
 export type Client = { id: number; name: string; dni?: string; phone?: string };
 export type Advisor = { id: number; name: string };
+export type ProjectAsset = {
+    id: number;
+    kind: 'image' | 'document';
+    title?: string | null;
+    file_name: string;
+    mime_type?: string;
+    file_size?: number;
+    download_url: string;
+};
 
 export type Lot = {
     id: number;
@@ -30,6 +39,9 @@ export type Project = {
     location?: string;
     total_lots?: number;
     blocks?: string[];
+    assets?: ProjectAsset[];
+    images?: ProjectAsset[];
+    documents?: ProjectAsset[];
     lots?: Lot[];
 };
 

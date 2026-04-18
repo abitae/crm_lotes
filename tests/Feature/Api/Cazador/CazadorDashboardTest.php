@@ -46,6 +46,11 @@ class CazadorDashboardTest extends TestCase
             ->assertJsonStructure([
                 'data' => [
                     'clients_count',
+                    'clients' => [
+                        'total',
+                        'propio',
+                        'datero',
+                    ],
                     'pre_reservations' => [
                         'active',
                         'pending',
@@ -90,6 +95,45 @@ class CazadorDashboardTest extends TestCase
             ->json('data.clients_count');
 
         $this->assertSame($before + 1, $after);
+    }
+
+    public function test_dashboard_breaks_down_clients_by_type(): void
+    {
+        $advisor = Advisor::firstOrFail();
+        $city = City::firstOrFail();
+        $propioType = ClientType::where('code', 'PROPIO')->firstOrFail();
+        $dateroType = ClientType::where('code', 'DATERO')->firstOrFail();
+        $token = $this->loginToken($advisor);
+
+        Client::create([
+            'name' => 'Cliente propio dashboard',
+            'dni' => '87654322',
+            'phone' => '987000112',
+            'email' => 'dash-propio@test.local',
+            'client_type_id' => $propioType->id,
+            'city_id' => $city->id,
+            'advisor_id' => $advisor->id,
+        ]);
+
+        Client::create([
+            'name' => 'Cliente datero dashboard',
+            'dni' => '87654323',
+            'phone' => '987000113',
+            'email' => 'dash-datero@test.local',
+            'client_type_id' => $dateroType->id,
+            'city_id' => $city->id,
+            'advisor_id' => $advisor->id,
+        ]);
+
+        $clients = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson(route('api.v1.cazador.dashboard.show'))
+            ->assertOk()
+            ->json('data.clients');
+
+        $this->assertNotNull($clients);
+        $this->assertSame($clients['propio'] + $clients['datero'], $clients['total']);
+        $this->assertGreaterThanOrEqual(1, $clients['propio']);
+        $this->assertGreaterThanOrEqual(1, $clients['datero']);
     }
 
     private function loginToken(Advisor $advisor): string

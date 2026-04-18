@@ -53,6 +53,8 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('projects/excel-template', [ProjectController::class, 'excelTemplate'])->name('projects.excel-template');
         Route::post('projects/import-from-excel', [ProjectController::class, 'importFromExcel'])->name('projects.import-from-excel');
+        Route::get('projects/{project}/assets/{asset}/download', [ProjectController::class, 'downloadAsset'])->name('projects.assets.download');
+        Route::delete('projects/{project}/assets/{asset}', [ProjectController::class, 'destroyAsset'])->name('projects.assets.destroy');
         Route::resource('projects', ProjectController::class);
         Route::get('lots/export-pdf', [LotController::class, 'exportPdf'])->name('lots.export-pdf');
         Route::post('lots/{lot}/ai-follow-up-suggestion', LotAiFollowUpSuggestionController::class)

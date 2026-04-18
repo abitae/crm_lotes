@@ -25,6 +25,10 @@ class StoreProjectRequest extends FormRequest
             'total_lots' => ['nullable', 'integer', 'min:0'],
             'blocks' => ['nullable', 'array'],
             'blocks.*' => ['string', 'max:10'],
+            'image_files' => ['nullable', 'array'],
+            'image_files.*' => ['file', 'image', 'max:10240'],
+            'document_files' => ['nullable', 'array'],
+            'document_files.*' => ['file', 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx', 'max:15360'],
         ];
     }
 }

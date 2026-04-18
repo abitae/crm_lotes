@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\Cazador;
 
 use App\Models\Inmopro\Advisor;
+use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\ClientType;
 use App\Models\Inmopro\Lot;
@@ -115,6 +116,57 @@ class CazadorPreReservationsTest extends TestCase
                 'voucher_image' => UploadedFile::fake()->image('voucher.png'),
             ])->assertStatus(422)
             ->assertJsonFragment(['message' => 'La unidad no está disponible para pre-reserva.']);
+    }
+
+    public function test_advisor_can_create_pre_reservation_for_owned_datero_client(): void
+    {
+        Storage::fake('public');
+
+        $dateroType = ClientType::where('code', 'DATERO')->firstOrFail();
+        $client = Client::where('client_type_id', $dateroType->id)->firstOrFail();
+        $advisor = Advisor::findOrFail($client->advisor_id);
+        $lot = Lot::whereHas('status', fn ($query) => $query->where('code', 'LIBRE'))->firstOrFail();
+
+        $this->withHeader('Authorization', 'Bearer '.$this->loginToken($advisor))
+            ->withHeader('Accept', 'application/json')
+            ->post(route('api.v1.cazador.lots.pre-reservations.store', $lot), [
+                'client_id' => $client->id,
+                'project_id' => $lot->project_id,
+                'lot_id' => $lot->id,
+                'amount' => 1500,
+                'voucher_image' => UploadedFile::fake()->image('voucher.png'),
+            ])->assertCreated()
+            ->assertJsonFragment(['status' => 'PENDIENTE']);
+    }
+
+    public function test_advisor_cannot_create_pre_reservation_for_non_operational_client_type(): void
+    {
+        Storage::fake('public');
+
+        $invalidType = ClientType::where('code', 'PROSPECTO')->firstOrFail();
+        $advisor = Advisor::firstOrFail();
+        $city = City::firstOrFail();
+        $client = Client::create([
+            'name' => 'Cliente prospecto pre-reserva',
+            'dni' => '87654324',
+            'phone' => '987000114',
+            'email' => 'prospecto-prereserva@test.local',
+            'advisor_id' => $advisor->id,
+            'client_type_id' => $invalidType->id,
+            'city_id' => $city->id,
+        ]);
+        $lot = Lot::whereHas('status', fn ($query) => $query->where('code', 'LIBRE'))->firstOrFail();
+
+        $this->withHeader('Authorization', 'Bearer '.$this->loginToken($advisor))
+            ->withHeader('Accept', 'application/json')
+            ->post(route('api.v1.cazador.lots.pre-reservations.store', $lot), [
+                'client_id' => $client->id,
+                'project_id' => $lot->project_id,
+                'lot_id' => $lot->id,
+                'amount' => 1500,
+                'voucher_image' => UploadedFile::fake()->image('voucher.png'),
+            ])->assertStatus(422)
+            ->assertJsonFragment(['message' => 'El cliente debe pertenecer al vendedor y ser PROPIO o DATERO.']);
     }
 
     private function loginToken(Advisor $advisor): string

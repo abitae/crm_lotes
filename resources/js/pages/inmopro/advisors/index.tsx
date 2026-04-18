@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Download, FileSpreadsheet, KeyRound, Pencil, Plus, Receipt, Search, UserPlus, ChevronRight } from 'lucide-react';
+import { Download, FileSpreadsheet, KeyRound, Pencil, Plus, Receipt, Search, Upload, UserPlus, ChevronRight } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import { confirmDelete } from '@/lib/swal';
+import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
 type AdvisorLevel = { id: number; name: string };
@@ -102,7 +103,25 @@ type PageProps = {
     filters: { search?: string };
 };
 
-const MEMBERSHIP_YEARS = [2026, 2025, 2024, 2023];
+/** Suscripción anual: 12 meses; si el registro no trae tipo, se trata como anual (datos antiguos). */
+function isAnnualMembership(m: Membership): boolean {
+    const months = m.membership_type?.months;
+    if (months == null) {
+        return true;
+    }
+
+    return months === 12;
+}
+
+/** La membresía anual con mayor año (la vigente / más reciente en calendario). */
+function getLatestAnnualMembership(memberships: Membership[] | undefined): Membership | null {
+    const annual = (memberships ?? []).filter(isAnnualMembership);
+    if (annual.length === 0) {
+        return null;
+    }
+
+    return annual.reduce((best, m) => (m.year > best.year ? m : best), annual[0]!);
+}
 
 function membershipToDetail(m: Membership, advisor?: { id: number; name: string }): MembershipDetail {
     const totalPaid = (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
@@ -170,7 +189,8 @@ export default function AdvisorsIndex({
     const totalAdvisors = advisors.data.length;
     const totalQuota = advisors.data.reduce((sum, advisor) => sum + Number(advisor.personal_quota), 0);
     const membershipsPending = advisors.data.reduce((sum, advisor) => {
-        return sum + (advisor.memberships ?? []).filter((membership) => !isPaid(membership)).length;
+        const latest = getLatestAnnualMembership(advisor.memberships);
+        return sum + (latest && !isPaid(latest) ? 1 : 0);
     }, 0);
 
     const handleSearch = (e: React.FormEvent) => {
@@ -271,9 +291,9 @@ export default function AdvisorsIndex({
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Ciudad</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Superior</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Cuota</th>
-                                    {MEMBERSHIP_YEARS.map((y) => (
-                                        <th key={y} className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">{y}</th>
-                                    ))}
+                                    <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        Última suscripción anual
+                                    </th>
                                     <th className="px-4 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Acciones</th>
                                 </tr>
                             </thead>
@@ -310,31 +330,30 @@ export default function AdvisorsIndex({
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{adv.superior?.name ?? 'Alta Gerencia'}</td>
                                         <td className="px-4 py-3 font-medium text-slate-700">S/ {Number(adv.personal_quota).toLocaleString()}</td>
-                                        {MEMBERSHIP_YEARS.map((year) => {
-                                            const mem = (adv.memberships ?? []).find((m) => m.year === year);
-                                            if (!mem) {
+                                        <td className="px-2 py-2 text-center">
+                                            {(() => {
+                                                const mem = getLatestAnnualMembership(adv.memberships);
+                                                if (!mem) {
+                                                    return <span className="text-slate-300">—</span>;
+                                                }
+                                                const paid = isPaid(mem);
                                                 return (
-                                                    <td key={year} className="px-2 py-2 text-center text-slate-300">—</td>
-                                                );
-                                            }
-                                            const paid = isPaid(mem);
-                                            return (
-                                                <td key={year} className="px-2 py-2 text-center">
                                                     <button
                                                         type="button"
                                                         onClick={() => openMembershipDetailFromRow(mem, { id: adv.id, name: adv.name })}
-                                                        className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
+                                                        className={`inline-flex min-w-[4.5rem] flex-col items-center rounded-lg px-2 py-1 text-[10px] font-bold ${
                                                             paid
                                                                 ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                                                                 : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                                                         }`}
-                                                        title={paid ? 'Al día · Ver detalle' : `Pendiente S/ ${balanceDue(mem).toLocaleString('es-PE')}`}
+                                                        title={paid ? `${mem.year} · Al día · Ver detalle` : `${mem.year} · Pendiente S/ ${balanceDue(mem).toLocaleString('es-PE')}`}
                                                     >
-                                                        {paid ? 'Al día' : 'Pend.'}
+                                                        <span className="text-[9px] font-semibold opacity-80">{mem.year}</span>
+                                                        <span>{paid ? 'Al día' : 'Pend.'}</span>
                                                     </button>
-                                                </td>
-                                            );
-                                        })}
+                                                );
+                                            })()}
+                                        </td>
                                         <td className="px-4 py-3 text-right">
                                             <Button
                                                 variant="ghost"
@@ -504,6 +523,8 @@ function AdvisorExcelImportModal({
     onOpenChange: (open: boolean) => void;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
+    const [dragActive, setDragActive] = useState(false);
+    const [fileName, setFileName] = useState<string | null>(null);
     const [loadingPreview, setLoadingPreview] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const [preview, setPreview] = useState<AdvisorImportPreviewResponse | null>(null);
@@ -512,6 +533,7 @@ function AdvisorExcelImportModal({
     const reset = (): void => {
         setPreview(null);
         setFetchError(null);
+        setFileName(null);
         if (fileRef.current) {
             fileRef.current.value = '';
         }
@@ -523,10 +545,44 @@ function AdvisorExcelImportModal({
         }
     }, [open]);
 
+    const assignFile = (file: File | undefined): void => {
+        if (!file) {
+            setFileName(null);
+
+            return;
+        }
+        const lower = file.name.toLowerCase();
+        if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) {
+            setFetchError('Solo se aceptan archivos Excel (.xlsx o .xls).');
+
+            return;
+        }
+        const input = fileRef.current;
+        if (!input) {
+            return;
+        }
+        try {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+        } catch {
+            setFetchError('No se pudo asignar el archivo. Use el botón para elegir el archivo desde su equipo.');
+
+            return;
+        }
+        setFetchError(null);
+        setFileName(file.name);
+        setPreview(null);
+    };
+
+    const openFilePicker = (): void => {
+        fileRef.current?.click();
+    };
+
     const runPreview = async (): Promise<void> => {
         const input = fileRef.current;
         if (!input?.files?.length) {
-            setFetchError('Seleccione un archivo Excel (.xlsx o .xls).');
+            setFetchError('Seleccione o suelte aquí un archivo Excel (.xlsx o .xls).');
 
             return;
         }
@@ -587,107 +643,157 @@ function AdvisorExcelImportModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
-                <DialogHeader>
-                    <DialogTitle>Importar vendedores desde Excel</DialogTitle>
-                    <DialogDescription>
-                        Se validará cada fila del archivo. Solo podrá confirmar la importación si no hay errores. Los
-                        registros existentes se identifican por DNI y se actualizan.
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent className="flex max-h-[92vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+                <div className="border-b border-slate-100 px-6 py-4">
+                    <DialogHeader className="space-y-1 text-left">
+                        <DialogTitle>Importar vendedores desde Excel</DialogTitle>
+                        <DialogDescription className="text-left">
+                            Todo el flujo ocurre en este modal: elija o arrastre el archivo, valide fila por fila y confirme
+                            solo si no hay errores. Los registros existentes se identifican por DNI y se actualizan.
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
 
-                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="min-w-[200px] flex-1">
-                            <Label htmlFor="advisor-import-file">Archivo</Label>
-                            <input
-                                id="advisor-import-file"
-                                ref={fileRef}
-                                type="file"
-                                accept=".xlsx,.xls"
-                                className="mt-1 block w-full cursor-pointer rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:text-sm"
-                                onChange={() => setFetchError(null)}
-                            />
-                        </div>
-                        <Button type="button" variant="secondary" disabled={loadingPreview} onClick={() => void runPreview()}>
-                            {loadingPreview ? 'Validando…' : 'Validar archivo'}
-                        </Button>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                    <input
+                        id="advisor-import-file"
+                        ref={fileRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="sr-only"
+                        aria-hidden
+                        tabIndex={-1}
+                        onChange={(e) => assignFile(e.target.files?.[0])}
+                    />
+
+                    <div>
+                        <Label className="text-slate-700">Archivo Excel</Label>
+                        <button
+                            type="button"
+                            onClick={openFilePicker}
+                            onDragEnter={(e) => {
+                                e.preventDefault();
+                                setDragActive(true);
+                            }}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                setDragActive(true);
+                            }}
+                            onDragLeave={(e) => {
+                                e.preventDefault();
+                                if (e.currentTarget === e.target) {
+                                    setDragActive(false);
+                                }
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                setDragActive(false);
+                                assignFile(e.dataTransfer.files?.[0]);
+                            }}
+                            className={cn(
+                                'mt-2 flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-colors',
+                                dragActive
+                                    ? 'border-emerald-500 bg-emerald-50/80 text-emerald-900'
+                                    : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:border-slate-300 hover:bg-slate-50',
+                            )}
+                        >
+                            <Upload className="h-9 w-9 opacity-70" aria-hidden />
+                            <span className="text-sm font-semibold">
+                                Arrastre el archivo aquí o{' '}
+                                <span className="text-emerald-700 underline decoration-emerald-300 underline-offset-2">elija desde su equipo</span>
+                            </span>
+                            <span className="text-xs text-slate-500">Formatos: .xlsx, .xls · primera columna DNI</span>
+                            {fileName ? <span className="mt-1 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-800 shadow-sm">{fileName}</span> : null}
+                        </button>
                     </div>
 
                     {fetchError ? <p className="text-sm font-medium text-red-600">{fetchError}</p> : null}
 
                     {preview ? (
                         <div className="space-y-3">
-                            <p className="text-sm text-slate-600">
-                                Filas válidas: <strong>{preview.summary.valid}</strong> · Con error:{' '}
-                                <strong>{preview.summary.invalid}</strong>
-                            </p>
+                            <div className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm">
+                                <span className="rounded-lg bg-emerald-50 px-3 py-1.5 font-medium text-emerald-800">
+                                    Válidas: <strong className="tabular-nums">{preview.summary.valid}</strong>
+                                </span>
+                                <span className="rounded-lg bg-red-50 px-3 py-1.5 font-medium text-red-800">
+                                    Con error: <strong className="tabular-nums">{preview.summary.invalid}</strong>
+                                </span>
+                                {!preview.can_confirm && preview.rows.length > 0 ? (
+                                    <span className="text-xs font-medium text-amber-800 sm:self-center">
+                                        Corrija el Excel y pulse &quot;Volver a validar&quot;.
+                                    </span>
+                                ) : null}
+                            </div>
 
-                            <div className="max-h-[min(50vh,420px)] overflow-auto rounded-lg border border-slate-200">
+                            <div className="max-h-[min(48vh,400px)] overflow-auto rounded-xl border border-slate-200 shadow-sm">
                                 <table className="w-full border-collapse text-left text-xs">
-                                    <thead className="sticky top-0 bg-slate-50">
+                                    <thead className="sticky top-0 z-[1] bg-slate-50 shadow-sm">
                                         <tr className="border-b border-slate-200">
-                                            <th className="px-2 py-2 font-semibold">Fila Excel</th>
-                                            <th className="px-2 py-2 font-semibold">DNI</th>
-                                            <th className="px-2 py-2 font-semibold">Estado</th>
-                                            <th className="px-2 py-2 font-semibold">Acción</th>
-                                            <th className="px-2 py-2 font-semibold">Detalle</th>
+                                            <th className="px-3 py-2.5 font-semibold text-slate-700">Fila Excel</th>
+                                            <th className="px-3 py-2.5 font-semibold text-slate-700">DNI</th>
+                                            <th className="px-3 py-2.5 font-semibold text-slate-700">Estado</th>
+                                            <th className="px-3 py-2.5 font-semibold text-slate-700">Acción</th>
+                                            <th className="px-3 py-2.5 font-semibold text-slate-700">Detalle</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100">
+                                    <tbody className="divide-y divide-slate-100 bg-white">
                                         {preview.rows.map((row) => (
-                                            <tr key={row.excel_row}>
-                                                <td className="px-2 py-1.5 tabular-nums">{row.excel_row}</td>
-                                                <td className="px-2 py-1.5">{row.dni ?? '—'}</td>
-                                                <td className="px-2 py-1.5">
+                                            <tr key={row.excel_row} className={row.status === 'invalid' ? 'bg-red-50/40' : undefined}>
+                                                <td className="px-3 py-2 tabular-nums text-slate-700">{row.excel_row}</td>
+                                                <td className="px-3 py-2 font-medium text-slate-800">{row.dni ?? '—'}</td>
+                                                <td className="px-3 py-2">
                                                     {row.status === 'valid' ? (
-                                                        <span className="text-emerald-700">Válida</span>
+                                                        <span className="font-medium text-emerald-700">Válida</span>
                                                     ) : (
-                                                        <span className="text-red-600">Error</span>
+                                                        <span className="font-medium text-red-600">Error</span>
                                                     )}
                                                 </td>
-                                                <td className="px-2 py-1.5">
+                                                <td className="px-3 py-2 text-slate-700">
                                                     {row.action === 'create'
                                                         ? 'Crear'
                                                         : row.action === 'update'
                                                           ? 'Actualizar'
                                                           : '—'}
                                                 </td>
-                                                <td className="px-2 py-1.5 text-slate-600">
-                                                    {row.errors.length ? row.errors.join(' ') : '—'}
-                                                </td>
+                                                <td className="px-3 py-2 text-slate-600">{row.errors.length ? row.errors.join(' ') : '—'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
 
-                            {preview.can_confirm && preview.token ? (
-                                <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-                                    <Button type="button" variant="outline" onClick={reset}>
-                                        Otro archivo
-                                    </Button>
-                                    <Button type="button" disabled={confirming} onClick={confirmImport}>
-                                        {confirming ? 'Importando…' : 'Confirmar importación'}
-                                    </Button>
-                                </DialogFooter>
-                            ) : preview.rows.length > 0 ? (
-                                <p className="text-sm text-amber-700">
-                                    Corrija los errores en el archivo o cargue otra versión; no se puede confirmar mientras
-                                    haya filas inválidas o sin datos procesables.
-                                </p>
-                            ) : (
-                                <p className="text-sm text-slate-500">No se encontraron filas de datos en el archivo.</p>
-                            )}
+                            {preview.rows.length === 0 ? <p className="text-sm text-slate-500">No se encontraron filas de datos en el archivo.</p> : null}
                         </div>
                     ) : null}
                 </div>
 
-                <DialogFooter className="border-t border-slate-100 pt-3">
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="sm:min-w-[100px]">
                         Cerrar
                     </Button>
-                </DialogFooter>
+                    <div className="flex flex-wrap justify-end gap-2">
+                        {fileName ? (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={loadingPreview || confirming}
+                                onClick={() => void runPreview()}
+                            >
+                                {loadingPreview ? 'Validando…' : preview ? 'Volver a validar' : 'Validar archivo'}
+                            </Button>
+                        ) : null}
+                        {preview ? (
+                            <Button type="button" variant="outline" disabled={loadingPreview || confirming} onClick={reset}>
+                                Otro archivo
+                            </Button>
+                        ) : null}
+                        {preview?.can_confirm && preview.token ? (
+                            <Button type="button" disabled={confirming} onClick={confirmImport} className="bg-emerald-600 hover:bg-emerald-700">
+                                {confirming ? 'Importando…' : 'Confirmar importación'}
+                            </Button>
+                        ) : null}
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
     );

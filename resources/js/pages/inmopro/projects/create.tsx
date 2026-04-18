@@ -12,6 +12,8 @@ type ProjectCreateForm = {
     location: string;
     total_lots: string | number;
     blocks: string[];
+    image_files: File[];
+    document_files: File[];
 };
 
 export default function ProjectsCreate() {
@@ -22,6 +24,8 @@ export default function ProjectsCreate() {
             location: '',
             total_lots: '' as string | number,
             blocks: [] as string[],
+            image_files: [],
+            document_files: [],
         });
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -52,7 +56,7 @@ export default function ProjectsCreate() {
             ...formData,
             total_lots: formData.total_lots === '' ? null : Number(formData.total_lots),
         }));
-        post('/inmopro/projects');
+        post('/inmopro/projects', { forceFormData: true });
     };
 
     return (
@@ -121,6 +125,30 @@ export default function ProjectsCreate() {
                                 ))}
                             </div>
                         )}
+                    </div>
+                    <div>
+                        <Label htmlFor="image_files">Imágenes del proyecto</Label>
+                        <Input
+                            id="image_files"
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={(e) => setData('image_files', Array.from(e.target.files ?? []))}
+                            className="mt-1"
+                        />
+                        <InputError message={errors.image_files || errors['image_files.0']} />
+                    </div>
+                    <div>
+                        <Label htmlFor="document_files">Documentos del proyecto</Label>
+                        <Input
+                            id="document_files"
+                            type="file"
+                            multiple
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                            onChange={(e) => setData('document_files', Array.from(e.target.files ?? []))}
+                            className="mt-1"
+                        />
+                        <InputError message={errors.document_files || errors['document_files.0']} />
                     </div>
                     <Button type="submit" disabled={processing}>
                         Guardar

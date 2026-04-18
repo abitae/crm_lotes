@@ -52,6 +52,22 @@ class CazadorAttentionTicketsTest extends TestCase
         ]);
     }
 
+    public function test_advisor_can_create_attention_ticket_for_owned_datero_client(): void
+    {
+        $dateroType = ClientType::where('code', 'DATERO')->firstOrFail();
+        $client = Client::where('client_type_id', $dateroType->id)->firstOrFail();
+        $advisor = Advisor::findOrFail($client->advisor_id);
+        $project = Project::firstOrFail();
+
+        $this->withHeader('Authorization', 'Bearer '.$this->loginToken($advisor))
+            ->postJson(route('api.v1.cazador.attention-tickets.store'), [
+                'client_id' => $client->id,
+                'project_id' => $project->id,
+            ])
+            ->assertCreated()
+            ->assertJsonFragment(['status' => 'pendiente']);
+    }
+
     public function test_advisor_cannot_create_attention_ticket_for_client_of_another_advisor(): void
     {
         $ownType = ClientType::where('code', 'PROPIO')->firstOrFail();
@@ -67,7 +83,7 @@ class CazadorAttentionTicketsTest extends TestCase
                 'project_id' => $project->id,
             ])
             ->assertStatus(422)
-            ->assertJsonFragment(['message' => 'El cliente no pertenece al vendedor autenticado.']);
+            ->assertJsonFragment(['message' => 'El cliente debe pertenecer al vendedor y ser PROPIO o DATERO.']);
     }
 
     public function test_advisor_can_cancel_owned_attention_ticket(): void

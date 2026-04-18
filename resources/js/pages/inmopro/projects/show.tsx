@@ -159,6 +159,60 @@ export default function ProjectsShow({ project, lotStatuses }: PageProps) {
             <div className="flex flex-col gap-4 p-4 md:p-6" style={{ minHeight: 'calc(100vh - 8rem)' }}>
                 <ProjectShowHeader project={project} clientError={errors?.client} />
 
+                {(project.images?.length || project.documents?.length) ? (
+                    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <h3 className="text-lg font-black text-slate-800">Archivos del proyecto</h3>
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Imágenes</p>
+                                {project.images && project.images.length > 0 ? project.images.map((asset) => (
+                                    <div key={asset.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                                        <div>
+                                            <p className="font-medium text-slate-800">{asset.title || asset.file_name}</p>
+                                            <p className="text-xs text-slate-500">{asset.file_name}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <a className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700" href={asset.download_url}>
+                                                Descargar
+                                            </a>
+                                            <button
+                                                type="button"
+                                                className="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700"
+                                                onClick={() => router.delete(`/inmopro/projects/${project.id}/assets/${asset.id}`)}
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : <p className="text-sm text-slate-500">Sin imágenes registradas.</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Documentos</p>
+                                {project.documents && project.documents.length > 0 ? project.documents.map((asset) => (
+                                    <div key={asset.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                                        <div>
+                                            <p className="font-medium text-slate-800">{asset.title || asset.file_name}</p>
+                                            <p className="text-xs text-slate-500">{asset.file_name}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <a className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700" href={asset.download_url}>
+                                                Descargar
+                                            </a>
+                                            <button
+                                                type="button"
+                                                className="rounded-md border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700"
+                                                onClick={() => router.delete(`/inmopro/projects/${project.id}/assets/${asset.id}`)}
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : <p className="text-sm text-slate-500">Sin documentos registrados.</p>}
+                            </div>
+                        </div>
+                    </section>
+                ) : null}
+
                 <ProjectLotsTable
                     project={project}
                     lotStatuses={lotStatuses}

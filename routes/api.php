@@ -53,6 +53,7 @@ Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
 
         Route::get('projects', [ProjectController::class, 'index'])->name('projects.index');
         Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+        Route::get('projects/{project}/assets/{asset}/download', [ProjectController::class, 'downloadAsset'])->name('projects.assets.download');
         Route::get('my-lots', [LotController::class, 'indexMine'])->name('my-lots.index');
         Route::get('lots', [LotController::class, 'index'])->name('lots.index');
         Route::get('lots/{lot}', [LotController::class, 'show'])->name('lots.show');

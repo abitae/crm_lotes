@@ -22,9 +22,16 @@ class DashboardController extends Controller
         $advisor = $request->attributes->get('advisor');
         $advisorId = $advisor->id;
 
-        $clientsCount = Client::query()
+        $visibleClients = Client::query()
             ->where('advisor_id', $advisorId)
+            ->whereHas('type', fn ($query) => $query->whereIn('code', ['PROPIO', 'DATERO']));
+
+        $clientsCount = (clone $visibleClients)->count();
+        $propioClientsCount = (clone $visibleClients)
             ->whereHas('type', fn ($query) => $query->where('code', 'PROPIO'))
+            ->count();
+        $dateroClientsCount = (clone $visibleClients)
+            ->whereHas('type', fn ($query) => $query->where('code', 'DATERO'))
             ->count();
 
         $preReservationPending = LotPreReservation::query()
@@ -53,13 +60,18 @@ class DashboardController extends Controller
 
         $remindersPending = AdvisorReminder::query()
             ->where('advisor_id', $advisorId)
-            ->whereHas('client', fn ($clientQuery) => $clientQuery->whereHas('type', fn ($typeQuery) => $typeQuery->where('code', 'PROPIO')))
+            ->whereHas('client', fn ($clientQuery) => $clientQuery->whereHas('type', fn ($typeQuery) => $typeQuery->whereIn('code', ['PROPIO', 'DATERO'])))
             ->pending()
             ->count();
 
         return response()->json([
             'data' => [
                 'clients_count' => $clientsCount,
+                'clients' => [
+                    'total' => $clientsCount,
+                    'propio' => $propioClientsCount,
+                    'datero' => $dateroClientsCount,
+                ],
                 'pre_reservations' => [
                     'active' => $preReservationActive,
                     'pending' => $preReservationPending,

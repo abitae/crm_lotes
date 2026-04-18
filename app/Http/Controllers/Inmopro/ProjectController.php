@@ -7,16 +7,21 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inmopro\ImportProjectFromExcelRequest;
 use App\Http\Requests\Inmopro\StoreProjectRequest;
 use App\Http\Requests\Inmopro\UpdateProjectRequest;
+use App\Models\Inmopro\ProjectAsset;
 use App\Imports\Inmopro\ProjectWithLotsImport;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProjectController extends Controller
 {
@@ -123,40 +128,75 @@ class ProjectController extends Controller
 
     public function store(StoreProjectRequest $request): RedirectResponse
     {
-        Project::create($request->validated());
+        $validated = $request->validated();
+        $projectData = $this->projectData($validated);
+
+        DB::transaction(function () use ($projectData, $request): void {
+            $project = Project::create($projectData);
+            $this->storeAssets($project, $request);
+        });
 
         return redirect()->route('inmopro.projects.index');
     }
 
     public function show(Project $project): Response
     {
-        $project->load(['lots.status', 'lots.client', 'lots.advisor']);
+        $project->load(['lots.status', 'lots.client', 'lots.advisor', 'assets']);
 
         return Inertia::render('inmopro/projects/show', [
-            'project' => $project,
+            'project' => $this->projectPayload($project, true),
             'lotStatuses' => LotStatus::orderBy('sort_order')->get(),
         ]);
     }
 
     public function edit(Project $project): Response
     {
+        $project->load('assets');
+
         return Inertia::render('inmopro/projects/edit', [
-            'project' => $project,
+            'project' => $this->projectPayload($project),
         ]);
     }
 
     public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
-        $project->update($request->validated());
+        $validated = $request->validated();
+        $projectData = $this->projectData($validated);
+
+        DB::transaction(function () use ($project, $projectData, $request): void {
+            $project->update($projectData);
+            $this->storeAssets($project, $request);
+        });
 
         return redirect()->route('inmopro.projects.index');
     }
 
     public function destroy(Project $project): RedirectResponse
     {
+        $project->load('assets');
+        foreach ($project->assets as $asset) {
+            Storage::disk('local')->delete($asset->file_path);
+        }
         $project->delete();
 
         return redirect()->route('inmopro.projects.index');
+    }
+
+    public function downloadAsset(Project $project, ProjectAsset $asset): StreamedResponse
+    {
+        abort_unless($asset->project_id === $project->id, 404);
+
+        return Storage::disk('local')->download($asset->file_path, $asset->file_name);
+    }
+
+    public function destroyAsset(Project $project, ProjectAsset $asset): RedirectResponse
+    {
+        abort_unless($asset->project_id === $project->id, 404);
+
+        Storage::disk('local')->delete($asset->file_path);
+        $asset->delete();
+
+        return back()->with('success', 'Adjunto eliminado correctamente.');
     }
 
     public function excelTemplate(): BinaryFileResponse
@@ -182,5 +222,103 @@ class ProjectController extends Controller
         return redirect()
             ->route('inmopro.projects.index')
             ->with('error', 'No se pudo importar. Verifique que el archivo tenga el formato correcto y que exista el estado de lote LIBRE.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function projectData(array $validated): array
+    {
+        unset($validated['image_files'], $validated['document_files']);
+
+        return $validated;
+    }
+
+    private function storeAssets(Project $project, Request $request): void
+    {
+        $nextSortOrder = ((int) $project->assets()->max('sort_order')) + 1;
+
+        foreach (($request->file('image_files') ?? []) as $file) {
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+
+            $this->createAsset($project, $file, 'image', $nextSortOrder++);
+        }
+
+        foreach (($request->file('document_files') ?? []) as $file) {
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+
+            $this->createAsset($project, $file, 'document', $nextSortOrder++);
+        }
+    }
+
+    private function createAsset(Project $project, UploadedFile $file, string $kind, int $sortOrder): void
+    {
+        $directory = sprintf('projects/%d/%ss', $project->id, $kind);
+        $storedPath = $file->store($directory, 'local');
+
+        $project->assets()->create([
+            'kind' => $kind,
+            'title' => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
+            'file_name' => $file->getClientOriginalName(),
+            'file_path' => $storedPath,
+            'mime_type' => $file->getClientMimeType() ?: 'application/octet-stream',
+            'file_size' => $file->getSize() ?: 0,
+            'sort_order' => $sortOrder,
+            'is_active' => true,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function projectPayload(Project $project, bool $includeLots = false): array
+    {
+        $project->loadMissing('assets');
+
+        return [
+            'id' => $project->id,
+            'name' => $project->name,
+            'location' => $project->location,
+            'total_lots' => $project->total_lots,
+            'blocks' => $project->blocks,
+            'assets' => $project->assets
+                ->map(fn (ProjectAsset $asset) => $this->assetPayload($project, $asset))
+                ->values()
+                ->all(),
+            'images' => $project->assets
+                ->where('kind', 'image')
+                ->map(fn (ProjectAsset $asset) => $this->assetPayload($project, $asset))
+                ->values()
+                ->all(),
+            'documents' => $project->assets
+                ->where('kind', 'document')
+                ->map(fn (ProjectAsset $asset) => $this->assetPayload($project, $asset))
+                ->values()
+                ->all(),
+            'lots' => $includeLots ? $project->lots : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function assetPayload(Project $project, ProjectAsset $asset): array
+    {
+        return [
+            'id' => $asset->id,
+            'kind' => $asset->kind,
+            'title' => $asset->title,
+            'file_name' => $asset->file_name,
+            'mime_type' => $asset->mime_type,
+            'file_size' => $asset->file_size,
+            'sort_order' => $asset->sort_order,
+            'is_active' => $asset->is_active,
+            'download_url' => route('inmopro.projects.assets.download', [$project, $asset]),
+        ];
     }
 }

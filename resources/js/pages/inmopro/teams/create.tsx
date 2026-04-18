@@ -57,15 +57,29 @@ function TeamForm({ data, setData, errors, processing, onSubmit, submitLabel }: 
                 <Label htmlFor="description">Descripcion</Label>
                 <Input id="description" value={data.description} onChange={(e) => setData('description', e.target.value)} className="mt-1" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor="color">Color</Label>
-                    <Input id="color" value={data.color} onChange={(e) => setData('color', e.target.value)} className="mt-1" />
+            <div>
+                <Label htmlFor="color-hex">Color</Label>
+                <div className="mt-1 flex gap-2">
+                    <input
+                        type="color"
+                        aria-label="Selector de color"
+                        value={/^#[0-9A-Fa-f]{6}$/.test(data.color) ? data.color : '#0f766e'}
+                        onChange={(e) => setData('color', e.target.value)}
+                        className="h-10 w-14 shrink-0 cursor-pointer rounded border border-slate-200"
+                    />
+                    <Input
+                        id="color-hex"
+                        value={data.color}
+                        onChange={(e) => setData('color', e.target.value)}
+                        placeholder="#0f766e"
+                        className="flex-1"
+                    />
                 </div>
-                <div>
-                    <Label htmlFor="sort_order">Orden</Label>
-                    <Input id="sort_order" type="number" min={0} value={data.sort_order} onChange={(e) => setData('sort_order', Number(e.target.value))} className="mt-1" />
-                </div>
+                <InputError message={errors.color} />
+            </div>
+            <div>
+                <Label htmlFor="sort_order">Orden</Label>
+                <Input id="sort_order" type="number" min={0} value={data.sort_order} onChange={(e) => setData('sort_order', Number(e.target.value))} className="mt-1" />
             </div>
             <div>
                 <Label htmlFor="group_sales_goal">Meta grupal (S/)</Label>
