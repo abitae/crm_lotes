@@ -6,11 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\v1\Datero\StoreClientRequest;
 use App\Http\Requests\Api\v1\Datero\UpdateClientRequest;
 use App\Models\Inmopro\Client;
-use App\Models\Inmopro\ClientType;
 use App\Models\Inmopro\Datero;
+use App\Services\Inmopro\RegisterClientForDateroAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
 
 class ClientController extends Controller
 {
@@ -38,22 +37,12 @@ class ClientController extends Controller
         ]);
     }
 
-    public function store(StoreClientRequest $request): JsonResponse
+    public function store(StoreClientRequest $request, RegisterClientForDateroAction $registerClient): JsonResponse
     {
         /** @var Datero $datero */
         $datero = $request->attributes->get('datero');
 
-        $dateroTypeId = ClientType::query()->where('code', 'DATERO')->value('id');
-        if ($dateroTypeId === null) {
-            throw new RuntimeException('Falta el tipo de cliente DATERO en la base de datos.');
-        }
-
-        $client = Client::create([
-            ...$request->validated(),
-            'advisor_id' => $datero->advisor_id,
-            'client_type_id' => $dateroTypeId,
-            'registered_by_datero_id' => $datero->id,
-        ]);
+        $client = $registerClient->execute($datero, $request->validated());
 
         return response()->json([
             'message' => 'Cliente registrado.',

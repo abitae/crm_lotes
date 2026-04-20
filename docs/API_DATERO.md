@@ -54,6 +54,7 @@ Para cada petición autenticada el backend:
 3. **Listar ciudades** (`GET /cities`) para selects en formularios de cliente (opcional pero recomendado).
 4. **Listar clientes captados por este datero** (`GET /clients`).
 5. **Alta de cliente** (`POST /clients`): el CRM asigna automáticamente el tipo **DATERO** y el `advisor_id` del vendedor responsable del datero.
+5b. **Registro vía web (QR):** en login y en `GET /me`, el objeto `datero` incluye **`registration_url`** (formulario) y **`registration_qr_url`** (imagen PNG del QR generada en el servidor).
 6. **Detalle** (`GET /clients/{id}`) y **edición** (`PUT /clients/{id}`) solo de clientes registrados por el mismo datero.
 7. **Cambio de PIN** (`PUT /me/pin`) cuando el usuario lo solicite.
 8. **Cerrar sesión** (`POST /auth/logout`).
@@ -117,6 +118,8 @@ Autenticación del datero.
     "username": "datero_funcional",
     "is_active": true,
     "last_login_at": "2026-03-21T12:00:00-05:00",
+    "registration_url": "https://tu-dominio.test/registro-datero/550e8400-e29b-41d4-a716-446655440000",
+    "registration_qr_url": "https://tu-dominio.test/registro-datero/550e8400-e29b-41d4-a716-446655440000/qr.png",
     "city": {
       "id": 1,
       "name": "Lima",
@@ -147,6 +150,8 @@ Autenticación del datero.
 **Notas:**
 
 - El **PIN** del datero **nunca** se devuelve en JSON.
+- **`registration_url`**: URL pública (absoluta) del formulario web de registro de clientes para este datero; el token en la ruta es único por datero.
+- **`registration_qr_url`**: URL absoluta de un **PNG** con el mismo enlace codificado en QR (`GET` público, rate limit por IP); útil para mostrar en una `Image` en la app móvil sin depender de SVG en el cliente.
 - Si el datero no existe, está inactivo, el PIN no coincide, no tiene PIN en BD, no tiene asesor o el asesor está inactivo → **`422`** con `{"message":"Credenciales inválidas."}`.
 - Tras login exitoso se actualiza `last_login_at` del datero.
 
@@ -184,6 +189,8 @@ Perfil del datero autenticado y resumen del vendedor responsable.
       "username": "datero_funcional",
       "is_active": true,
       "last_login_at": "2026-03-21T12:00:00-05:00",
+      "registration_url": "https://tu-dominio.test/registro-datero/550e8400-e29b-41d4-a716-446655440000",
+      "registration_qr_url": "https://tu-dominio.test/registro-datero/550e8400-e29b-41d4-a716-446655440000/qr.png",
       "city": {
         "id": 1,
         "name": "Lima",

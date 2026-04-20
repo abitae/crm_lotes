@@ -61,6 +61,8 @@ class CazadorDaterosTest extends TestCase
             ->assertJsonPath('data.name', 'Datero API')
             ->assertJsonPath('data.username', 'datero_api_cazador');
 
+        $this->assertStringContainsString('registro-datero', (string) $create->json('data.registration_url'));
+
         $dateroId = (int) $create->json('data.id');
 
         $this->assertDatabaseHas('dateros', [

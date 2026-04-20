@@ -98,6 +98,8 @@ class DateroController extends Controller
             'username' => $datero->username,
             'is_active' => $datero->is_active,
             'last_login_at' => $datero->last_login_at?->toIso8601String(),
+            'registration_url' => $datero->registration_url,
+            'registration_qr_url' => $datero->registration_qr_url,
             'city' => $datero->city ? [
                 'id' => $datero->city->id,
                 'name' => $datero->city->name,

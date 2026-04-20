@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Contact, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Contact, Copy, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
@@ -36,6 +36,7 @@ type DateroRow = {
     username: string;
     city_id: number;
     is_active: boolean;
+    registration_url?: string | null;
     assigned_advisor?: AdvisorRef | null;
     city?: CityRef | null;
 };
@@ -392,6 +393,22 @@ function EditDateroModal({
                     <DialogTitle>Editar datero</DialogTitle>
                     <DialogDescription>Deje el PIN en blanco si no desea cambiarlo.</DialogDescription>
                 </DialogHeader>
+                {datero.registration_url ? (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/40">
+                        <p className="font-medium text-slate-700 dark:text-slate-200">Enlace de registro de clientes (QR)</p>
+                        <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">{datero.registration_url}</p>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 gap-1"
+                            onClick={() => void navigator.clipboard.writeText(datero.registration_url ?? '')}
+                        >
+                            <Copy className="h-3.5 w-3.5" />
+                            Copiar enlace
+                        </Button>
+                    </div>
+                ) : null}
                 <form onSubmit={submit} className="space-y-4">
                     <div>
                         <Label htmlFor="de-advisor">Vendedor asignado</Label>

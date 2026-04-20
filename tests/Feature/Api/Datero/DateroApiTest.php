@@ -53,6 +53,8 @@ class DateroApiTest extends TestCase
             ->assertJsonStructure(['token', 'datero', 'advisor']);
 
         $this->assertNotEmpty($response->json('token'));
+        $this->assertStringContainsString($datero->fresh()->invite_token, (string) $response->json('datero.registration_url'));
+        $this->assertStringContainsString('qr.png', (string) $response->json('datero.registration_qr_url'));
     }
 
     public function test_login_fails_with_invalid_credentials(): void

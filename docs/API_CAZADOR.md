@@ -197,6 +197,8 @@ Query opcional:
 
 - `search`: coincidencia parcial en nombre, correo, DNI o usuario.
 
+Cada elemento incluye **`registration_url`** (formulario web) y **`registration_qr_url`** (PNG del mismo enlace en QR, servido por el CRM en `…/registro-datero/{token}/qr.png`).
+
 Response `200`:
 
 ```json
@@ -211,6 +213,8 @@ Response `200`:
       "username": "datero_funcional",
       "is_active": true,
       "last_login_at": null,
+      "registration_url": "https://tu-dominio.test/registro-datero/550e8400-e29b-41d4-a716-446655440000",
+      "registration_qr_url": "https://tu-dominio.test/registro-datero/550e8400-e29b-41d4-a716-446655440000/qr.png",
       "city": {
         "id": 1,
         "name": "Lima",

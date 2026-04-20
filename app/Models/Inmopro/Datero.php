@@ -2,11 +2,13 @@
 
 namespace App\Models\Inmopro;
 
+use App\Support\DateroRegistrationUrl;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class Datero extends Model
 {
@@ -15,6 +17,15 @@ class Datero extends Model
      */
     protected $hidden = [
         'pin',
+        'invite_token',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $appends = [
+        'registration_url',
+        'registration_qr_url',
     ];
 
     /**
@@ -42,6 +53,39 @@ class Datero extends Model
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Datero $datero): void {
+            if ($datero->invite_token === null || $datero->invite_token === '') {
+                $datero->invite_token = (string) Str::uuid();
+            }
+        });
+    }
+
+    /**
+     * @return Attribute<string|null, never>
+     */
+    protected function registrationUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?string => DateroRegistrationUrl::forDatero($this),
+        );
+    }
+
+    /**
+     * URL absoluta del PNG del QR (misma URL de registro codificada en imagen).
+     *
+     * @return Attribute<string|null, never>
+     */
+    protected function registrationQrUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): ?string => $this->invite_token
+                ? route('public.datero-registration.qr', ['token' => $this->invite_token], absolute: true)
+                : null,
+        );
     }
 
     /**
