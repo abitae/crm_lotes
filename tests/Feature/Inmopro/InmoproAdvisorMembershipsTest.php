@@ -128,6 +128,49 @@ class InmoproAdvisorMembershipsTest extends TestCase
         ]);
     }
 
+    public function test_authenticated_users_can_create_membership_with_installments_and_view_detail(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::first();
+        $type = MembershipType::create([
+            'name' => 'Membresía con cuotas',
+            'months' => 12,
+            'amount' => 1200,
+        ]);
+        $this->actingAs($user);
+
+        $response = $this->post(route('inmopro.advisor-memberships.store'), [
+            'advisor_id' => $advisor->id,
+            'membership_type_id' => $type->id,
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'amount' => 1200,
+            'installments_count' => 12,
+        ]);
+
+        $response->assertRedirect(route('inmopro.advisors.index'));
+
+        $membership = AdvisorMembership::query()
+            ->where('advisor_id', $advisor->id)
+            ->where('membership_type_id', $type->id)
+            ->first();
+
+        $this->assertNotNull($membership);
+        $this->assertDatabaseCount('advisor_membership_installments', 12);
+        $this->assertDatabaseHas('advisor_membership_installments', [
+            'advisor_membership_id' => $membership->id,
+            'sequence' => 1,
+            'status' => 'PENDIENTE',
+        ]);
+
+        $responseIndex = $this->get(route('inmopro.advisors.index', ['membership_id' => $membership->id]));
+        $responseIndex->assertOk();
+        $responseIndex->assertInertia(fn ($page) => $page
+            ->component('inmopro/advisors/index')
+            ->where('membershipDetail.membership.id', $membership->id)
+            ->has('membershipDetail.membership'));
+    }
+
     public function test_authenticated_users_can_update_membership_amount_and_dates(): void
     {
         $user = User::factory()->create();

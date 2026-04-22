@@ -90,6 +90,18 @@ type MembershipDetail = {
 };
 type Paginated<T> = { data: T[]; links: PaginationLink[]; current_page: number; last_page: number };
 
+function normalizeList<T>(value: T[] | Record<string, T> | null | undefined): T[] {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.values(value);
+    }
+
+    return [];
+}
+
 type PageProps = {
     advisors: Paginated<Advisor>;
     advisorLevels: AdvisorLevel[];
@@ -116,7 +128,7 @@ function isAnnualMembership(m: Membership): boolean {
 
 /** La membresía anual con mayor año (la vigente / más reciente en calendario). */
 function getLatestAnnualMembership(memberships: Membership[] | undefined): Membership | null {
-    const annual = (memberships ?? []).filter(isAnnualMembership);
+    const annual = normalizeList(memberships).filter(isAnnualMembership);
     if (annual.length === 0) {
         return null;
     }
@@ -125,7 +137,7 @@ function getLatestAnnualMembership(memberships: Membership[] | undefined): Membe
 }
 
 function membershipToDetail(m: Membership, advisor?: { id: number; name: string }): MembershipDetail {
-    const totalPaid = (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalPaid = normalizeList(m.payments).reduce((sum, p) => sum + Number(p.amount), 0);
     const balanceDue = Math.max(0, Number(m.amount) - totalPaid);
     const membership = { ...m, advisor: m.advisor ?? advisor };
     return { membership, totalPaid, balanceDue, isPaid: balanceDue <= 0 };
@@ -211,7 +223,7 @@ export default function AdvisorsIndex({
 
     const advisorsExportHref = `/inmopro/advisors/export-excel${advisorsExportQuery.toString() ? `?${advisorsExportQuery.toString()}` : ''}`;
 
-    const totalPaid = (m: Membership) => (m.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalPaid = (m: Membership) => normalizeList(m.payments).reduce((sum, p) => sum + Number(p.amount), 0);
     const balanceDue = (m: Membership) => Math.max(0, Number(m.amount) - totalPaid(m));
     const isPaid = (m: Membership) => balanceDue(m) <= 0;
 
@@ -1745,13 +1757,13 @@ function MembershipDetailModal({
     };
 
     const [editAmountOpen, setEditAmountOpen] = useState(false);
-    const payments = membership.payments ?? [];
+    const payments = normalizeList(membership.payments);
     const sortedPayments = [...payments].sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
-    const pendingInstallments = (membership.installments ?? []).filter(
+    const pendingInstallments = normalizeList(membership.installments).filter(
         (i) => i.status === 'PENDIENTE' || i.status === 'PARCIAL' || i.status === 'VENCIDA'
     );
 
-    const installments = membership.installments ?? [];
+    const installments = normalizeList(membership.installments);
     const startDate = membership.start_date ? new Date(membership.start_date).toLocaleDateString('es-PE') : null;
     const endDate = membership.end_date ? new Date(membership.end_date).toLocaleDateString('es-PE') : null;
     const vigencia = startDate && endDate ? `${startDate} – ${endDate}` : membership.year?.toString() ?? '—';

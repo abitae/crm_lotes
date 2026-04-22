@@ -114,6 +114,24 @@ class AdvisorController extends Controller
         }
 
         $advisors = $query->orderBy('name')->paginate(20)->withQueryString();
+        $advisors->getCollection()->transform(function (Advisor $advisor): Advisor {
+            if (! $advisor->relationLoaded('memberships')) {
+                return $advisor;
+            }
+
+            $advisor->setRelation('memberships', $advisor->memberships->values()->map(function (AdvisorMembership $membership): AdvisorMembership {
+                if ($membership->relationLoaded('installments')) {
+                    $membership->setRelation('installments', $membership->installments->values());
+                }
+                if ($membership->relationLoaded('payments')) {
+                    $membership->setRelation('payments', $membership->payments->values());
+                }
+
+                return $membership;
+            }));
+
+            return $advisor;
+        });
         $advisorLevels = AdvisorLevel::orderBy('sort_order')->get();
         $advisorsList = Advisor::orderBy('name')->get(['id', 'name']);
         $teams = Team::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color']);
@@ -133,6 +151,8 @@ class AdvisorController extends Controller
         if ($request->filled('membership_id')) {
             $m = AdvisorMembership::with(['advisor', 'membershipType', 'installments', 'payments'])->find($request->input('membership_id'));
             if ($m) {
+                $m->setRelation('installments', $m->installments->values());
+                $m->setRelation('payments', $m->payments->values());
                 $membershipDetail = [
                     'membership' => $m,
                     'totalPaid' => $m->totalPaid(),
