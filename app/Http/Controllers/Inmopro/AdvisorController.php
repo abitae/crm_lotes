@@ -6,8 +6,10 @@ use App\Exports\Inmopro\AdvisorsExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Inmopro\ImportAdvisorConfirmRequest;
 use App\Http\Requests\Inmopro\ImportAdvisorPreviewRequest;
+use App\Http\Requests\Inmopro\StoreAdvisorMaterialItemRequest;
 use App\Http\Requests\Inmopro\StoreAdvisorRequest;
 use App\Http\Requests\Inmopro\UpdateAdvisorCazadorAccessRequest;
+use App\Http\Requests\Inmopro\UpdateAdvisorMaterialItemsRequest;
 use App\Http\Requests\Inmopro\UpdateAdvisorRequest;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
@@ -19,6 +21,7 @@ use App\Models\Inmopro\MembershipType;
 use App\Models\Inmopro\Team;
 use App\Services\Inmopro\AdvisorsExcelImportService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,14 +44,7 @@ class AdvisorController extends Controller
     public function exportExcel(Request $request): BinaryFileResponse
     {
         $query = Advisor::query()->with(['level', 'superior', 'team', 'city']);
-
-        if ($request->filled('search')) {
-            $term = $request->input('search');
-            $query->where(function ($q) use ($term) {
-                $q->where('name', 'like', "%{$term}%")
-                    ->orWhere('email', 'like', "%{$term}%");
-            });
-        }
+        $this->applyAdvisorListFilters($query, $request);
 
         $advisors = $query->orderBy('name')->get();
 
@@ -102,16 +98,11 @@ class AdvisorController extends Controller
             'memberships.membershipType',
             'memberships.installments',
             'memberships.payments',
+            'materialItems' => fn ($q) => $q->orderByDesc('delivered_at')->orderByDesc('id'),
             'materialItems.type',
         ])->withCount('lots');
 
-        if ($request->filled('search')) {
-            $term = $request->input('search');
-            $query->where(function ($q) use ($term) {
-                $q->where('name', 'like', "%{$term}%")
-                    ->orWhere('email', 'like', "%{$term}%");
-            });
-        }
+        $this->applyAdvisorListFilters($query, $request);
 
         $advisors = $query->orderBy('name')->paginate(20)->withQueryString();
         $advisors->getCollection()->transform(function (Advisor $advisor): Advisor {
@@ -164,7 +155,12 @@ class AdvisorController extends Controller
 
         $advisorForModal = null;
         if ($request->filled('modal') && $request->input('modal') === 'edit_advisor' && $request->filled('advisor_id')) {
-            $advisorForModal = Advisor::with(['level', 'city', 'materialItems.type'])->find($request->input('advisor_id'));
+            $advisorForModal = Advisor::with([
+                'level',
+                'city',
+                'materialItems' => fn ($q) => $q->orderByDesc('delivered_at')->orderByDesc('id'),
+                'materialItems.type',
+            ])->find($request->input('advisor_id'));
         }
 
         return Inertia::render('inmopro/advisors/index', [
@@ -178,8 +174,51 @@ class AdvisorController extends Controller
             'membershipDetail' => $membershipDetail,
             'advisorForModal' => $advisorForModal,
             'openModal' => $request->input('modal'),
-            'filters' => $request->only('search'),
+            'filters' => $request->only('search', 'advisor_level_id', 'team_id', 'membership_pending'),
         ]);
+    }
+
+    /**
+     * Filtros compartidos entre el listado Inertia y la exportación Excel.
+     */
+    private function applyAdvisorListFilters(Builder $query, Request $request): void
+    {
+        if ($request->filled('search')) {
+            $term = $request->input('search');
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'like', "%{$term}%")
+                    ->orWhere('email', 'like', "%{$term}%");
+            });
+        }
+
+        if ($request->filled('advisor_level_id')) {
+            $query->where('advisor_level_id', $request->integer('advisor_level_id'));
+        }
+
+        if ($request->filled('team_id')) {
+            $query->where('team_id', $request->integer('team_id'));
+        }
+
+        if ($request->boolean('membership_pending')) {
+            $query->whereRaw(
+                'EXISTS (
+                    SELECT 1 FROM advisor_memberships am
+                    LEFT JOIN membership_types mt ON mt.id = am.membership_type_id
+                    WHERE am.advisor_id = advisors.id
+                    AND (am.membership_type_id IS NULL OR mt.months = 12)
+                    AND am.year = (
+                        SELECT MAX(am2.year) FROM advisor_memberships am2
+                        LEFT JOIN membership_types mt2 ON mt2.id = am2.membership_type_id
+                        WHERE am2.advisor_id = advisors.id
+                        AND (am2.membership_type_id IS NULL OR mt2.months = 12)
+                    )
+                    AND COALESCE((
+                        SELECT SUM(amp.amount) FROM advisor_membership_payments amp
+                        WHERE amp.advisor_membership_id = am.id
+                    ), 0) < am.amount - 0.0000001
+                )'
+            );
+        }
     }
 
     public function create(): RedirectResponse
@@ -255,6 +294,38 @@ class AdvisorController extends Controller
             ->with('success', 'Usuario y acceso Cazador actualizados. Si cambió el PIN o el usuario, el vendedor debe iniciar sesión de nuevo en la app.');
     }
 
+    public function updateMaterialItems(UpdateAdvisorMaterialItemsRequest $request, Advisor $advisor): RedirectResponse
+    {
+        $this->syncAdvisorMaterialItems($advisor, $request->validated('material_items'));
+
+        return redirect()
+            ->route('inmopro.advisors.index')
+            ->with('success', 'Materiales del vendedor actualizados.');
+    }
+
+    public function storeMaterialItem(StoreAdvisorMaterialItemRequest $request, Advisor $advisor): RedirectResponse
+    {
+        $validated = $request->validated();
+        $deliveredRaw = $validated['delivered_at'] ?? null;
+        $deliveredAt = null;
+        if (is_string($deliveredRaw) && $deliveredRaw !== '') {
+            $deliveredAt = Carbon::parse($deliveredRaw)->startOfDay();
+        } else {
+            $deliveredAt = Carbon::now()->startOfDay();
+        }
+
+        AdvisorMaterialItem::query()->create([
+            'advisor_id' => $advisor->id,
+            'advisor_material_type_id' => (int) $validated['advisor_material_type_id'],
+            'delivered_at' => $deliveredAt,
+            'notes' => isset($validated['notes']) && is_string($validated['notes']) && $validated['notes'] !== '' ? $validated['notes'] : null,
+        ]);
+
+        return redirect()
+            ->route('inmopro.advisors.index')
+            ->with('success', 'Entrega de material registrada.');
+    }
+
     /**
      * @param  array<int, array<string, mixed>>|null  $items
      */
@@ -271,16 +342,29 @@ class AdvisorController extends Controller
                 $deliveredAt = Carbon::parse($deliveredRaw);
             }
 
-            AdvisorMaterialItem::query()->updateOrCreate(
-                [
-                    'advisor_id' => $advisor->id,
-                    'advisor_material_type_id' => (int) $row['advisor_material_type_id'],
-                ],
-                [
+            $typeId = (int) $row['advisor_material_type_id'];
+            $notes = isset($row['notes']) && is_string($row['notes']) && $row['notes'] !== '' ? $row['notes'] : null;
+
+            $existing = AdvisorMaterialItem::query()
+                ->where('advisor_id', $advisor->id)
+                ->where('advisor_material_type_id', $typeId)
+                ->orderByDesc('delivered_at')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($existing) {
+                $existing->update([
                     'delivered_at' => $deliveredAt,
-                    'notes' => isset($row['notes']) && is_string($row['notes']) && $row['notes'] !== '' ? $row['notes'] : null,
-                ]
-            );
+                    'notes' => $notes,
+                ]);
+            } else {
+                AdvisorMaterialItem::query()->create([
+                    'advisor_id' => $advisor->id,
+                    'advisor_material_type_id' => $typeId,
+                    'delivered_at' => $deliveredAt,
+                    'notes' => $notes,
+                ]);
+            }
         }
     }
 }

@@ -12,6 +12,8 @@ class AdvisorMembershipPayment extends Model
      */
     protected $fillable = [
         'advisor_membership_id',
+        'advisor_membership_installment_id',
+        'cash_account_id',
         'amount',
         'paid_at',
         'notes',

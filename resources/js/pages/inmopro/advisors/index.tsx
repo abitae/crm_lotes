@@ -1,10 +1,11 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { CalendarDays, Download, FileSpreadsheet, KeyRound, Pencil, Plus, Receipt, Search, Upload, UserPlus, ChevronRight } from 'lucide-react';
+import { CalendarDays, Download, FileSpreadsheet, KeyRound, Package, Pencil, Plus, Receipt, Search, Upload, UserPlus } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import Pagination, { type PaginationLink } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -13,7 +14,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -60,7 +60,13 @@ type Advisor = {
         type?: { id: number; name: string; code: string };
     }>;
 };
-type Payment = { id: number; amount: string; paid_at: string; notes?: string | null };
+type Payment = {
+    id: number;
+    amount: string;
+    paid_at: string;
+    notes?: string | null;
+    advisor_membership_installment_id?: number | null;
+};
 type MembershipTypeOption = { id: number; name: string; months: number; amount: string };
 type Membership = {
     id: number;
@@ -113,7 +119,12 @@ type PageProps = {
     membershipDetail: MembershipDetail | null;
     advisorForModal: Advisor | null;
     openModal: string | null;
-    filters: { search?: string };
+    filters: {
+        search?: string;
+        advisor_level_id?: string | number;
+        team_id?: string | number;
+        membership_pending?: string | number | boolean;
+    };
 };
 
 /** Suscripción anual: 12 meses; si el registro no trae tipo, se trata como anual (datos antiguos). */
@@ -144,9 +155,24 @@ function membershipToDetail(m: Membership, advisor?: { id: number; name: string 
 }
 
 function buildMaterialFormRows(types: MaterialTypeRow[], existing?: Advisor['material_items']): MaterialFormRow[] {
-    const map = new Map((existing ?? []).map((m) => [m.advisor_material_type_id, m]));
+    const list = normalizeList(existing);
+    const sorted = [...list].sort((a, b) => {
+        const da = a.delivered_at ? new Date(String(a.delivered_at)).getTime() : 0;
+        const db = b.delivered_at ? new Date(String(b.delivered_at)).getTime() : 0;
+        if (db !== da) {
+            return db - da;
+        }
+
+        return (b.id ?? 0) - (a.id ?? 0);
+    });
+    const latestByType = new Map<number, (typeof list)[0]>();
+    for (const m of sorted) {
+        if (!latestByType.has(m.advisor_material_type_id)) {
+            latestByType.set(m.advisor_material_type_id, m);
+        }
+    }
     return types.map((t) => {
-        const row = map.get(t.id);
+        const row = latestByType.get(t.id);
         const d = row?.delivered_at;
         const dateStr = d ? String(d).slice(0, 10) : '';
         return {
@@ -179,6 +205,9 @@ export default function AdvisorsIndex({
     const [modalMembershipDetail, setModalMembershipDetail] = useState<MembershipDetail | null>(null);
     const [modalAdvisorTemplate, setModalAdvisorTemplate] = useState(false);
     const [modalAdvisorImport, setModalAdvisorImport] = useState(false);
+    const [materialsModalAdvisorId, setMaterialsModalAdvisorId] = useState<number | null>(null);
+    const materialsModalAdvisor =
+        materialsModalAdvisorId == null ? null : (advisors.data.find((a) => a.id === materialsModalAdvisorId) ?? null);
 
     /* eslint-disable react-hooks/set-state-in-effect -- abrir modales desde ?modal= en la URL */
     useEffect(() => {
@@ -201,6 +230,10 @@ export default function AdvisorsIndex({
         { title: 'Inmopro', href: '/inmopro/dashboard' },
         { title: 'Vendedores', href: '/inmopro/advisors' },
     ];
+    const totalPaid = (m: Membership) => normalizeList(m.payments).reduce((sum, p) => sum + Number(p.amount), 0);
+    const balanceDue = (m: Membership) => Math.max(0, Number(m.amount) - totalPaid(m));
+    const isPaid = (m: Membership) => balanceDue(m) <= 0;
+
     const totalAdvisors = advisors.data.length;
     const totalQuota = advisors.data.reduce((sum, advisor) => sum + Number(advisor.personal_quota), 0);
     const membershipsPending = advisors.data.reduce((sum, advisor) => {
@@ -208,11 +241,29 @@ export default function AdvisorsIndex({
         return sum + (latest && !isPaid(latest) ? 1 : 0);
     }, 0);
 
-    const handleSearch = (e: React.FormEvent) => {
+    const handleFilterSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const form = e.target as HTMLFormElement;
-        const q = new FormData(form).get('search') as string;
-        router.get('/inmopro/advisors', { ...filters, search: q || undefined }, { preserveState: true });
+        const fd = new FormData(form);
+        const search = (fd.get('search') as string)?.trim();
+        const advisorLevelId = (fd.get('advisor_level_id') as string)?.trim();
+        const teamId = (fd.get('team_id') as string)?.trim();
+        const membershipPending = fd.get('membership_pending') === '1';
+
+        const params: Record<string, string | undefined> = {};
+        if (search) {
+            params.search = search;
+        }
+        if (advisorLevelId) {
+            params.advisor_level_id = advisorLevelId;
+        }
+        if (teamId) {
+            params.team_id = teamId;
+        }
+        if (membershipPending) {
+            params.membership_pending = '1';
+        }
+        router.get('/inmopro/advisors', params, { preserveState: true });
     };
 
     const advisorsExportQuery = new URLSearchParams();
@@ -220,12 +271,17 @@ export default function AdvisorsIndex({
     if (filters.search) {
         advisorsExportQuery.set('search', String(filters.search));
     }
+    if (filters.advisor_level_id != null && String(filters.advisor_level_id) !== '') {
+        advisorsExportQuery.set('advisor_level_id', String(filters.advisor_level_id));
+    }
+    if (filters.team_id != null && String(filters.team_id) !== '') {
+        advisorsExportQuery.set('team_id', String(filters.team_id));
+    }
+    if (filters.membership_pending) {
+        advisorsExportQuery.set('membership_pending', '1');
+    }
 
     const advisorsExportHref = `/inmopro/advisors/export-excel${advisorsExportQuery.toString() ? `?${advisorsExportQuery.toString()}` : ''}`;
-
-    const totalPaid = (m: Membership) => normalizeList(m.payments).reduce((sum, p) => sum + Number(p.amount), 0);
-    const balanceDue = (m: Membership) => Math.max(0, Number(m.amount) - totalPaid(m));
-    const isPaid = (m: Membership) => balanceDue(m) <= 0;
 
     const openMembershipDetailFromRow = (m: Membership, advisor?: { id: number; name: string }) => {
         setModalMembershipDetail(membershipToDetail(m, advisor));
@@ -299,18 +355,66 @@ export default function AdvisorsIndex({
                     <AdvisorMetric label="Membresias pendientes" value={String(membershipsPending)} tone="amber" />
                 </div>
 
-                <form onSubmit={handleSearch} className="flex gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                            <div className="relative w-full sm:w-80">
-                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    name="search"
-                                    type="text"
-                                    placeholder="Buscar por nombre o email..."
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 font-medium outline-none transition-all focus:ring-2 focus:ring-emerald-500"
-                                    defaultValue={filters.search}
-                                />
-                            </div>
-                            <Button type="submit">Buscar</Button>
+                <form
+                    onSubmit={handleFilterSubmit}
+                    className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:flex-row lg:flex-wrap lg:items-end"
+                >
+                    <div className="relative w-full min-w-0 flex-1 sm:max-w-xs">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                            name="search"
+                            type="text"
+                            placeholder="Buscar por nombre o email..."
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 font-medium outline-none transition-all focus:ring-2 focus:ring-emerald-500"
+                            defaultValue={filters.search}
+                        />
+                    </div>
+                    <div className="w-full min-w-[10rem] sm:w-auto sm:max-w-[11rem]">
+                        <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Nivel</Label>
+                        <select
+                            name="advisor_level_id"
+                            defaultValue={filters.advisor_level_id != null ? String(filters.advisor_level_id) : ''}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <option value="">Todos los niveles</option>
+                            {advisorLevels.map((lvl) => (
+                                <option key={lvl.id} value={lvl.id}>
+                                    {lvl.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="w-full min-w-[10rem] sm:w-auto sm:max-w-[11rem]">
+                        <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Team</Label>
+                        <select
+                            name="team_id"
+                            defaultValue={filters.team_id != null ? String(filters.team_id) : ''}
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                            <option value="">Todos los teams</option>
+                            {teams.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    {t.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex w-full min-w-0 flex-1 items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2 sm:w-auto sm:flex-initial">
+                        <input
+                            type="checkbox"
+                            id="filter-membership-pending"
+                            name="membership_pending"
+                            value="1"
+                            defaultChecked={Boolean(filters.membership_pending)}
+                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <Label htmlFor="filter-membership-pending" className="cursor-pointer text-sm font-medium text-amber-900">
+                            Solo pendientes de pago (membresía anual vigente)
+                        </Label>
+                    </div>
+                    <Button type="submit" className="w-full shrink-0 sm:w-auto">
+                        Aplicar filtros
+                    </Button>
                 </form>
 
                 <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -422,16 +526,20 @@ export default function AdvisorsIndex({
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
+                                                className="h-8 w-8 text-slate-400 hover:text-violet-700"
+                                                onClick={() => setMaterialsModalAdvisorId(adv.id)}
+                                                title="Material corporativo"
+                                            >
+                                                <Package className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
                                                 className="h-8 w-8 text-slate-400 hover:text-slate-900"
                                                 onClick={() => setModalEditAdvisor(adv)}
                                                 title="Editar vendedor"
                                             >
                                                 <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="Ver perfil">
-                                                <a href={`/inmopro/advisors/${adv.id}`}>
-                                                    <ChevronRight className="h-4 w-4" />
-                                                </a>
                                             </Button>
                                         </td>
                                     </tr>
@@ -490,6 +598,13 @@ export default function AdvisorsIndex({
                     />
                 )}
 
+                <AdvisorMaterialsQuickModal
+                    open={materialsModalAdvisorId != null}
+                    onOpenChange={(open) => !open && setMaterialsModalAdvisorId(null)}
+                    advisor={materialsModalAdvisor}
+                    materialTypes={materialTypes}
+                />
+
                 {/* Modal: Nueva membresía */}
                 <CreateMembershipModal
                     open={modalCreateMembership}
@@ -507,6 +622,7 @@ export default function AdvisorsIndex({
                 {/* Modal: Detalle membresía + abonos */}
                 {modalMembershipDetail && (
                     <MembershipDetailModal
+                        key={modalMembershipDetail.membership.id}
                         open={!!modalMembershipDetail}
                         onOpenChange={(open) => {
                             if (!open) {
@@ -1526,6 +1642,198 @@ function AdvisorCazadorAccessModal({
     );
 }
 
+function AdvisorMaterialsQuickModal({
+    open,
+    onOpenChange,
+    advisor,
+    materialTypes,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    advisor: Advisor | null;
+    materialTypes: MaterialTypeRow[];
+}) {
+    const page = usePage();
+    const pageErrors = ((page.props as { errors?: Record<string, string> }).errors ?? {}) as Record<string, string>;
+
+    const addForm = useForm({
+        advisor_material_type_id: (materialTypes[0]?.id ?? 0) as number,
+        delivered_at: new Date().toISOString().slice(0, 10),
+        notes: '',
+    });
+
+    useEffect(() => {
+        if (!open || !advisor || materialTypes.length === 0) {
+            return;
+        }
+        addForm.setData({
+            advisor_material_type_id: materialTypes[0]!.id,
+            delivered_at: new Date().toISOString().slice(0, 10),
+            notes: '',
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- reiniciar al abrir / cambiar vendedor
+    }, [open, advisor?.id]);
+
+    const historyRows = advisor
+        ? [...normalizeList(advisor.material_items)].sort((a, b) => {
+              const da = a.delivered_at ? new Date(String(a.delivered_at)).getTime() : 0;
+              const db = b.delivered_at ? new Date(String(b.delivered_at)).getTime() : 0;
+              if (db !== da) {
+                  return db - da;
+              }
+
+              return (b.id ?? 0) - (a.id ?? 0);
+          })
+        : [];
+
+    const submitAdd = (e: FormEvent) => {
+        e.preventDefault();
+        if (!advisor) {
+            return;
+        }
+        addForm.post(`/inmopro/advisors/${advisor.id}/material-items`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                router.reload({ only: ['advisors'] });
+                addForm.setData('notes', '');
+                addForm.setData('delivered_at', new Date().toISOString().slice(0, 10));
+            },
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Material corporativo</DialogTitle>
+                    <DialogDescription>
+                        {advisor
+                            ? `Nueva entrega (arriba) e historial (abajo) — ${advisor.name}`
+                            : 'Abra el modal desde un vendedor de la tabla.'}
+                    </DialogDescription>
+                </DialogHeader>
+
+                {!advisor ? (
+                    <p className="rounded-lg border border-amber-100 bg-amber-50/80 p-4 text-sm text-amber-950">
+                        Este vendedor no está en la página actual del listado (por ejemplo, tras cambiar de página o filtros).
+                        Cierre el modal, localice al vendedor y vuelva a abrir &quot;Material corporativo&quot;.
+                    </p>
+                ) : (
+                    <div className="space-y-6">
+                        <div>
+                            <h4 className="mb-3 text-xs font-black uppercase tracking-wider text-slate-400">Registrar nueva entrega</h4>
+                            <form onSubmit={submitAdd} className="grid gap-3 sm:grid-cols-2">
+                                <div className="sm:col-span-2">
+                                    <Label htmlFor="mat-add-type">Tipo de material</Label>
+                                    <select
+                                        id="mat-add-type"
+                                        className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                        value={addForm.data.advisor_material_type_id}
+                                        onChange={(e) => addForm.setData('advisor_material_type_id', Number(e.target.value))}
+                                    >
+                                        {materialTypes.map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError message={addForm.errors.advisor_material_type_id ?? pageErrors.advisor_material_type_id} />
+                                </div>
+                                <div>
+                                    <Label htmlFor="mat-add-date">Fecha de entrega</Label>
+                                    <Input
+                                        id="mat-add-date"
+                                        type="date"
+                                        value={addForm.data.delivered_at}
+                                        onChange={(e) => addForm.setData('delivered_at', e.target.value)}
+                                        className="mt-1"
+                                    />
+                                    <InputError message={addForm.errors.delivered_at ?? pageErrors.delivered_at} />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <Label htmlFor="mat-add-notes">Notas (opcional)</Label>
+                                    <textarea
+                                        id="mat-add-notes"
+                                        rows={3}
+                                        value={addForm.data.notes}
+                                        onChange={(e) => addForm.setData('notes', e.target.value)}
+                                        className={cn(
+                                            'mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50',
+                                        )}
+                                        placeholder="Ej. talla M, entregado en oficina…"
+                                    />
+                                    <InputError message={addForm.errors.notes ?? pageErrors.notes} />
+                                </div>
+                                <div className="flex flex-wrap gap-2 sm:col-span-2">
+                                    <Button type="submit" disabled={addForm.processing || materialTypes.length === 0}>
+                                        Registrar entrega
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                                        Cerrar
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                            <h4 className="mb-2 text-xs font-black uppercase tracking-wider text-slate-400">Historial de entregas</h4>
+                            {historyRows.length === 0 ? (
+                                <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-6 text-center text-sm text-slate-500">
+                                    Aún no hay entregas registradas.
+                                </p>
+                            ) : (
+                                <div className="overflow-hidden rounded-xl border border-slate-200">
+                                    <table className="w-full border-collapse text-left text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 bg-slate-50">
+                                                <th className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                    Fecha
+                                                </th>
+                                                <th className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                    Material
+                                                </th>
+                                                <th className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                    Notas
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {historyRows.map((row) => (
+                                                <tr key={row.id} className="bg-white">
+                                                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700">
+                                                        {row.delivered_at
+                                                            ? new Date(String(row.delivered_at).slice(0, 10)).toLocaleDateString(
+                                                                  'es-PE',
+                                                                  {
+                                                                      day: '2-digit',
+                                                                      month: 'short',
+                                                                      year: 'numeric',
+                                                                  },
+                                                              )
+                                                            : '—'}
+                                                    </td>
+                                                    <td className="px-3 py-2 font-medium text-slate-800">
+                                                        {row.type?.name ?? materialTypes.find((t) => t.id === row.advisor_material_type_id)?.name ?? '—'}
+                                                    </td>
+                                                    <td className="max-w-[14rem] px-3 py-2 text-slate-600">
+                                                        <span className="line-clamp-2">{row.notes?.trim() ? row.notes : '—'}</span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function CreateMembershipModal({
     open,
     onOpenChange,
@@ -1547,7 +1855,6 @@ function CreateMembershipModal({
         start_date: today,
         end_date: today,
         amount: membershipTypes[0] ? String(membershipTypes[0].amount) : '',
-        installments_count: '' as string | number,
     });
 
     useEffect(() => {
@@ -1598,7 +1905,6 @@ function CreateMembershipModal({
             start_date: string;
             end_date: string;
             amount: string | null;
-            installments_count?: number;
         } = {
             advisor_id: Number(data.advisor_id),
             membership_type_id: Number(data.membership_type_id),
@@ -1606,9 +1912,6 @@ function CreateMembershipModal({
             end_date: data.end_date,
             amount: data.amount === '' ? null : String(data.amount),
         };
-        if (data.installments_count !== '' && data.installments_count != null) {
-            payload.installments_count = Number(data.installments_count);
-        }
         setSubmitting(true);
         router.post('/inmopro/advisor-memberships', payload, {
             onSuccess: () => {
@@ -1624,7 +1927,9 @@ function CreateMembershipModal({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Nueva membresía</DialogTitle>
-                    <DialogDescription>Tipo, vendedor y vigencia (fechas inicio/fin).</DialogDescription>
+                    <DialogDescription>
+                        Tipo, vendedor y vigencia. Las cuotas y los abonos se gestionan en el detalle de la membresía (cuotas manuales; cada abono va a una cuota con saldo).
+                    </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <div>
@@ -1700,20 +2005,6 @@ function CreateMembershipModal({
                         />
                         <InputError message={pageErrors.amount} />
                     </div>
-                    <div>
-                        <Label htmlFor="mem-installments">Nº de cuotas (opcional)</Label>
-                        <Input
-                            id="mem-installments"
-                            type="number"
-                            min={1}
-                            max={60}
-                            placeholder="Ej. 12"
-                            value={data.installments_count === '' ? '' : data.installments_count}
-                            onChange={(e) => setData('installments_count', e.target.value === '' ? '' : Number(e.target.value))}
-                            className="mt-1"
-                        />
-                        <InputError message={pageErrors.installments_count} />
-                    </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
                         <Button type="submit" disabled={submitting}>Crear membresía</Button>
@@ -1735,42 +2026,71 @@ function MembershipDetailModal({
 }) {
     const { membership, totalPaid, balanceDue, isPaid } = detail;
     const defaultDate = () => new Date().toISOString().slice(0, 10);
+    const [editAmountOpen, setEditAmountOpen] = useState(false);
+
+    const installments = useMemo(
+        () => [...normalizeList(membership.installments)].sort((a, b) => a.sequence - b.sequence),
+        [membership.installments],
+    );
+
+    const payableInstallments = useMemo(
+        () => installments.filter((i) => Number(i.amount) - Number(i.paid_amount) > 0.0001),
+        [installments],
+    );
+
     const paymentForm = useForm({
         amount: '',
         paid_at: defaultDate(),
         notes: '',
-        advisor_membership_installment_id: null as number | null,
     });
+
+    const installmentForm = useForm({
+        amount: '',
+        due_date: defaultDate(),
+        notes: '',
+        sequence: '' as string | number,
+    });
+
+    /** Primera cuota con saldo (misma regla que el servidor para asignar el abono). */
+    const targetInstallment = payableInstallments[0] ?? null;
+    const maxPay =
+        targetInstallment != null
+            ? Math.max(0, Number(targetInstallment.amount) - Number(targetInstallment.paid_amount))
+            : 0;
+
+    const submitInstallment = (e: FormEvent) => {
+        e.preventDefault();
+        installmentForm.post(`/inmopro/advisor-memberships/${membership.id}/installments`, {
+            onSuccess: () => {
+                installmentForm.reset();
+                installmentForm.setData('due_date', defaultDate());
+            },
+        });
+    };
 
     const submitPayment = (e: FormEvent) => {
         e.preventDefault();
         paymentForm.post(`/inmopro/advisor-memberships/${membership.id}/payments`, {
-            onSuccess: () => paymentForm.reset('amount', 'paid_at', 'notes', 'advisor_membership_installment_id'),
+            onSuccess: () => paymentForm.reset('amount', 'paid_at', 'notes'),
         });
     };
 
     const handleDestroy = async () => {
-        if (await confirmDelete(`¿Eliminar la membresía de ${membership.advisor?.name ?? 'este vendedor'} (${membership.year})? Se eliminarán también todos los abonos.`)) {
+        if (await confirmDelete(`¿Eliminar la membresía de ${membership.advisor?.name ?? 'este vendedor'} (${membership.year})? Se eliminarán también todos los abonos y cuotas.`)) {
             router.delete(`/inmopro/advisor-memberships/${membership.id}`);
             onOpenChange(false);
         }
     };
 
-    const [editAmountOpen, setEditAmountOpen] = useState(false);
     const payments = normalizeList(membership.payments);
     const sortedPayments = [...payments].sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
-    const pendingInstallments = normalizeList(membership.installments).filter(
-        (i) => i.status === 'PENDIENTE' || i.status === 'PARCIAL' || i.status === 'VENCIDA'
-    );
-
-    const installments = normalizeList(membership.installments);
     const startDate = membership.start_date ? new Date(membership.start_date).toLocaleDateString('es-PE') : null;
     const endDate = membership.end_date ? new Date(membership.end_date).toLocaleDateString('es-PE') : null;
     const vigencia = startDate && endDate ? `${startDate} – ${endDate}` : membership.year?.toString() ?? '—';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {membership.membership_type?.name ?? 'Membresía'} – {membership.advisor?.name ?? 'Vendedor'}
@@ -1808,8 +2128,105 @@ function MembershipDetailModal({
                         </div>
                     </div>
 
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+                        <h4 className="mb-2 text-sm font-semibold text-slate-800">Añadir cuota (manual)</h4>
+                        <form onSubmit={submitInstallment} className="grid gap-2 sm:grid-cols-2">
+                            <div>
+                                <Label className="text-xs">Monto cuota (S/)</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={installmentForm.data.amount}
+                                    onChange={(e) => installmentForm.setData('amount', e.target.value)}
+                                    className="mt-1 h-9"
+                                    required
+                                />
+                                <InputError message={installmentForm.errors.amount} />
+                            </div>
+                            <div>
+                                <Label className="text-xs">Vencimiento</Label>
+                                <Input
+                                    type="date"
+                                    value={installmentForm.data.due_date}
+                                    onChange={(e) => installmentForm.setData('due_date', e.target.value)}
+                                    className="mt-1 h-9"
+                                    required
+                                />
+                                <InputError message={installmentForm.errors.due_date} />
+                            </div>
+                            <div>
+                                <Label className="text-xs">Nº secuencia (opcional)</Label>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    placeholder="Siguiente automático"
+                                    value={installmentForm.data.sequence === '' ? '' : installmentForm.data.sequence}
+                                    onChange={(e) =>
+                                        installmentForm.setData('sequence', e.target.value === '' ? '' : Number(e.target.value))
+                                    }
+                                    className="mt-1 h-9"
+                                />
+                                <InputError message={installmentForm.errors.sequence} />
+                            </div>
+                            <div>
+                                <Label className="text-xs">Notas (opcional)</Label>
+                                <Input
+                                    value={installmentForm.data.notes}
+                                    onChange={(e) => installmentForm.setData('notes', e.target.value)}
+                                    className="mt-1 h-9"
+                                />
+                            </div>
+                            <div className="sm:col-span-2">
+                                <Button type="submit" size="sm" disabled={installmentForm.processing}>
+                                    Guardar cuota
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {installments.length > 0 && (
+                        <div>
+                            <h4 className="mb-2 text-sm font-semibold text-slate-700">Cuotas ({installments.length})</h4>
+                            <ul className="max-h-40 space-y-1 overflow-y-auto rounded border border-slate-100 p-2 text-sm">
+                                {installments.map((inst) => (
+                                    <li key={inst.id} className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                                        <span className="text-slate-600">
+                                            #{inst.sequence} · {inst.due_date ? new Date(inst.due_date).toLocaleDateString('es-PE') : '—'}
+                                            {` · S/ ${Number(inst.paid_amount).toLocaleString('es-PE')} / S/ ${Number(inst.amount).toLocaleString('es-PE')}`}
+                                        </span>
+                                        <span
+                                            className={`w-fit rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                                                inst.status === 'PAGADA'
+                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                    : inst.status === 'PARCIAL'
+                                                      ? 'bg-amber-100 text-amber-800'
+                                                      : inst.status === 'VENCIDA'
+                                                        ? 'bg-red-100 text-red-800'
+                                                        : 'bg-slate-100 text-slate-600'
+                                            }`}
+                                        >
+                                            {inst.status}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     <div>
                         <h4 className="mb-2 text-sm font-semibold text-slate-700">Registrar abono</h4>
+                        {payableInstallments.length === 0 ? (
+                            <p className="text-sm text-amber-800">
+                                No hay cuotas con saldo. Añada una o más cuotas arriba antes de registrar abonos.
+                            </p>
+                        ) : (
+                            <p className="mb-2 rounded-md border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-950">
+                                El abono se asignará automáticamente a la cuota <strong>#{targetInstallment?.sequence}</strong>{' '}
+                                (primera con saldo pendiente). Saldo máximo en esa cuota:{' '}
+                                <strong>S/ {maxPay.toLocaleString('es-PE')}</strong>.
+                            </p>
+                        )}
                         <form onSubmit={submitPayment} className="space-y-2">
                             <div className="flex flex-wrap items-end gap-2">
                                 <div className="min-w-24">
@@ -1818,10 +2235,12 @@ function MembershipDetailModal({
                                         type="number"
                                         step="0.01"
                                         min="0.01"
+                                        max={maxPay > 0 ? maxPay : undefined}
                                         value={paymentForm.data.amount}
                                         onChange={(e) => paymentForm.setData('amount', e.target.value)}
                                         className="mt-1 h-9"
                                         required
+                                        disabled={payableInstallments.length === 0}
                                     />
                                     <InputError message={paymentForm.errors.amount} />
                                 </div>
@@ -1833,6 +2252,7 @@ function MembershipDetailModal({
                                         onChange={(e) => paymentForm.setData('paid_at', e.target.value)}
                                         className="mt-1 h-9"
                                         required
+                                        disabled={payableInstallments.length === 0}
                                     />
                                 </div>
                                 <div className="min-w-28 flex-1">
@@ -1841,52 +2261,19 @@ function MembershipDetailModal({
                                         value={paymentForm.data.notes}
                                         onChange={(e) => paymentForm.setData('notes', e.target.value)}
                                         className="mt-1 h-9"
+                                        disabled={payableInstallments.length === 0}
                                     />
                                 </div>
-                                <Button type="submit" size="sm" disabled={paymentForm.processing}>Agregar</Button>
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    disabled={paymentForm.processing || payableInstallments.length === 0}
+                                >
+                                    Agregar
+                                </Button>
                             </div>
-                            {pendingInstallments.length > 0 && (
-                                <div className="min-w-48">
-                                    <Label className="text-xs">Asignar a cuota (opcional)</Label>
-                                    <select
-                                        value={paymentForm.data.advisor_membership_installment_id ?? ''}
-                                        onChange={(e) => paymentForm.setData('advisor_membership_installment_id', e.target.value ? Number(e.target.value) : null)}
-                                        className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2 text-sm"
-                                    >
-                                        <option value="">— Sin cuota —</option>
-                                        {pendingInstallments.map((inst) => (
-                                            <option key={inst.id} value={inst.id}>
-                                                Cuota #{inst.sequence} · S/ {Number(inst.amount).toLocaleString('es-PE')} ({inst.status})
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <InputError message={paymentForm.errors.advisor_membership_installment_id} />
-                                </div>
-                            )}
                         </form>
                     </div>
-
-                    {installments.length > 0 && (
-                        <div>
-                            <h4 className="mb-2 text-sm font-semibold text-slate-700">Cuotas ({installments.length})</h4>
-                            <ul className="max-h-36 space-y-1 overflow-y-auto rounded border border-slate-100 p-2 text-sm">
-                                {installments.map((inst) => (
-                                    <li key={inst.id} className="flex items-center justify-between gap-2">
-                                        <span className="text-slate-600">
-                                            #{inst.sequence} · {inst.due_date ? new Date(inst.due_date).toLocaleDateString('es-PE') : '—'} · S/ {Number(inst.amount).toLocaleString('es-PE')}
-                                        </span>
-                                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                                            inst.status === 'PAGADA' ? 'bg-emerald-100 text-emerald-800' :
-                                            inst.status === 'PARCIAL' ? 'bg-amber-100 text-amber-800' :
-                                            inst.status === 'VENCIDA' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
-                                        }`}>
-                                            {inst.status}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
 
                     <div>
                         <h4 className="mb-2 text-sm font-semibold text-slate-700">Abonos ({sortedPayments.length})</h4>
@@ -1894,12 +2281,21 @@ function MembershipDetailModal({
                             <p className="text-sm text-slate-500">Aún no hay abonos.</p>
                         ) : (
                             <ul className="max-h-40 space-y-1 overflow-y-auto rounded border border-slate-100 p-2 text-sm">
-                                {sortedPayments.map((p) => (
-                                    <li key={p.id} className="flex justify-between">
-                                        <span>{new Date(p.paid_at).toLocaleDateString('es-PE')} {p.notes ? `· ${p.notes}` : ''}</span>
-                                        <span className="font-medium">S/ {Number(p.amount).toLocaleString('es-PE')}</span>
-                                    </li>
-                                ))}
+                                {sortedPayments.map((p) => {
+                                    const toCuota = p.advisor_membership_installment_id
+                                        ? installments.find((i) => i.id === p.advisor_membership_installment_id)
+                                        : null;
+                                    return (
+                                        <li key={p.id} className="flex flex-col gap-0.5 sm:flex-row sm:justify-between">
+                                            <span>
+                                                {new Date(p.paid_at).toLocaleDateString('es-PE')}
+                                                {toCuota ? ` · Cuota #${toCuota.sequence}` : ''}
+                                                {p.notes ? ` · ${p.notes}` : ''}
+                                            </span>
+                                            <span className="font-medium">S/ {Number(p.amount).toLocaleString('es-PE')}</span>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
                     </div>

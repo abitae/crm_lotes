@@ -13,24 +13,26 @@ use Illuminate\Support\Facades\DB;
 class MembershipReceivableService
 {
     /**
-     * Crea N cuotas para una membresía (monto total / N por cuota).
+     * Crea N cuotas repartiendo un principal dado. Las fechas de vencimiento se reparten de forma
+     * proporcional entre start_date y end_date de la membresía (la última cuota vence en end_date).
      */
-    public function createInstallments(AdvisorMembership $membership, int $count): void
+    public function createInstallmentsForAmount(AdvisorMembership $membership, int $count, float $principal): void
     {
-        if ($count < 1) {
+        if ($count < 1 || $principal <= 0) {
             return;
         }
 
-        $total = (float) $membership->amount;
-        $perInstallment = round($total / $count, 2);
-        $startDate = $membership->start_date ? Carbon::parse($membership->start_date) : null;
+        $perInstallment = round($principal / $count, 2);
+        $start = $membership->start_date ? Carbon::parse($membership->start_date)->startOfDay() : null;
+        $end = $membership->end_date ? Carbon::parse($membership->end_date)->startOfDay() : null;
 
-        DB::transaction(function () use ($membership, $count, $perInstallment, $total, $startDate): void {
+        DB::transaction(function () use ($membership, $count, $perInstallment, $principal, $start, $end): void {
             for ($seq = 1; $seq <= $count; $seq++) {
-                $dueDate = $startDate ? $startDate->copy()->addMonths($seq)->subDay() : null;
                 $amount = $seq === $count
-                    ? $total - ($perInstallment * ($count - 1))
+                    ? $principal - ($perInstallment * ($count - 1))
                     : $perInstallment;
+
+                $dueDate = $this->installmentDueDateBetween($start, $end, $seq, $count);
 
                 $membership->installments()->create([
                     'sequence' => $seq,
@@ -41,6 +43,40 @@ class MembershipReceivableService
                 ]);
             }
         });
+    }
+
+    /**
+     * Reparto proporcional en días: cuota k/N cae en start + round(k/N * días_totales), salvo la N en end_date.
+     */
+    private function installmentDueDateBetween(?Carbon $start, ?Carbon $end, int $sequence, int $count): ?Carbon
+    {
+        if (! $start || ! $end) {
+            return null;
+        }
+
+        if ($sequence === $count) {
+            return $end->copy();
+        }
+
+        $totalDays = max(0, $start->diffInDays($end));
+        if ($totalDays === 0) {
+            return $start->copy();
+        }
+
+        $offsetDays = (int) floor($totalDays * $sequence / $count);
+        if ($offsetDays < 1 && $sequence >= 1) {
+            $offsetDays = 1;
+        }
+
+        return $start->copy()->addDays(min($offsetDays, $totalDays));
+    }
+
+    /**
+     * Crea N cuotas para el monto total de la membresía (compatibilidad).
+     */
+    public function createInstallments(AdvisorMembership $membership, int $count): void
+    {
+        $this->createInstallmentsForAmount($membership, $count, (float) $membership->amount);
     }
 
     /**

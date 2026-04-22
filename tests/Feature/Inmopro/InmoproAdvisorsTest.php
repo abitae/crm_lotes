@@ -4,7 +4,12 @@ namespace Tests\Feature\Inmopro;
 
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
+use App\Models\Inmopro\AdvisorMaterialItem;
+use App\Models\Inmopro\AdvisorMaterialType;
+use App\Models\Inmopro\AdvisorMembership;
+use App\Models\Inmopro\AdvisorMembershipPayment;
 use App\Models\Inmopro\City;
+use App\Models\Inmopro\MembershipType;
 use App\Models\Inmopro\Team;
 use App\Models\User;
 use Database\Seeders\Inmopro\AdvisorLevelSeeder;
@@ -130,5 +135,180 @@ class InmoproAdvisorsTest extends TestCase
             'personal_quota' => 10,
             'bank_cci' => '123',
         ])->assertSessionHasErrors(['bank_cci']);
+    }
+
+    public function test_authenticated_users_can_update_advisor_material_items_only(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::firstOrFail();
+        $type = AdvisorMaterialType::query()->firstOrFail();
+        $this->actingAs($user);
+
+        $response = $this->put(route('inmopro.advisors.material-items.update', $advisor), [
+            'material_items' => [
+                [
+                    'advisor_material_type_id' => $type->id,
+                    'delivered_at' => '2026-04-20',
+                    'notes' => 'Entregado en oficina',
+                ],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inmopro.advisors.index'));
+        $this->assertDatabaseHas('advisor_material_items', [
+            'advisor_id' => $advisor->id,
+            'advisor_material_type_id' => $type->id,
+            'notes' => 'Entregado en oficina',
+        ]);
+        $row = AdvisorMaterialItem::query()
+            ->where('advisor_id', $advisor->id)
+            ->where('advisor_material_type_id', $type->id)
+            ->first();
+        $this->assertNotNull($row);
+        $this->assertSame('2026-04-20', $row->delivered_at->format('Y-m-d'));
+    }
+
+    public function test_update_material_items_rejects_invalid_type_id(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::firstOrFail();
+        $this->actingAs($user);
+
+        $response = $this->from(route('inmopro.advisors.index'))->put(route('inmopro.advisors.material-items.update', $advisor), [
+            'material_items' => [
+                [
+                    'advisor_material_type_id' => 999999,
+                    'delivered_at' => null,
+                    'notes' => null,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('material_items.0.advisor_material_type_id');
+    }
+
+    public function test_authenticated_users_can_append_material_delivery(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::firstOrFail();
+        $type = AdvisorMaterialType::query()->firstOrFail();
+        $this->actingAs($user);
+
+        $this->post(route('inmopro.advisors.material-items.store', $advisor), [
+            'advisor_material_type_id' => $type->id,
+            'delivered_at' => '2026-04-01',
+            'notes' => 'Primera entrega',
+        ])->assertRedirect(route('inmopro.advisors.index'));
+
+        $this->post(route('inmopro.advisors.material-items.store', $advisor), [
+            'advisor_material_type_id' => $type->id,
+            'delivered_at' => '2026-05-10',
+            'notes' => 'Segunda entrega',
+        ])->assertRedirect(route('inmopro.advisors.index'));
+
+        $this->assertSame(
+            2,
+            AdvisorMaterialItem::query()
+                ->where('advisor_id', $advisor->id)
+                ->where('advisor_material_type_id', $type->id)
+                ->count()
+        );
+    }
+
+    public function test_advisors_index_echoes_filters_in_props(): void
+    {
+        $user = User::factory()->create();
+        $level = AdvisorLevel::query()->firstOrFail();
+        $team = Team::query()->firstOrFail();
+        $this->actingAs($user);
+
+        $this->get(route('inmopro.advisors.index', [
+            'advisor_level_id' => $level->id,
+            'team_id' => $team->id,
+            'membership_pending' => '1',
+        ]))->assertInertia(fn ($page) => $page
+            ->component('inmopro/advisors/index')
+            ->where('filters.advisor_level_id', (string) $level->id)
+            ->where('filters.team_id', (string) $team->id)
+            ->where('filters.membership_pending', '1'));
+    }
+
+    public function test_advisors_index_membership_pending_filter_limits_results(): void
+    {
+        $user = User::factory()->create();
+        $level = AdvisorLevel::query()->firstOrFail();
+        $team = Team::query()->firstOrFail();
+        $city = City::query()->firstOrFail();
+        $type = MembershipType::query()->create([
+            'name' => 'Anual filtro',
+            'months' => 12,
+            'amount' => 1000,
+        ]);
+
+        $unpaidAdvisor = Advisor::query()->create([
+            'dni' => '99001122',
+            'first_name' => 'Pendiente',
+            'last_name' => 'FiltroMemb',
+            'phone' => '999000001',
+            'email' => 'memb-pendiente-filtro@example.com',
+            'username' => 'memb_pend_filtro',
+            'pin' => '123456',
+            'is_active' => true,
+            'city_id' => $city->id,
+            'team_id' => $team->id,
+            'advisor_level_id' => $level->id,
+            'superior_id' => null,
+            'personal_quota' => 100,
+        ]);
+
+        $paidAdvisor = Advisor::query()->create([
+            'dni' => '99001123',
+            'first_name' => 'Pagada',
+            'last_name' => 'FiltroMemb',
+            'phone' => '999000002',
+            'email' => 'memb-pagada-filtro@example.com',
+            'username' => 'memb_pag_filtro',
+            'pin' => '123456',
+            'is_active' => true,
+            'city_id' => $city->id,
+            'team_id' => $team->id,
+            'advisor_level_id' => $level->id,
+            'superior_id' => null,
+            'personal_quota' => 100,
+        ]);
+
+        AdvisorMembership::query()->create([
+            'advisor_id' => $unpaidAdvisor->id,
+            'membership_type_id' => $type->id,
+            'year' => 2026,
+            'amount' => 1000,
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+        ]);
+
+        $paidMembership = AdvisorMembership::query()->create([
+            'advisor_id' => $paidAdvisor->id,
+            'membership_type_id' => $type->id,
+            'year' => 2026,
+            'amount' => 1000,
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+        ]);
+        AdvisorMembershipPayment::query()->create([
+            'advisor_membership_id' => $paidMembership->id,
+            'amount' => 1000,
+            'paid_at' => '2026-03-01',
+            'notes' => null,
+        ]);
+
+        $this->actingAs($user);
+        $response = $this->get(route('inmopro.advisors.index', [
+            'membership_pending' => '1',
+            'search' => 'memb-pendiente-filtro',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('memb-pendiente-filtro@example.com', false);
+        $response->assertDontSee('memb-pagada-filtro@example.com', false);
     }
 }

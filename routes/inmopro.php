@@ -80,12 +80,15 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
         Route::post('advisors/import-preview', [AdvisorController::class, 'importPreview'])->name('advisors.import-preview');
         Route::post('advisors/import-confirm', [AdvisorController::class, 'importConfirm'])->name('advisors.import-confirm');
         Route::put('advisors/{advisor}/cazador-access', [AdvisorController::class, 'updateCazadorAccess'])->name('advisors.cazador-access.update');
+        Route::put('advisors/{advisor}/material-items', [AdvisorController::class, 'updateMaterialItems'])->name('advisors.material-items.update');
+        Route::post('advisors/{advisor}/material-items', [AdvisorController::class, 'storeMaterialItem'])->name('advisors.material-items.store');
         Route::resource('advisors', AdvisorController::class)->except(['destroy']);
         Route::resource('dateros', DateroController::class);
         Route::resource('teams', TeamController::class);
         Route::get('membership-types/{membership_type}/bulk-assign', [MembershipTypeController::class, 'bulkAssign'])->name('membership-types.bulk-assign');
         Route::post('membership-types/{membership_type}/bulk-assign', [MembershipTypeController::class, 'bulkAssignStore'])->name('membership-types.bulk-assign.store');
         Route::resource('membership-types', MembershipTypeController::class)->parameters(['membership-types' => 'membership_type']);
+        Route::post('advisor-memberships/{advisor_membership}/installments', [AdvisorMembershipController::class, 'storeInstallment'])->name('advisor-memberships.installments.store');
         Route::post('advisor-memberships/{advisor_membership}/payments', [AdvisorMembershipController::class, 'storePayment'])->name('advisor-memberships.payments.store');
         Route::resource('advisor-memberships', AdvisorMembershipController::class)->parameters(['advisor-memberships' => 'advisor_membership']);
         Route::resource('lot-statuses', LotStatusController::class)->parameters(['lot-statuses' => 'lot_status']);

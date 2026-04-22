@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Inmopro;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreAdvisorMembershipRequest extends FormRequest
@@ -15,7 +16,7 @@ class StoreAdvisorMembershipRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -25,7 +26,6 @@ class StoreAdvisorMembershipRequest extends FormRequest
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'amount' => ['nullable', 'numeric', 'min:0'],
-            'installments_count' => ['nullable', 'integer', 'min:1', 'max:60'],
         ];
     }
 }
