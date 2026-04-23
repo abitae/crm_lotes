@@ -1,10 +1,11 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import InputError from '@/components/input-error';
+import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
 type ProjectAsset = {
@@ -17,6 +18,7 @@ type ProjectAsset = {
 type Project = {
     id: number;
     name: string;
+    project_type_id?: number | null;
     location?: string;
     total_lots?: number;
     blocks?: string[];
@@ -24,6 +26,7 @@ type Project = {
 };
 type ProjectEditForm = {
     name: string;
+    project_type_id: number | '';
     location: string;
     total_lots: number | '';
     blocks: string[];
@@ -32,12 +35,19 @@ type ProjectEditForm = {
     _method?: 'put';
 };
 
-export default function ProjectsEdit({ project }: { project: Project }) {
+export default function ProjectsEdit({
+    project,
+    projectTypes,
+}: {
+    project: Project;
+    projectTypes: Array<{ id: number; name: string; code: string }>;
+}) {
     const blocks = project.blocks ?? [];
     const [blockInput, setBlockInput] = useState('');
     const [blocksList, setBlocksList] = useState<string[]>(blocks);
     const { data, setData, post, processing, errors, transform } = useForm<ProjectEditForm>({
             name: project.name,
+            project_type_id: project.project_type_id ?? '',
             location: project.location ?? '',
             total_lots: project.total_lots ?? ('' as number | ''),
             blocks: blocksList,
@@ -71,6 +81,7 @@ export default function ProjectsEdit({ project }: { project: Project }) {
         e.preventDefault();
         transform((formData) => ({
             ...formData,
+            project_type_id: formData.project_type_id === '' ? null : Number(formData.project_type_id),
             total_lots: formData.total_lots === '' ? null : Number(formData.total_lots),
             _method: 'put',
         }));
@@ -87,6 +98,23 @@ export default function ProjectsEdit({ project }: { project: Project }) {
                         <Label htmlFor="name">Nombre</Label>
                         <Input id="name" value={data.name} onChange={(e) => setData('name', e.target.value)} className="mt-1" />
                         <InputError message={errors.name} />
+                    </div>
+                    <div>
+                        <Label htmlFor="project_type_id">Tipo de proyecto</Label>
+                        <select
+                            id="project_type_id"
+                            value={data.project_type_id}
+                            onChange={(e) => setData('project_type_id', e.target.value === '' ? '' : Number(e.target.value))}
+                            className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        >
+                            <option value="">Sin tipo</option>
+                            {projectTypes.map((type) => (
+                                <option key={type.id} value={type.id}>
+                                    {type.name}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.project_type_id} />
                     </div>
                     <div>
                         <Label htmlFor="location">Ubicación</Label>

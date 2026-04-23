@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Inmopro;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateProjectRequest extends FormRequest
@@ -15,12 +16,13 @@ class UpdateProjectRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'project_type_id' => ['nullable', 'exists:project_types,id'],
             'location' => ['nullable', 'string', 'max:255'],
             'total_lots' => ['nullable', 'integer', 'min:0'],
             'blocks' => ['nullable', 'array'],

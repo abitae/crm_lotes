@@ -62,6 +62,7 @@ const managementSections: NavSection[] = [
         items: [
             { title: 'Inventario de lotes', href: '/inmopro/lots', icon: MapPin },
             { title: 'Proyectos', href: '/inmopro/projects', icon: Building2 },
+            { title: 'Tipos de proyecto', href: '/inmopro/project-types', icon: Layers },
         ],
     },
     {

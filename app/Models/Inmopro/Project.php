@@ -3,6 +3,7 @@
 namespace App\Models\Inmopro;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Project extends Model
@@ -12,6 +13,7 @@ class Project extends Model
      */
     protected $fillable = [
         'name',
+        'project_type_id',
         'location',
         'total_lots',
         'blocks',
@@ -26,6 +28,14 @@ class Project extends Model
             'blocks' => 'array',
             'total_lots' => 'integer',
         ];
+    }
+
+    /**
+     * @return BelongsTo<ProjectType, $this>
+     */
+    public function projectType(): BelongsTo
+    {
+        return $this->belongsTo(ProjectType::class, 'project_type_id');
     }
 
     /**

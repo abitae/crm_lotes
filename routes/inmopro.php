@@ -30,6 +30,7 @@ use App\Http\Controllers\Inmopro\LotTransferConfirmationController;
 use App\Http\Controllers\Inmopro\MembershipTypeController;
 use App\Http\Controllers\Inmopro\ProcessDiagramsController;
 use App\Http\Controllers\Inmopro\ProjectController;
+use App\Http\Controllers\Inmopro\ProjectTypeController;
 use App\Http\Controllers\Inmopro\ReportController;
 use App\Http\Controllers\Inmopro\ReportSalesConfigController;
 use App\Http\Controllers\Inmopro\TeamController;
@@ -56,6 +57,9 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
         Route::get('projects/{project}/assets/{asset}/download', [ProjectController::class, 'downloadAsset'])->name('projects.assets.download');
         Route::delete('projects/{project}/assets/{asset}', [ProjectController::class, 'destroyAsset'])->name('projects.assets.destroy');
         Route::resource('projects', ProjectController::class);
+        Route::resource('project-types', ProjectTypeController::class)
+            ->except(['create', 'edit', 'show'])
+            ->parameters(['project-types' => 'project_type']);
         Route::get('lots/export-pdf', [LotController::class, 'exportPdf'])->name('lots.export-pdf');
         Route::post('lots/{lot}/ai-follow-up-suggestion', LotAiFollowUpSuggestionController::class)
             ->middleware('throttle:ai')

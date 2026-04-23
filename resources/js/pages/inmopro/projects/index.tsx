@@ -1,17 +1,19 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle, Download, Eye, FileSpreadsheet, MapPin, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import Pagination, { type PaginationLink } from '@/components/pagination';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
 import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
 type Project = {
     id: number;
     name: string;
+    project_type_id?: number | null;
+    project_type?: { id: number; name: string; code: string } | null;
     location?: string | null;
     total_lots?: number | null;
     lots_count?: number;
@@ -29,7 +31,8 @@ type Project = {
 
 type PageProps = {
     projects: { data: Project[]; links: PaginationLink[]; total?: number };
-    filters: { search?: string; location?: string; health?: string; order?: string };
+    filters: { search?: string; project_type_id?: string | number; location?: string; health?: string; order?: string };
+    projectTypes: Array<{ id: number; name: string; code: string }>;
     locations: string[];
     summary: {
         totalProjects: number;
@@ -40,7 +43,7 @@ type PageProps = {
     };
 };
 
-export default function ProjectsIndex({ projects, filters, locations, summary }: PageProps) {
+export default function ProjectsIndex({ projects, filters, projectTypes, locations, summary }: PageProps) {
     const items = projects.data;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -84,6 +87,7 @@ export default function ProjectsIndex({ projects, filters, locations, summary }:
             '/inmopro/projects',
             {
                 search: formData.get('search') || undefined,
+                project_type_id: formData.get('project_type_id') || undefined,
                 location: formData.get('location') || undefined,
                 health: formData.get('health') || undefined,
                 order: formData.get('order') || undefined,
@@ -155,7 +159,7 @@ export default function ProjectsIndex({ projects, filters, locations, summary }:
                         <CardDescription>Busque por proyecto, sectorice por ubicacion y priorice riesgos de inventario.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={handleFilter} className="grid gap-3 lg:grid-cols-4">
+                        <form onSubmit={handleFilter} className="grid gap-3 lg:grid-cols-5">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 <Input name="search" placeholder="Nombre o ubicacion..." defaultValue={filters.search} className="pl-9" />
@@ -164,6 +168,18 @@ export default function ProjectsIndex({ projects, filters, locations, summary }:
                                 <option value="">Todas las ubicaciones</option>
                                 {locations.map((location) => (
                                     <option key={location} value={location}>{location}</option>
+                                ))}
+                            </select>
+                            <select
+                                name="project_type_id"
+                                defaultValue={filters.project_type_id != null ? String(filters.project_type_id) : ''}
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                            >
+                                <option value="">Todos los tipos</option>
+                                {projectTypes.map((type) => (
+                                    <option key={type.id} value={type.id}>
+                                        {type.name}
+                                    </option>
                                 ))}
                             </select>
                             <select name="health" defaultValue={filters.health ?? ''} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
@@ -213,6 +229,7 @@ export default function ProjectsIndex({ projects, filters, locations, summary }:
                                         <thead>
                                             <tr className="border-b border-slate-100 bg-slate-50/80">
                                                 <th className="px-4 py-3 text-left font-medium text-slate-600">Proyecto</th>
+                                                <th className="px-4 py-3 text-left font-medium text-slate-600">Tipo</th>
                                                 <th className="px-4 py-3 text-left font-medium text-slate-600">Stock</th>
                                                 <th className="px-4 py-3 text-left font-medium text-slate-600">Avance</th>
                                                 <th className="px-4 py-3 text-left font-medium text-slate-600">Cartera</th>
@@ -228,6 +245,11 @@ export default function ProjectsIndex({ projects, filters, locations, summary }:
                                                             <p className="font-semibold text-slate-900">{project.name}</p>
                                                             <p className="text-xs text-slate-500">{project.location ?? 'Sin ubicacion'} · {project.blocks_count ?? 0} manzana(s)</p>
                                                         </div>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                                            {project.project_type?.name ?? 'Sin tipo'}
+                                                        </span>
                                                     </td>
                                                     <td className="px-4 py-4">
                                                         <div className="space-y-1 text-xs text-slate-600">

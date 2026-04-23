@@ -6,7 +6,10 @@ use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
 use App\Models\Inmopro\ProjectAsset;
+use App\Models\Inmopro\ProjectType;
 use App\Models\User;
+use Database\Seeders\Inmopro\LotStatusSeeder;
+use Database\Seeders\Inmopro\ProjectSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -19,8 +22,8 @@ class InmoproProjectsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(\Database\Seeders\Inmopro\ProjectSeeder::class);
-        $this->seed(\Database\Seeders\Inmopro\LotStatusSeeder::class);
+        $this->seed(ProjectSeeder::class);
+        $this->seed(LotStatusSeeder::class);
     }
 
     public function test_guests_cannot_visit_projects_index(): void
@@ -39,9 +42,11 @@ class InmoproProjectsTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->component('inmopro/projects/index')
             ->has('projects')
+            ->has('projectTypes')
             ->has('locations')
             ->has('summary')
-            ->where('filters.search', null));
+            ->where('filters.search', null)
+            ->where('filters.project_type_id', null));
     }
 
     public function test_authenticated_users_can_visit_project_show(): void
@@ -88,6 +93,7 @@ class InmoproProjectsTest extends TestCase
 
         $response = $this->get(route('inmopro.projects.index', [
             'search' => $project->name,
+            'project_type_id' => $project->project_type_id,
             'health' => 'with_stock',
         ]));
 
@@ -95,9 +101,11 @@ class InmoproProjectsTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->component('inmopro/projects/index')
             ->where('filters.search', $project->name)
+            ->where('filters.project_type_id', (string) $project->project_type_id)
             ->where('filters.health', 'with_stock')
             ->has('projects.data', 1)
             ->where('projects.data.0.name', $project->name)
+            ->where('projects.data.0.project_type.id', $project->project_type_id)
             ->where('projects.data.0.free_lots_count', 1));
     }
 
@@ -105,10 +113,12 @@ class InmoproProjectsTest extends TestCase
     {
         Storage::fake('local');
         $user = User::factory()->create();
+        $projectType = ProjectType::query()->firstOrFail();
         $this->actingAs($user);
 
         $response = $this->post(route('inmopro.projects.store'), [
             'name' => 'Proyecto Test',
+            'project_type_id' => $projectType->id,
             'location' => 'Lima',
             'total_lots' => 50,
             'blocks' => ['A', 'B'],
@@ -119,6 +129,7 @@ class InmoproProjectsTest extends TestCase
         $response->assertRedirect(route('inmopro.projects.index'));
         $this->assertDatabaseHas('projects', [
             'name' => 'Proyecto Test',
+            'project_type_id' => $projectType->id,
             'location' => 'Lima',
         ]);
         $project = Project::query()->where('name', 'Proyecto Test')->firstOrFail();
@@ -137,10 +148,12 @@ class InmoproProjectsTest extends TestCase
         Storage::fake('local');
         $user = User::factory()->create();
         $project = Project::first();
+        $projectType = ProjectType::query()->whereKeyNot($project?->project_type_id)->first() ?? ProjectType::query()->firstOrFail();
         $this->actingAs($user);
 
         $response = $this->put(route('inmopro.projects.update', $project), [
             'name' => 'Proyecto Actualizado',
+            'project_type_id' => $projectType->id,
             'location' => $project->location,
             'total_lots' => $project->total_lots,
             'blocks' => $project->blocks ?? [],
@@ -151,6 +164,7 @@ class InmoproProjectsTest extends TestCase
         $this->assertDatabaseHas('projects', [
             'id' => $project->id,
             'name' => 'Proyecto Actualizado',
+            'project_type_id' => $projectType->id,
         ]);
         $this->assertDatabaseHas('project_assets', [
             'project_id' => $project->id,

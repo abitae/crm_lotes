@@ -7,16 +7,17 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inmopro\ImportProjectFromExcelRequest;
 use App\Http\Requests\Inmopro\StoreProjectRequest;
 use App\Http\Requests\Inmopro\UpdateProjectRequest;
-use App\Models\Inmopro\ProjectAsset;
 use App\Imports\Inmopro\ProjectWithLotsImport;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
-use Illuminate\Http\UploadedFile;
+use App\Models\Inmopro\ProjectAsset;
+use App\Models\Inmopro\ProjectType;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -28,6 +29,7 @@ class ProjectController extends Controller
     public function index(Request $request): Response
     {
         $query = Project::query()
+            ->with('projectType')
             ->withCount('lots')
             ->withCount([
                 'lots as free_lots_count' => fn (Builder $builder) => $builder->whereHas('status', fn (Builder $statusQuery) => $statusQuery->where('code', 'LIBRE')),
@@ -49,6 +51,10 @@ class ProjectController extends Controller
 
         if ($request->filled('location')) {
             $query->where('location', (string) $request->input('location'));
+        }
+
+        if ($request->filled('project_type_id')) {
+            $query->where('project_type_id', (int) $request->input('project_type_id'));
         }
 
         if ($request->filled('health')) {
@@ -77,6 +83,12 @@ class ProjectController extends Controller
             return [
                 'id' => $project->id,
                 'name' => $project->name,
+                'project_type_id' => $project->project_type_id,
+                'project_type' => $project->projectType ? [
+                    'id' => $project->projectType->id,
+                    'name' => $project->projectType->name,
+                    'code' => $project->projectType->code,
+                ] : null,
                 'location' => $project->location,
                 'total_lots' => $project->total_lots,
                 'blocks' => $project->blocks,
@@ -101,10 +113,16 @@ class ProjectController extends Controller
             'projects' => $projects,
             'filters' => [
                 'search' => $request->input('search'),
+                'project_type_id' => $request->input('project_type_id'),
                 'location' => $request->input('location'),
                 'health' => $request->input('health'),
                 'order' => $request->input('order'),
             ],
+            'projectTypes' => ProjectType::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code']),
             'locations' => Project::query()
                 ->whereNotNull('location')
                 ->where('location', '!=', '')
@@ -123,7 +141,13 @@ class ProjectController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('inmopro/projects/create');
+        return Inertia::render('inmopro/projects/create', [
+            'projectTypes' => ProjectType::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code']),
+        ]);
     }
 
     public function store(StoreProjectRequest $request): RedirectResponse
@@ -155,6 +179,11 @@ class ProjectController extends Controller
 
         return Inertia::render('inmopro/projects/edit', [
             'project' => $this->projectPayload($project),
+            'projectTypes' => ProjectType::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code']),
         ]);
     }
 
@@ -278,11 +307,17 @@ class ProjectController extends Controller
      */
     private function projectPayload(Project $project, bool $includeLots = false): array
     {
-        $project->loadMissing('assets');
+        $project->loadMissing(['assets', 'projectType']);
 
         return [
             'id' => $project->id,
             'name' => $project->name,
+            'project_type_id' => $project->project_type_id,
+            'project_type' => $project->projectType ? [
+                'id' => $project->projectType->id,
+                'name' => $project->projectType->name,
+                'code' => $project->projectType->code,
+            ] : null,
             'location' => $project->location,
             'total_lots' => $project->total_lots,
             'blocks' => $project->blocks,
