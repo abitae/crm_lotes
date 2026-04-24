@@ -12,6 +12,7 @@ use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\ClientType;
+use App\Support\InertiaListingRedirect;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -101,7 +102,7 @@ class ClientController extends Controller
     {
         Excel::import(new ClientsImport, $request->file('file'));
 
-        return redirect()->route('inmopro.clients.index');
+        return redirect()->route('inmopro.clients.index', InertiaListingRedirect::clientsIndexQuery($request));
     }
 
     public function create(): Response
@@ -117,7 +118,7 @@ class ClientController extends Controller
     {
         Client::create($request->validated());
 
-        return redirect()->route('inmopro.clients.index');
+        return redirect()->route('inmopro.clients.index', InertiaListingRedirect::clientsIndexQuery($request));
     }
 
     public function show(Client $client): Response
@@ -143,13 +144,13 @@ class ClientController extends Controller
     {
         $client->update($request->validated());
 
-        return redirect()->route('inmopro.clients.index');
+        return redirect()->route('inmopro.clients.index', InertiaListingRedirect::clientsIndexQuery($request));
     }
 
-    public function destroy(Client $client): RedirectResponse
+    public function destroy(Request $request, Client $client): RedirectResponse
     {
         $client->delete();
 
-        return redirect()->route('inmopro.clients.index');
+        return redirect()->route('inmopro.clients.index', InertiaListingRedirect::clientsIndexQuery($request));
     }
 }

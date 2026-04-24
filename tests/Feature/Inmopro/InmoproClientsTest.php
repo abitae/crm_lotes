@@ -83,6 +83,30 @@ class InmoproClientsTest extends TestCase
         ]);
     }
 
+    public function test_store_client_redirect_preserves_listing_query_string(): void
+    {
+        $user = User::factory()->create();
+        $type = ClientType::first();
+        $advisor = Advisor::first();
+        $city = City::first();
+        $this->actingAs($user);
+
+        $response = $this->post(route('inmopro.clients.store', ['page' => '2', 'search' => 'Juan']), [
+            'name' => 'Cliente Paginado',
+            'dni' => '87654321',
+            'phone' => '911222333',
+            'email' => 'pag@test.com',
+            'client_type_id' => $type->id,
+            'advisor_id' => $advisor->id,
+            'city_id' => $city?->id,
+        ]);
+
+        $response->assertRedirect(route('inmopro.clients.index', [
+            'page' => '2',
+            'search' => 'Juan',
+        ]));
+    }
+
     public function test_authenticated_users_cannot_create_client_with_duplicate_dni_or_phone(): void
     {
         $user = User::factory()->create();
