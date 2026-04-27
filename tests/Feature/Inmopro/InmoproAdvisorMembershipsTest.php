@@ -251,5 +251,41 @@ class InmoproAdvisorMembershipsTest extends TestCase
         $this->assertSame('550.00', $membership->amount);
         $this->assertSame('2026-02-01', $membership->start_date->format('Y-m-d'));
         $this->assertSame('2027-01-31', $membership->end_date->format('Y-m-d'));
+        $this->assertSame(2026, $membership->year);
+    }
+
+    public function test_can_create_second_membership_same_advisor_same_calendar_year(): void
+    {
+        $user = User::factory()->create();
+        $advisor = Advisor::query()->firstOrFail();
+        $typeA = MembershipType::query()->create([
+            'name' => 'Membresía A — '.__FUNCTION__,
+            'months' => 12,
+            'amount' => 400,
+        ]);
+        $typeB = MembershipType::query()->create([
+            'name' => 'Membresía B — '.__FUNCTION__,
+            'months' => 12,
+            'amount' => 450,
+        ]);
+        $this->actingAs($user);
+
+        $this->post(route('inmopro.advisor-memberships.store'), [
+            'advisor_id' => $advisor->id,
+            'membership_type_id' => $typeA->id,
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-06-30',
+            'amount' => 400,
+        ])->assertRedirect(route('inmopro.advisors.index'));
+
+        $this->post(route('inmopro.advisor-memberships.store'), [
+            'advisor_id' => $advisor->id,
+            'membership_type_id' => $typeB->id,
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-12-31',
+            'amount' => 450,
+        ])->assertRedirect(route('inmopro.advisors.index'));
+
+        $this->assertSame(2, AdvisorMembership::query()->where('advisor_id', $advisor->id)->where('year', 2026)->count());
     }
 }

@@ -287,14 +287,10 @@ export default function AdvisorsIndex({
         setModalMembershipDetail(membershipToDetail(m, advisor));
     };
 
-    const openMembershipForAdvisorRow = (adv: Advisor) => {
-        const latest = getLatestAnnualMembership(adv.memberships);
-        if (latest) {
-            openMembershipDetailFromRow(latest, { id: adv.id, name: adv.name });
-        } else {
-            setMembershipModalAdvisorId(adv.id);
-            setModalCreateMembership(true);
-        }
+    /** Nueva membresía para el vendedor; el detalle de la última anual se abre desde la celda de suscripción. */
+    const openCreateMembershipForAdvisor = (adv: Advisor) => {
+        setMembershipModalAdvisorId(adv.id);
+        setModalCreateMembership(true);
     };
 
     return (
@@ -514,12 +510,8 @@ export default function AdvisorsIndex({
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 text-slate-400 hover:text-emerald-700"
-                                                title={
-                                                    getLatestAnnualMembership(adv.memberships)
-                                                        ? 'Editar membresía anual (última)'
-                                                        : 'Agregar membresía'
-                                                }
-                                                onClick={() => openMembershipForAdvisorRow(adv)}
+                                                title="Nueva membresía (este vendedor)"
+                                                onClick={() => openCreateMembershipForAdvisor(adv)}
                                             >
                                                 <CalendarDays className="h-4 w-4" />
                                             </Button>

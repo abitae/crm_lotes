@@ -66,10 +66,12 @@ class AdvisorMembershipController extends Controller
     public function update(UpdateAdvisorMembershipRequest $request, AdvisorMembership $advisor_membership): RedirectResponse
     {
         $validated = $request->validated();
+        $startDate = Carbon::parse($validated['start_date']);
         $data = [
             'amount' => $validated['amount'],
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
+            'year' => (int) $startDate->format('Y'),
         ];
         if (array_key_exists('membership_type_id', $validated) && $validated['membership_type_id'] !== null) {
             $data['membership_type_id'] = $validated['membership_type_id'];
