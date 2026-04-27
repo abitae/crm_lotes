@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
+import { advisorsListingQuerySuffix } from '@/lib/inmopro-listing-query';
 import { confirmDelete } from '@/lib/swal';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
@@ -707,6 +708,8 @@ function AdvisorExcelImportModal({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const inertiaPage = usePage();
+    const listQs = advisorsListingQuerySuffix(inertiaPage.url);
     const fileRef = useRef<HTMLInputElement>(null);
     const [dragActive, setDragActive] = useState(false);
     const [fileName, setFileName] = useState<string | null>(null);
@@ -817,7 +820,7 @@ function AdvisorExcelImportModal({
 
         setConfirming(true);
         router.post(
-            '/inmopro/advisors/import-confirm',
+            `/inmopro/advisors/import-confirm${listQs}`,
             { token: preview.token },
             {
                 onFinish: () => setConfirming(false),
@@ -1028,6 +1031,7 @@ function CreateAdvisorModal({
     cities: CityOption[];
     materialTypes: MaterialTypeRow[];
 }) {
+    const listQs = advisorsListingQuerySuffix(usePage().url);
     const { data, setData, post, processing, errors, reset } = useForm({
         dni: '',
         first_name: '',
@@ -1049,7 +1053,7 @@ function CreateAdvisorModal({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        post('/inmopro/advisors', { onSuccess: () => { reset(); onOpenChange(false); } });
+        post(`/inmopro/advisors${listQs}`, { onSuccess: () => { reset(); onOpenChange(false); } });
     };
 
     const updateMaterialRow = (index: number, patch: Partial<MaterialFormRow>) => {
@@ -1295,6 +1299,7 @@ function EditAdvisorModal({
     cities: CityOption[];
     materialTypes: MaterialTypeRow[];
 }) {
+    const listQs = advisorsListingQuerySuffix(usePage().url);
     const { data, setData, put, processing, errors } = useForm({
         dni: advisor.dni ?? '',
         first_name: advisor.first_name ?? advisor.name,
@@ -1316,7 +1321,7 @@ function EditAdvisorModal({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/inmopro/advisors/${advisor.id}`, { onSuccess: () => onOpenChange(false) });
+        put(`/inmopro/advisors/${advisor.id}${listQs}`, { onSuccess: () => onOpenChange(false) });
     };
 
     const updateMaterialRow = (index: number, patch: Partial<MaterialFormRow>) => {
@@ -1552,6 +1557,7 @@ function AdvisorCazadorAccessModal({
     onOpenChange: (open: boolean) => void;
     advisor: Advisor;
 }) {
+    const listQs = advisorsListingQuerySuffix(usePage().url);
     const { data, setData, put, processing, errors, reset } = useForm({
         username: advisor.username ?? '',
         pin: '',
@@ -1560,7 +1566,7 @@ function AdvisorCazadorAccessModal({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/inmopro/advisors/${advisor.id}/cazador-access`, {
+        put(`/inmopro/advisors/${advisor.id}/cazador-access${listQs}`, {
             preserveScroll: true,
             onSuccess: () => {
                 reset('pin', 'pin_confirmation');
@@ -1645,8 +1651,9 @@ function AdvisorMaterialsQuickModal({
     advisor: Advisor | null;
     materialTypes: MaterialTypeRow[];
 }) {
-    const page = usePage();
-    const pageErrors = ((page.props as { errors?: Record<string, string> }).errors ?? {}) as Record<string, string>;
+    const inertiaPage = usePage();
+    const listQs = advisorsListingQuerySuffix(inertiaPage.url);
+    const pageErrors = ((inertiaPage.props as { errors?: Record<string, string> }).errors ?? {}) as Record<string, string>;
 
     const addForm = useForm({
         advisor_material_type_id: (materialTypes[0]?.id ?? 0) as number,
@@ -1683,7 +1690,7 @@ function AdvisorMaterialsQuickModal({
         if (!advisor) {
             return;
         }
-        addForm.post(`/inmopro/advisors/${advisor.id}/material-items`, {
+        addForm.post(`/inmopro/advisors/${advisor.id}/material-items${listQs}`, {
             preserveScroll: true,
             onSuccess: () => {
                 router.reload({ only: ['advisors'] });
@@ -1862,6 +1869,7 @@ function CreateMembershipModal({
     }, [open, preselectedAdvisorId, advisorsList, setData]);
 
     const page = usePage();
+    const listQs = advisorsListingQuerySuffix(page.url);
     const pageErrors = ((page.props as { errors?: Record<string, string> }).errors ?? {}) as Record<string, string>;
     const selectedType = membershipTypes.find((t) => t.id === data.membership_type_id);
 
@@ -1905,7 +1913,7 @@ function CreateMembershipModal({
             amount: data.amount === '' ? null : String(data.amount),
         };
         setSubmitting(true);
-        router.post('/inmopro/advisor-memberships', payload, {
+        router.post(`/inmopro/advisor-memberships${listQs}`, payload, {
             onSuccess: () => {
                 reset();
                 onOpenChange(false);
@@ -2016,6 +2024,7 @@ function MembershipDetailModal({
     onOpenChange: (open: boolean) => void;
     detail: MembershipDetail;
 }) {
+    const listQs = advisorsListingQuerySuffix(usePage().url);
     const { membership, totalPaid, balanceDue, isPaid } = detail;
     const defaultDate = () => new Date().toISOString().slice(0, 10);
     const [editAmountOpen, setEditAmountOpen] = useState(false);
@@ -2052,7 +2061,7 @@ function MembershipDetailModal({
 
     const submitInstallment = (e: FormEvent) => {
         e.preventDefault();
-        installmentForm.post(`/inmopro/advisor-memberships/${membership.id}/installments`, {
+        installmentForm.post(`/inmopro/advisor-memberships/${membership.id}/installments${listQs}`, {
             onSuccess: () => {
                 installmentForm.reset();
                 installmentForm.setData('due_date', defaultDate());
@@ -2062,14 +2071,14 @@ function MembershipDetailModal({
 
     const submitPayment = (e: FormEvent) => {
         e.preventDefault();
-        paymentForm.post(`/inmopro/advisor-memberships/${membership.id}/payments`, {
+        paymentForm.post(`/inmopro/advisor-memberships/${membership.id}/payments${listQs}`, {
             onSuccess: () => paymentForm.reset('amount', 'paid_at', 'notes'),
         });
     };
 
     const handleDestroy = async () => {
         if (await confirmDelete(`¿Eliminar la membresía de ${membership.advisor?.name ?? 'este vendedor'} (${membership.year})? Se eliminarán también todos los abonos y cuotas.`)) {
-            router.delete(`/inmopro/advisor-memberships/${membership.id}`);
+            router.delete(`/inmopro/advisor-memberships/${membership.id}${listQs}`);
             onOpenChange(false);
         }
     };
@@ -2319,6 +2328,7 @@ function EditMembershipModal({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const listQs = advisorsListingQuerySuffix(usePage().url);
     const startDate = membership.start_date ? new Date(membership.start_date).toISOString().slice(0, 10) : '';
     const endDate = membership.end_date ? new Date(membership.end_date).toISOString().slice(0, 10) : '';
     const { data, setData, put, processing, errors } = useForm({
@@ -2329,7 +2339,7 @@ function EditMembershipModal({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/inmopro/advisor-memberships/${membership.id}`, { onSuccess: () => onOpenChange(false) });
+        put(`/inmopro/advisor-memberships/${membership.id}${listQs}`, { onSuccess: () => onOpenChange(false) });
     };
 
     return (

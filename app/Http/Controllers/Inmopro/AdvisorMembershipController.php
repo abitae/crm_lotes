@@ -10,19 +10,23 @@ use App\Http\Requests\Inmopro\UpdateAdvisorMembershipRequest;
 use App\Models\Inmopro\AdvisorMembership;
 use App\Models\Inmopro\MembershipType;
 use App\Services\Inmopro\MembershipReceivableService;
+use App\Support\InertiaListingRedirect;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class AdvisorMembershipController extends Controller
 {
-    public function index(): RedirectResponse
+    public function index(Request $request): RedirectResponse
     {
-        return redirect()->route('inmopro.advisors.index');
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request));
     }
 
-    public function create(): RedirectResponse
+    public function create(Request $request): RedirectResponse
     {
-        return redirect()->route('inmopro.advisors.index', ['modal' => 'create_membership']);
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
+            'modal' => 'create_membership',
+        ]));
     }
 
     public function store(StoreAdvisorMembershipRequest $request): RedirectResponse
@@ -45,22 +49,22 @@ class AdvisorMembershipController extends Controller
         ]);
 
         return redirect()
-            ->route('inmopro.advisors.index')
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))
             ->with('success', 'Membresía registrada. Cree las cuotas manualmente y registre abonos asignados a cada cuota.');
     }
 
-    public function show(AdvisorMembership $advisor_membership): RedirectResponse
+    public function show(Request $request, AdvisorMembership $advisor_membership): RedirectResponse
     {
-        return redirect()->route('inmopro.advisors.index', [
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
             'membership_id' => $advisor_membership->id,
-        ]);
+        ]));
     }
 
-    public function edit(AdvisorMembership $advisor_membership): RedirectResponse
+    public function edit(Request $request, AdvisorMembership $advisor_membership): RedirectResponse
     {
-        return redirect()->route('inmopro.advisors.index', [
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
             'membership_id' => $advisor_membership->id,
-        ]);
+        ]));
     }
 
     public function update(UpdateAdvisorMembershipRequest $request, AdvisorMembership $advisor_membership): RedirectResponse
@@ -79,16 +83,18 @@ class AdvisorMembershipController extends Controller
         $advisor_membership->update($data);
 
         return redirect()
-            ->route('inmopro.advisors.index', ['membership_id' => $advisor_membership->id])
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
+                'membership_id' => $advisor_membership->id,
+            ]))
             ->with('success', 'Membresía actualizada.');
     }
 
-    public function destroy(AdvisorMembership $advisor_membership): RedirectResponse
+    public function destroy(Request $request, AdvisorMembership $advisor_membership): RedirectResponse
     {
         $advisor_membership->delete();
 
         return redirect()
-            ->route('inmopro.advisors.index')
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))
             ->with('success', 'Membresía eliminada.');
     }
 
@@ -102,7 +108,9 @@ class AdvisorMembershipController extends Controller
 
         if ($advisor_membership->installments()->where('sequence', $sequence)->exists()) {
             return redirect()
-                ->route('inmopro.advisors.index', ['membership_id' => $advisor_membership->id])
+                ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
+                    'membership_id' => $advisor_membership->id,
+                ]))
                 ->withErrors(['sequence' => 'Ya existe una cuota con ese número.']);
         }
 
@@ -119,7 +127,9 @@ class AdvisorMembershipController extends Controller
         ]);
 
         return redirect()
-            ->route('inmopro.advisors.index', ['membership_id' => $advisor_membership->id])
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
+                'membership_id' => $advisor_membership->id,
+            ]))
             ->with('success', 'Cuota registrada. Puede registrar abonos contra cuotas con saldo pendiente.');
     }
 
@@ -130,7 +140,9 @@ class AdvisorMembershipController extends Controller
         $receivableService->recordPayment($advisor_membership, $validated);
 
         return redirect()
-            ->route('inmopro.advisors.index', ['membership_id' => $advisor_membership->id])
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
+                'membership_id' => $advisor_membership->id,
+            ]))
             ->with('success', 'Abono registrado correctamente.');
     }
 }

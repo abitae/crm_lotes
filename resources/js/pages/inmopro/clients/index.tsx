@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Download, Eye, FileSpreadsheet, Mail, Phone, Search, UserPlus, Users } from 'lucide-react';
 import { useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Pagination, { type PaginationLink } from '@/components/pagination';
+import { clientsListingQuerySuffix } from '@/lib/inmopro-listing-query';
 import type { BreadcrumbItem } from '@/types';
 
 type Client = {
@@ -42,6 +43,7 @@ export default function ClientsIndex({
     const clientsWithEmail = clients.data.filter((client) => Boolean(client.email)).length;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [importing, setImporting] = useState(false);
+    const listQs = clientsListingQuerySuffix(usePage().url);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -74,7 +76,7 @@ export default function ClientsIndex({
         const formData = new FormData();
         formData.append('file', input.files[0]);
 
-        router.post('/inmopro/clients/import-from-excel', formData, {
+        router.post(`/inmopro/clients/import-from-excel${listQs}`, formData, {
             forceFormData: true,
             onFinish: () => {
                 setImporting(false);
@@ -141,7 +143,7 @@ export default function ClientsIndex({
                             </Button>
                         </form>
                         <Button size="sm" asChild>
-                            <Link href="/inmopro/clients/create">
+                            <Link href={`/inmopro/clients/create${listQs}`}>
                                 <UserPlus className="h-4 w-4" />
                                 Nuevo cliente
                             </Link>
@@ -217,7 +219,7 @@ export default function ClientsIndex({
                                 <p className="mt-4 font-medium text-slate-700">Sin coincidencias</p>
                                 <p className="mt-1 text-sm text-slate-500">No hay clientes con los criterios de busqueda.</p>
                                 <Button className="mt-4" variant="outline" asChild>
-                                    <Link href="/inmopro/clients/create">Nuevo cliente</Link>
+                                    <Link href={`/inmopro/clients/create${listQs}`}>Nuevo cliente</Link>
                                 </Button>
                             </div>
                         ) : (
@@ -277,7 +279,7 @@ export default function ClientsIndex({
                                                     <td className="px-4 py-3 text-right tabular-nums text-slate-600">{client.lots_count ?? 0}</td>
                                                     <td className="px-4 py-3 text-right">
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                                            <Link href={`/inmopro/clients/${client.id}`} title="Ver">
+                                                            <Link href={`/inmopro/clients/${client.id}${listQs}`} title="Ver">
                                                                 <Eye className="h-4 w-4" />
                                                             </Link>
                                                         </Button>

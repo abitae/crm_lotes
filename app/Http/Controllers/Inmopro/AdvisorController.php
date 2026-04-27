@@ -20,6 +20,7 @@ use App\Models\Inmopro\City;
 use App\Models\Inmopro\MembershipType;
 use App\Models\Inmopro\Team;
 use App\Services\Inmopro\AdvisorsExcelImportService;
+use App\Support\InertiaListingRedirect;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -65,12 +66,12 @@ class AdvisorController extends Controller
             $importService->confirm($request->validated('token'), $request->user());
         } catch (RuntimeException $e) {
             return redirect()
-                ->route('inmopro.advisors.index')
+                ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))
                 ->with('error', $e->getMessage());
         }
 
         return redirect()
-            ->route('inmopro.advisors.index')
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))
             ->with('success', 'Importación de vendedores completada correctamente.');
     }
 
@@ -221,9 +222,11 @@ class AdvisorController extends Controller
         }
     }
 
-    public function create(): RedirectResponse
+    public function create(Request $request): RedirectResponse
     {
-        return redirect()->route('inmopro.advisors.index', ['modal' => 'create_advisor']);
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
+            'modal' => 'create_advisor',
+        ]));
     }
 
     public function store(StoreAdvisorRequest $request): RedirectResponse
@@ -239,17 +242,23 @@ class AdvisorController extends Controller
         $advisor = Advisor::create($validated);
         $this->syncAdvisorMaterialItems($advisor, $materialItems);
 
-        return redirect()->route('inmopro.advisors.index')->with('success', 'Vendedor registrado correctamente.');
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))->with('success', 'Vendedor registrado correctamente.');
     }
 
-    public function show(Advisor $advisor): RedirectResponse
+    public function show(Request $request, Advisor $advisor): RedirectResponse
     {
-        return redirect()->route('inmopro.advisors.index', ['modal' => 'edit_advisor', 'advisor_id' => $advisor->id]);
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
+            'modal' => 'edit_advisor',
+            'advisor_id' => $advisor->id,
+        ]));
     }
 
-    public function edit(Advisor $advisor): RedirectResponse
+    public function edit(Request $request, Advisor $advisor): RedirectResponse
     {
-        return redirect()->route('inmopro.advisors.index', ['modal' => 'edit_advisor', 'advisor_id' => $advisor->id]);
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQueryMerged($request, [
+            'modal' => 'edit_advisor',
+            'advisor_id' => $advisor->id,
+        ]));
     }
 
     public function update(UpdateAdvisorRequest $request, Advisor $advisor): RedirectResponse
@@ -268,7 +277,7 @@ class AdvisorController extends Controller
         $advisor->update($validated);
         $this->syncAdvisorMaterialItems($advisor->fresh(), $materialItems);
 
-        return redirect()->route('inmopro.advisors.index');
+        return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request));
     }
 
     public function updateCazadorAccess(UpdateAdvisorCazadorAccessRequest $request, Advisor $advisor): RedirectResponse
@@ -290,7 +299,7 @@ class AdvisorController extends Controller
         }
 
         return redirect()
-            ->route('inmopro.advisors.index')
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))
             ->with('success', 'Usuario y acceso Cazador actualizados. Si cambió el PIN o el usuario, el vendedor debe iniciar sesión de nuevo en la app.');
     }
 
@@ -299,7 +308,7 @@ class AdvisorController extends Controller
         $this->syncAdvisorMaterialItems($advisor, $request->validated('material_items'));
 
         return redirect()
-            ->route('inmopro.advisors.index')
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))
             ->with('success', 'Materiales del vendedor actualizados.');
     }
 
@@ -322,7 +331,7 @@ class AdvisorController extends Controller
         ]);
 
         return redirect()
-            ->route('inmopro.advisors.index')
+            ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))
             ->with('success', 'Entrega de material registrada.');
     }
 

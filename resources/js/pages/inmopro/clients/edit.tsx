@@ -1,10 +1,11 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { FormEvent } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
+import { clientsListingQuerySuffix } from '@/lib/inmopro-listing-query';
 import type { BreadcrumbItem } from '@/types';
 
 type ClientType = { id: number; name: string; color?: string };
@@ -33,6 +34,7 @@ export default function ClientsEdit({
     cities: City[];
     advisors: Advisor[];
 }) {
+    const listQs = clientsListingQuerySuffix(usePage().url);
     const { data, setData, put, processing, errors } = useForm({
         name: client.name,
         dni: client.dni,
@@ -52,7 +54,7 @@ export default function ClientsEdit({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/inmopro/clients/${client.id}`);
+        put(`/inmopro/clients/${client.id}${listQs}`);
     };
 
     return (

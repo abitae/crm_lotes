@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { FormEvent } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
+import { clientsListingQuerySuffix } from '@/lib/inmopro-listing-query';
 import type { BreadcrumbItem } from '@/types';
 
 type ClientType = { id: number; name: string; color?: string };
@@ -21,6 +22,7 @@ export default function ClientsCreate({
     cities: City[];
     advisors: Advisor[];
 }) {
+    const listQs = clientsListingQuerySuffix(usePage().url);
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         dni: '',
@@ -40,7 +42,7 @@ export default function ClientsCreate({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        post('/inmopro/clients');
+        post(`/inmopro/clients${listQs}`);
     };
 
     return (
