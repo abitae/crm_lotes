@@ -629,6 +629,7 @@ export default function AdvisorsIndex({
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Team</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Ciudad</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Superior</th>
+                                    <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Nacimiento</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Ingreso</th>
                                     <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Cuota</th>
                                     <th className="px-3 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -669,6 +670,15 @@ export default function AdvisorsIndex({
                                             ) : null}
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{adv.superior?.name ?? 'Alta Gerencia'}</td>
+                                        <td className="px-4 py-3 text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                                            {adv.birth_date
+                                                ? new Date(String(adv.birth_date).slice(0, 10)).toLocaleDateString('es-PE', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                  })
+                                                : '—'}
+                                        </td>
                                         <td className="px-4 py-3 text-xs text-slate-600 tabular-nums">
                                             {adv.joined_at
                                                 ? new Date(String(adv.joined_at).slice(0, 10)).toLocaleDateString('es-PE', {
