@@ -28,6 +28,12 @@ final class InertiaListingRedirect
             'membership_id',
             'modal',
             'advisor_id',
+            'joined_from',
+            'joined_to',
+            'birthday_from',
+            'birthday_to',
+            'birthdays_upcoming',
+            'subscriptions_expiring',
         ]);
     }
 

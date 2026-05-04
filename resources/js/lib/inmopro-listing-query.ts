@@ -9,6 +9,12 @@ const ADVISORS_LIST_KEYS = [
     'membership_id',
     'modal',
     'advisor_id',
+    'joined_from',
+    'joined_to',
+    'birthday_from',
+    'birthday_to',
+    'birthdays_upcoming',
+    'subscriptions_expiring',
 ] as const;
 
 function listingQuerySuffix(url: string, allowedKeys: readonly string[]): string {

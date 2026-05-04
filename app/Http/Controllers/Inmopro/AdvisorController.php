@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -164,6 +165,24 @@ class AdvisorController extends Controller
             ])->find($request->input('advisor_id'));
         }
 
+        $today = Carbon::now()->startOfDay();
+        $cutoff = $today->copy()->addDays(30);
+
+        $birthdaysUpcoming = Advisor::query()
+            ->whereNotNull('birth_date')
+            ->tap(fn (Builder $q) => $this->applyBirthdayWindow($q, $today, $cutoff))
+            ->count();
+
+        $subscriptionsExpiring = Advisor::query()
+            ->whereExists(function ($q) use ($today, $cutoff): void {
+                $q->select(DB::raw(1))
+                    ->from('advisor_memberships')
+                    ->whereColumn('advisor_memberships.advisor_id', 'advisors.id')
+                    ->whereNotNull('end_date')
+                    ->whereBetween('end_date', [$today->toDateString(), $cutoff->toDateString()]);
+            })
+            ->count();
+
         return Inertia::render('inmopro/advisors/index', [
             'advisors' => $advisors,
             'advisorLevels' => $advisorLevels,
@@ -175,7 +194,20 @@ class AdvisorController extends Controller
             'membershipDetail' => $membershipDetail,
             'advisorForModal' => $advisorForModal,
             'openModal' => $request->input('modal'),
-            'filters' => $request->only('search', 'advisor_level_id', 'team_id', 'membership_pending'),
+            'birthdaysUpcoming' => $birthdaysUpcoming,
+            'subscriptionsExpiring' => $subscriptionsExpiring,
+            'filters' => $request->only(
+                'search',
+                'advisor_level_id',
+                'team_id',
+                'membership_pending',
+                'joined_from',
+                'joined_to',
+                'birthday_from',
+                'birthday_to',
+                'birthdays_upcoming',
+                'subscriptions_expiring',
+            ),
         ]);
     }
 
@@ -220,6 +252,100 @@ class AdvisorController extends Controller
                 )'
             );
         }
+
+        $joinedFrom = $this->parseDateInput($request->input('joined_from'));
+        $joinedTo = $this->parseDateInput($request->input('joined_to'));
+        if ($joinedFrom) {
+            $query->whereDate('joined_at', '>=', $joinedFrom->toDateString());
+        }
+        if ($joinedTo) {
+            $query->whereDate('joined_at', '<=', $joinedTo->toDateString());
+        }
+
+        $birthdayFromRaw = $request->input('birthday_from');
+        $birthdayToRaw = $request->input('birthday_to');
+        $birthdayFrom = $this->parseDateInput($birthdayFromRaw);
+        $birthdayTo = $this->parseDateInput($birthdayToRaw);
+        if ($birthdayFrom || $birthdayTo) {
+            $fromMmDd = $birthdayFrom ? $birthdayFrom->format('m-d') : '01-01';
+            $toMmDd = $birthdayTo ? $birthdayTo->format('m-d') : '12-31';
+            $query->whereNotNull('birth_date');
+            $this->applyMmDdRange($query, $fromMmDd, $toMmDd);
+        }
+
+        if ($request->boolean('birthdays_upcoming')) {
+            $today = Carbon::now()->startOfDay();
+            $cutoff = $today->copy()->addDays(30);
+            $query->whereNotNull('birth_date');
+            $this->applyBirthdayWindow($query, $today, $cutoff);
+        }
+
+        if ($request->boolean('subscriptions_expiring')) {
+            $today = Carbon::now()->startOfDay();
+            $cutoff = $today->copy()->addDays(30);
+            $query->whereExists(function ($q) use ($today, $cutoff): void {
+                $q->select(DB::raw(1))
+                    ->from('advisor_memberships')
+                    ->whereColumn('advisor_memberships.advisor_id', 'advisors.id')
+                    ->whereNotNull('end_date')
+                    ->whereBetween('end_date', [$today->toDateString(), $cutoff->toDateString()]);
+            });
+        }
+    }
+
+    /**
+     * Convierte una entrada de fecha (string) en Carbon o null si está vacía/inválida.
+     */
+    private function parseDateInput(mixed $value): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Devuelve la expresión SQL portable para extraer 'MM-DD' de una columna fecha.
+     */
+    private function mmDdExpression(Builder $query, string $column): string
+    {
+        $driver = $query->getConnection()->getDriverName();
+
+        return $driver === 'sqlite'
+            ? "strftime('%m-%d', {$column})"
+            : "DATE_FORMAT({$column}, '%m-%d')";
+    }
+
+    /**
+     * Aplica un filtro por rango de cumpleaños (MM-DD), soportando cruce de fin de año.
+     */
+    private function applyMmDdRange(Builder $query, string $fromMmDd, string $toMmDd): void
+    {
+        $expr = $this->mmDdExpression($query, 'birth_date');
+
+        if ($fromMmDd <= $toMmDd) {
+            $query->whereRaw("{$expr} BETWEEN ? AND ?", [$fromMmDd, $toMmDd]);
+
+            return;
+        }
+
+        $query->where(function ($q) use ($expr, $fromMmDd, $toMmDd): void {
+            $q->whereRaw("{$expr} >= ?", [$fromMmDd])
+                ->orWhereRaw("{$expr} <= ?", [$toMmDd]);
+        });
+    }
+
+    /**
+     * Filtra vendedores cuyo cumpleaños (MM-DD) cae entre $today y $cutoff.
+     */
+    private function applyBirthdayWindow(Builder $query, Carbon $today, Carbon $cutoff): void
+    {
+        $this->applyMmDdRange($query, $today->format('m-d'), $cutoff->format('m-d'));
     }
 
     public function create(Request $request): RedirectResponse
