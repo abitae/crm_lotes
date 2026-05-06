@@ -3,6 +3,8 @@
 ## Resumen
 `Cazador` es el API para vendedores. El acceso es solo para `advisors` y usa autenticacion por token propio.
 
+Catálogo público de proyectos (sin token, para web): [API_WEB.md](./API_WEB.md).
+
 Análisis de arquitectura y reglas de negocio: [ANALISIS_API_CAZADOR.md](./ANALISIS_API_CAZADOR.md).
 
 Prompt maestro para Cursor (app **React Native** contra este API): [PROMPT_CURSOR_REACT_NATIVE_CAZADOR.md](./PROMPT_CURSOR_REACT_NATIVE_CAZADOR.md).

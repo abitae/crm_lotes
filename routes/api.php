@@ -15,7 +15,14 @@ use App\Http\Controllers\Api\v1\Datero\AuthController as DateroAuthController;
 use App\Http\Controllers\Api\v1\Datero\CityController as DateroCityController;
 use App\Http\Controllers\Api\v1\Datero\ClientController as DateroClientController;
 use App\Http\Controllers\Api\v1\Datero\ProfileController as DateroProfileController;
+use App\Http\Controllers\Api\v1\Web\WebController;
 use Illuminate\Support\Facades\Route;
+
+Route::prefix('v1/web')->name('api.v1.web.')->middleware('throttle:120,1')->group(function (): void {
+    Route::get('projects', [WebController::class, 'index'])->name('projects.index');
+    Route::get('projects/{project}', [WebController::class, 'show'])->name('projects.show');
+    Route::get('projects/{project}/assets/{asset}', [WebController::class, 'asset'])->name('projects.assets.show');
+});
 
 Route::prefix('v1/cazador')->name('api.v1.cazador.')->group(function (): void {
     Route::post('auth/login', [AuthController::class, 'login'])
