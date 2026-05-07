@@ -3,15 +3,17 @@
 namespace App\Http\Controllers\Inmopro;
 
 use App\Exports\Inmopro\ClientsExport;
+use App\Exports\Inmopro\ClientsTemplateExport;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Inmopro\ImportClientsFromExcelRequest;
+use App\Http\Requests\Inmopro\ImportClientsConfirmRequest;
+use App\Http\Requests\Inmopro\ImportClientsPreviewRequest;
 use App\Http\Requests\Inmopro\StoreClientRequest;
 use App\Http\Requests\Inmopro\UpdateClientRequest;
-use App\Imports\Inmopro\ClientsImport;
 use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\City;
 use App\Models\Inmopro\Client;
 use App\Models\Inmopro\ClientType;
+use App\Services\Inmopro\ClientsExcelImportService;
 use App\Support\InertiaListingRedirect;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +21,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ClientController extends Controller
@@ -98,11 +101,36 @@ class ClientController extends Controller
         );
     }
 
-    public function importFromExcel(ImportClientsFromExcelRequest $request): RedirectResponse
+    public function excelTemplate(): BinaryFileResponse
     {
-        Excel::import(new ClientsImport, $request->file('file'));
+        return Excel::download(
+            new ClientsTemplateExport,
+            'plantilla_clientes.xlsx'
+        );
+    }
 
-        return redirect()->route('inmopro.clients.index', InertiaListingRedirect::clientsIndexQuery($request));
+    public function importPreview(ImportClientsPreviewRequest $request, ClientsExcelImportService $importService): JsonResponse
+    {
+        return response()->json(
+            $importService->preview($request->file('file'))
+        );
+    }
+
+    public function importConfirm(
+        ImportClientsConfirmRequest $request,
+        ClientsExcelImportService $importService
+    ): RedirectResponse {
+        try {
+            $importService->confirm($request->validated('token'), $request->user());
+        } catch (RuntimeException $e) {
+            return redirect()
+                ->route('inmopro.clients.index', InertiaListingRedirect::clientsIndexQuery($request))
+                ->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('inmopro.clients.index', InertiaListingRedirect::clientsIndexQuery($request))
+            ->with('success', 'Clientes importados correctamente.');
     }
 
     public function create(): Response

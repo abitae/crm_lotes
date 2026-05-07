@@ -1,12 +1,15 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Download, Eye, FileSpreadsheet, Mail, Phone, Search, UserPlus, Users } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Download, Eye, FileSpreadsheet, Mail, Phone, Search, Upload, UserPlus, Users } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Pagination, { type PaginationLink } from '@/components/pagination';
 import { clientsListingQuerySuffix } from '@/lib/inmopro-listing-query';
+import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
 type Client = {
@@ -25,6 +28,31 @@ type Option = {
     name: string;
 };
 
+type ClientImportPreviewRow = {
+    excel_row: number;
+    name: string | null;
+    dni: string | null;
+    phone: string | null;
+    email: string | null;
+    client_type: string | null;
+    city: string | null;
+    advisor: string | null;
+    action: 'create' | 'update';
+    errors: string[];
+};
+
+type ClientImportPreviewResponse = {
+    summary: {
+        rows_read: number;
+        valid: number;
+        invalid: number;
+    };
+    rows: ClientImportPreviewRow[];
+    errors: Array<{ excel_row: number; field: string; message: string }>;
+    token: string | null;
+    can_import: boolean;
+};
+
 export default function ClientsIndex({
     clients,
     filters,
@@ -41,8 +69,7 @@ export default function ClientsIndex({
     const totalClients = clients.total ?? clients.data.length;
     const clientsWithLots = clients.data.filter((client) => (client.lots_count ?? 0) > 0).length;
     const clientsWithEmail = clients.data.filter((client) => Boolean(client.email)).length;
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [importing, setImporting] = useState(false);
+    const [importModalOpen, setImportModalOpen] = useState(false);
     const listQs = clientsListingQuerySuffix(usePage().url);
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -62,27 +89,6 @@ export default function ClientsIndex({
             city_id: (formData.get('city_id') as string) || undefined,
             advisor_id: (formData.get('advisor_id') as string) || undefined,
         }, { preserveState: true });
-    };
-
-    const handleImportSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const input = fileInputRef.current;
-
-        if (!input?.files?.length) {
-            return;
-        }
-
-        setImporting(true);
-        const formData = new FormData();
-        formData.append('file', input.files[0]);
-
-        router.post(`/inmopro/clients/import-from-excel${listQs}`, formData, {
-            forceFormData: true,
-            onFinish: () => {
-                setImporting(false);
-                input.value = '';
-            },
-        });
     };
 
     const exportQuery = new URLSearchParams();
@@ -118,30 +124,16 @@ export default function ClientsIndex({
                                 Exportar Excel
                             </a>
                         </Button>
-                        <form onSubmit={handleImportSubmit}>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".xlsx,.xls"
-                                className="hidden"
-                                onChange={(e) => {
-                                    if (e.target.files?.length) {
-                                        (e.target.form as HTMLFormElement).requestSubmit();
-                                    }
-                                }}
-                            />
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={importing}
-                            >
-                                <FileSpreadsheet className="h-4 w-4" />
-                                {importing ? 'Importando...' : 'Importar Excel'}
-                            </Button>
-                        </form>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            onClick={() => setImportModalOpen(true)}
+                        >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Importar Excel
+                        </Button>
                         <Button size="sm" asChild>
                             <Link href={`/inmopro/clients/create${listQs}`}>
                                 <UserPlus className="h-4 w-4" />
@@ -297,7 +289,307 @@ export default function ClientsIndex({
                     </CardContent>
                 </Card>
             </div>
+
+            <ClientsImportModal open={importModalOpen} onOpenChange={setImportModalOpen} listQs={listQs} />
         </AppLayout>
+    );
+}
+
+function ClientsImportModal({
+    open,
+    onOpenChange,
+    listQs,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    listQs: string;
+}) {
+    const fileRef = useRef<HTMLInputElement>(null);
+    const [fileName, setFileName] = useState<string | null>(null);
+    const [dragActive, setDragActive] = useState(false);
+    const [loadingPreview, setLoadingPreview] = useState(false);
+    const [confirming, setConfirming] = useState(false);
+    const [fetchError, setFetchError] = useState<string | null>(null);
+    const [preview, setPreview] = useState<ClientImportPreviewResponse | null>(null);
+
+    const reset = (): void => {
+        setFileName(null);
+        setDragActive(false);
+        setLoadingPreview(false);
+        setConfirming(false);
+        setFetchError(null);
+        setPreview(null);
+        if (fileRef.current) {
+            fileRef.current.value = '';
+        }
+    };
+
+    useEffect(() => {
+        if (!open) {
+            reset();
+        }
+    }, [open]);
+
+    const assignFile = (file: File | undefined): void => {
+        if (!file) {
+            setFileName(null);
+            setPreview(null);
+
+            return;
+        }
+
+        const lower = file.name.toLowerCase();
+        if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) {
+            setFetchError('Solo se aceptan archivos Excel (.xlsx o .xls).');
+
+            return;
+        }
+
+        const input = fileRef.current;
+        if (!input) {
+            return;
+        }
+
+        try {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+        } catch {
+            setFetchError('No se pudo asignar el archivo. Use el selector manual.');
+
+            return;
+        }
+
+        setFetchError(null);
+        setPreview(null);
+        setFileName(file.name);
+    };
+
+    const runPreview = async (): Promise<void> => {
+        const input = fileRef.current;
+
+        if (!input?.files?.length) {
+            setFetchError('Seleccione un archivo Excel antes de validar.');
+
+            return;
+        }
+
+        setLoadingPreview(true);
+        setFetchError(null);
+
+        const fd = new FormData();
+        fd.append('file', input.files[0]);
+
+        try {
+            const res = await fetch('/inmopro/clients/import-preview', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': getXsrfTokenFromCookie(),
+                },
+                body: fd,
+                credentials: 'same-origin',
+            });
+
+            const body = (await res.json()) as ClientImportPreviewResponse & {
+                message?: string;
+                errors?: Record<string, string[]>;
+            };
+
+            if (!res.ok) {
+                const firstFieldError = Object.values(body.errors ?? {}).flat()[0];
+                setFetchError(firstFieldError ?? body.message ?? 'No se pudo validar el archivo.');
+
+                return;
+            }
+
+            setPreview(body);
+        } catch {
+            setFetchError('Error de red al validar el archivo. Intente de nuevo.');
+        } finally {
+            setLoadingPreview(false);
+        }
+    };
+
+    const confirmImport = (): void => {
+        if (!preview?.token || !preview.can_import) {
+            return;
+        }
+
+        setConfirming(true);
+        router.post(
+            `/inmopro/clients/import-confirm${listQs}`,
+            { token: preview.token },
+            {
+                onFinish: () => setConfirming(false),
+                onSuccess: () => onOpenChange(false),
+            }
+        );
+    };
+
+    const rows = preview?.rows ?? [];
+    const errors = preview?.errors ?? [];
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="flex max-h-[92vh] w-[min(100vw-1.5rem,68rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:w-[min(100vw-2rem,68rem)]">
+                <div className="border-b border-slate-100 px-6 py-4">
+                    <DialogHeader className="space-y-1 text-left">
+                        <DialogTitle>Importar clientes desde Excel</DialogTitle>
+                        <DialogDescription className="text-left">
+                            Descargue la plantilla, cargue el archivo, revise la validacion y confirme solo si no hay errores.
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                    <input ref={fileRef} type="file" accept=".xlsx,.xls" className="sr-only" tabIndex={-1} onChange={(e) => assignFile(e.target.files?.[0])} />
+
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="space-y-2 text-sm text-slate-700">
+                                <p className="text-[11px] font-black uppercase tracking-widest text-emerald-700">Plantilla oficial</p>
+                                <p>Use las columnas: Nombre, DNI, Telefono, Email, Referido por, Tipo cliente, Ciudad y Asesor.</p>
+                                <p>La importacion validara referencias, duplicados y filas incompletas antes de confirmar.</p>
+                            </div>
+                            <Button type="button" asChild className="shrink-0 bg-emerald-600 hover:bg-emerald-700">
+                                <a href="/inmopro/clients/excel-template" download>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Descargar plantilla
+                                </a>
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label>Archivo Excel</Label>
+                        <button
+                            type="button"
+                            onClick={() => fileRef.current?.click()}
+                            onDragEnter={(e) => {
+                                e.preventDefault();
+                                setDragActive(true);
+                            }}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                setDragActive(true);
+                            }}
+                            onDragLeave={(e) => {
+                                e.preventDefault();
+                                if (e.currentTarget === e.target) {
+                                    setDragActive(false);
+                                }
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                setDragActive(false);
+                                assignFile(e.dataTransfer.files?.[0]);
+                            }}
+                            className={cn(
+                                'mt-2 flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-colors',
+                                dragActive ? 'border-emerald-500 bg-emerald-50/80 text-emerald-900' : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:border-slate-300 hover:bg-slate-50',
+                            )}
+                        >
+                            <Upload className="h-9 w-9 opacity-70" aria-hidden />
+                            <span className="text-sm font-semibold">
+                                Arrastre el archivo aqui o <span className="text-emerald-700 underline underline-offset-2">seleccionelo manualmente</span>
+                            </span>
+                            <span className="text-xs text-slate-500">{fileName ?? 'No hay archivo seleccionado'}</span>
+                        </button>
+                    </div>
+
+                    {fetchError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{fetchError}</div> : null}
+
+                    {preview ? (
+                        <div className="space-y-4">
+                            <div className="grid gap-3 md:grid-cols-3">
+                                <ImportMetric label="Filas leidas" value={String(preview.summary.rows_read)} />
+                                <ImportMetric label="Validas" value={String(preview.summary.valid)} tone="emerald" />
+                                <ImportMetric label="Con error" value={String(preview.summary.invalid)} tone={preview.summary.invalid > 0 ? 'rose' : 'slate'} />
+                            </div>
+
+                            {errors.length > 0 ? (
+                                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                                    <p className="text-sm font-semibold text-rose-800">Errores detectados</p>
+                                    <div className="mt-2 space-y-1 text-sm text-rose-700">
+                                        {errors.slice(0, 12).map((error, index) => (
+                                            <p key={`${error.excel_row}-${index}`}>
+                                                Fila {error.excel_row}: {error.message}
+                                            </p>
+                                        ))}
+                                        {errors.length > 12 ? <p>...y {errors.length - 12} error(es) mas.</p> : null}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-slate-50 text-left text-slate-600">
+                                            <th className="px-4 py-3">Fila</th>
+                                            <th className="px-4 py-3">Nombre</th>
+                                            <th className="px-4 py-3">DNI</th>
+                                            <th className="px-4 py-3">Telefono</th>
+                                            <th className="px-4 py-3">Tipo</th>
+                                            <th className="px-4 py-3">Asesor</th>
+                                            <th className="px-4 py-3">Accion</th>
+                                            <th className="px-4 py-3">Resultado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {rows.map((row) => (
+                                            <tr key={row.excel_row} className="align-top">
+                                                <td className="px-4 py-3 font-medium text-slate-900">{row.excel_row}</td>
+                                                <td className="px-4 py-3 text-slate-700">{row.name ?? '-'}</td>
+                                                <td className="px-4 py-3 text-slate-700">{row.dni ?? '-'}</td>
+                                                <td className="px-4 py-3 text-slate-700">{row.phone ?? '-'}</td>
+                                                <td className="px-4 py-3 text-slate-700">{row.client_type ?? '-'}</td>
+                                                <td className="px-4 py-3 text-slate-700">{row.advisor ?? '-'}</td>
+                                                <td className="px-4 py-3 text-slate-700">{row.action === 'update' ? 'Actualizar' : 'Crear'}</td>
+                                                <td className="px-4 py-3">
+                                                    {row.errors.length === 0 ? (
+                                                        <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">OK</span>
+                                                    ) : (
+                                                        <div className="space-y-1 text-xs text-rose-700">
+                                                            {row.errors.map((error) => (
+                                                                <p key={error}>{error}</p>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {!preview.can_import ? (
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                                    Corrija los errores del archivo antes de continuar con la importacion.
+                                </div>
+                            ) : (
+                                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                                    La validacion termino correctamente. Puede confirmar la importacion.
+                                </div>
+                            )}
+                        </div>
+                    ) : null}
+                </div>
+
+                <DialogFooter className="border-t border-slate-100 px-6 py-4">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        Cerrar
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => void runPreview()} disabled={loadingPreview}>
+                        {loadingPreview ? 'Validando...' : 'Validar archivo'}
+                    </Button>
+                    <Button type="button" onClick={confirmImport} disabled={!preview?.can_import || !preview?.token || confirming}>
+                        {confirming ? 'Importando...' : 'Importar clientes'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -322,4 +614,34 @@ function SummaryCard({
             <p className={`mt-3 text-3xl font-black ${tones[tone]}`}>{value}</p>
         </div>
     );
+}
+
+function ImportMetric({
+    label,
+    value,
+    tone = 'slate',
+}: {
+    label: string;
+    value: string;
+    tone?: 'slate' | 'emerald' | 'rose';
+}) {
+    const tones = {
+        slate: 'text-slate-900',
+        emerald: 'text-emerald-600',
+        rose: 'text-rose-600',
+    };
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+            <p className={`mt-2 text-lg font-black ${tones[tone]}`}>{value}</p>
+        </div>
+    );
+}
+
+function getXsrfTokenFromCookie(): string {
+    const parts = document.cookie.split(';').map((part) => part.trim());
+    const xsrfPart = parts.find((part) => part.startsWith('XSRF-TOKEN='));
+
+    return xsrfPart ? decodeURIComponent(xsrfPart.slice('XSRF-TOKEN='.length)) : '';
 }

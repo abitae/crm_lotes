@@ -53,7 +53,8 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
     Route::middleware(['inmopro.permission'])->group(function (): void {
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('projects/excel-template', [ProjectController::class, 'excelTemplate'])->name('projects.excel-template');
-        Route::post('projects/import-from-excel', [ProjectController::class, 'importFromExcel'])->name('projects.import-from-excel');
+        Route::post('projects/import-preview', [ProjectController::class, 'importPreview'])->name('projects.import-preview');
+        Route::post('projects/import-confirm', [ProjectController::class, 'importConfirm'])->name('projects.import-confirm');
         Route::get('projects/{project}/assets/{asset}/download', [ProjectController::class, 'downloadAsset'])->name('projects.assets.download');
         Route::delete('projects/{project}/assets/{asset}', [ProjectController::class, 'destroyAsset'])->name('projects.assets.destroy');
         Route::resource('projects', ProjectController::class);
@@ -66,8 +67,10 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
             ->name('lots.ai-follow-up-suggestion');
         Route::resource('lots', LotController::class);
         Route::get('clients/search', [ClientController::class, 'search'])->name('clients.search');
+        Route::get('clients/excel-template', [ClientController::class, 'excelTemplate'])->name('clients.excel-template');
         Route::get('clients/export-excel', [ClientController::class, 'exportExcel'])->name('clients.export-excel');
-        Route::post('clients/import-from-excel', [ClientController::class, 'importFromExcel'])->name('clients.import-from-excel');
+        Route::post('clients/import-preview', [ClientController::class, 'importPreview'])->name('clients.import-preview');
+        Route::post('clients/import-confirm', [ClientController::class, 'importConfirm'])->name('clients.import-confirm');
         Route::resource('clients', ClientController::class);
         Route::resource('client-types', ClientTypeController::class)->parameters(['client-types' => 'client_type']);
         Route::resource('cities', CityController::class);

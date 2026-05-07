@@ -2,45 +2,42 @@
 
 namespace App\Exports\Inmopro;
 
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithTitle;
 
-/**
- * Plantilla Excel: proyecto (nombre, ubicación, manzanas) + filas de lotes con campos de reserva.
- */
-class ProjectWithLotsTemplateExport implements FromCollection
+class ProjectWithLotsTemplateExport implements FromArray, WithTitle
 {
     /**
-     * @return Collection<int, array<int, string|int|float|null>>
+     * @return array<int, array<int, string|int|float|null>>
      */
-    public function collection(): Collection
+    public function array(): array
     {
-        return collect([
-            ['Proyecto', 'Nombre', 'Ubicación', 'Manzanas'],
-            ['', 'Ejemplo Residencial Norte', 'Lima', 'A, B, C'],
-            [],
+        return [
             [
-                'Manzana',
-                'Número',
-                'Área',
-                'Precio',
-                'Observaciones',
-                'Estado',
-                'Nombre cliente',
-                'DNI cliente',
-                'Adelanto - separación',
-                'Monto restante',
-                'Fecha límite de pago',
-                'N° de operación S.',
-                'Fecha de contrato',
-                'Nº de contrato',
-                'Asesor',
+                'ITEM',
+                'NOMBRE CLIENTE',
+                'MZ',
+                'LOTE',
+                'AREA',
+                'MONTO',
+                'ADELANTO - SEPARACION',
+                'MONTO RESTANTE',
+                'FACTURACIÓN',
+                'DNI CLIENTE',
+                'FECHA LIMITE DE PAGO',
+                'ESTADO DE LOTE',
+                'N° DE OPERACIÓN S.',
+                'FECHA DE CONTRATO',
+                'NRO DE CONTRATO',
             ],
-            ['A', 1, 120, 25000, '', 'LIBRE', '', '', '', '', '', '', '', '', ''],
-            ['A', 2, 120, 25000, '', 'RESERVADO', 'Juan Pérez', '12345678', 5000, 20000, '2025-12-31', 'OP-001', '2025-02-01', 'CT-001', 'María García'],
-            ['A', 3, 150, 32000, '', 'LIBRE', '', '', '', '', '', '', '', '', ''],
-            ['B', 1, 120, 25000, '', 'LIBRE', '', '', '', '', '', '', '', '', ''],
-            ['B', 2, 120, 25000, '', 'RESERVADO', 'Ana López', '87654321', 3000, 22000, '2025-11-15', 'OP-002', '2025-01-15', 'CT-002', 'Carlos Ruiz'],
-        ]);
+            [1, '', 'A', 1, 91.92, 25900, '', 25900, '', '', '', 'LIBRE', '', '', ''],
+            [2, 'Cliente de ejemplo', 'A', 2, 95.73, 26900, 1000, 25900, '', '12345678', '2026-05-30', 'RESERVADO', 'YAPE + EFECTIVO', '2026-05-07', 'CT-001'],
+            [3, '', 'B', 1, 120.83, 33900, '', 33900, '', '', '', 'LIBRE', '', '', ''],
+        ];
+    }
+
+    public function title(): string
+    {
+        return 'PROYECTO_MODELO';
     }
 }

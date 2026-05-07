@@ -74,7 +74,11 @@ class InmoproClientsTest extends TestCase
             'city_id' => $city?->id,
         ]);
 
-        $response->assertRedirect(route('inmopro.clients.index'));
+        $response->assertRedirect(route('inmopro.clients.index', [
+            'client_type_id' => (string) $type->id,
+            'city_id' => (string) $city?->id,
+            'advisor_id' => (string) $advisor->id,
+        ]));
         $this->assertDatabaseHas('clients', [
             'name' => 'Nuevo Cliente Test',
             'dni' => '12345678',
@@ -104,6 +108,9 @@ class InmoproClientsTest extends TestCase
         $response->assertRedirect(route('inmopro.clients.index', [
             'page' => '2',
             'search' => 'Juan',
+            'client_type_id' => (string) $type->id,
+            'city_id' => (string) $city?->id,
+            'advisor_id' => (string) $advisor->id,
         ]));
     }
 
@@ -173,7 +180,11 @@ class InmoproClientsTest extends TestCase
             'city_id' => $client->city_id,
         ]);
 
-        $response->assertRedirect(route('inmopro.clients.index'));
+        $response->assertRedirect(route('inmopro.clients.index', [
+            'client_type_id' => (string) $client->client_type_id,
+            'city_id' => (string) $client->city_id,
+            'advisor_id' => (string) $client->advisor_id,
+        ]));
         $this->assertDatabaseHas('clients', [
             'id' => $client->id,
             'name' => 'Cliente Actualizado',
@@ -236,7 +247,7 @@ class InmoproClientsTest extends TestCase
         $response->assertDownload('clientes.xlsx');
     }
 
-    public function test_authenticated_users_can_import_clients_from_excel(): void
+    public function test_authenticated_users_can_preview_and_confirm_clients_import_from_excel(): void
     {
         $user = User::factory()->create();
         $type = ClientType::query()->firstOrFail();
@@ -249,8 +260,21 @@ class InmoproClientsTest extends TestCase
             ['Cliente Excel', '44556677', '987654321', 'excel@test.com', 'Campana digital', $type->name, $city->name, $advisor->name],
         ]);
 
-        $this->post(route('inmopro.clients.import-from-excel'), [
+        $previewResponse = $this->post(route('inmopro.clients.import-preview'), [
             'file' => $file,
+        ]);
+
+        $previewResponse
+            ->assertOk()
+            ->assertJsonPath('summary.valid', 1)
+            ->assertJsonPath('summary.invalid', 0)
+            ->assertJsonPath('can_import', true);
+
+        $token = $previewResponse->json('token');
+        $this->assertIsString($token);
+
+        $this->post(route('inmopro.clients.import-confirm'), [
+            'token' => $token,
         ])->assertRedirect(route('inmopro.clients.index'));
 
         $this->assertDatabaseHas('clients', [
@@ -261,6 +285,25 @@ class InmoproClientsTest extends TestCase
             'client_type_id' => $type->id,
             'city_id' => $city->id,
         ]);
+    }
+
+    public function test_clients_import_preview_reports_missing_required_fields(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $file = $this->makeClientsExcelFile([
+            ['Nombre', 'DNI', 'Telefono', 'Email', 'Referido por', 'Tipo cliente', 'Ciudad', 'Asesor'],
+            ['Cliente Invalido', '', '', 'correo-invalido', '', '', '', ''],
+        ]);
+
+        $this->post(route('inmopro.clients.import-preview'), [
+            'file' => $file,
+        ])
+            ->assertOk()
+            ->assertJsonPath('summary.valid', 0)
+            ->assertJsonPath('summary.invalid', 1)
+            ->assertJsonPath('can_import', false);
     }
 
     private function makeClientsExcelFile(array $rows): UploadedFile

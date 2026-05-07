@@ -4,15 +4,17 @@ namespace App\Http\Controllers\Inmopro;
 
 use App\Exports\Inmopro\ProjectWithLotsTemplateExport;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Inmopro\ImportProjectFromExcelRequest;
+use App\Http\Requests\Inmopro\ImportProjectConfirmRequest;
+use App\Http\Requests\Inmopro\ImportProjectPreviewRequest;
 use App\Http\Requests\Inmopro\StoreProjectRequest;
 use App\Http\Requests\Inmopro\UpdateProjectRequest;
-use App\Imports\Inmopro\ProjectWithLotsImport;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
 use App\Models\Inmopro\ProjectAsset;
 use App\Models\Inmopro\ProjectType;
+use App\Services\Inmopro\ProjectsExcelImportService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -236,21 +239,31 @@ class ProjectController extends Controller
         );
     }
 
-    public function importFromExcel(ImportProjectFromExcelRequest $request): RedirectResponse
+    public function importPreview(ImportProjectPreviewRequest $request, ProjectsExcelImportService $importService): JsonResponse
     {
-        $import = new ProjectWithLotsImport;
-        Excel::import($import, $request->file('file'));
+        return response()->json(
+            $importService->preview(
+                $request->file('file'),
+                (int) $request->validated('project_type_id'),
+                (string) $request->validated('location'),
+                $request->validated('name')
+            )
+        );
+    }
 
-        $project = $import->getProject();
-        if ($project) {
+    public function importConfirm(ImportProjectConfirmRequest $request, ProjectsExcelImportService $importService): RedirectResponse
+    {
+        try {
+            $project = $importService->confirm($request->validated('token'), $request->user());
+        } catch (RuntimeException $e) {
             return redirect()
-                ->route('inmopro.projects.show', $project)
-                ->with('success', 'Proyecto y lotes importados correctamente.');
+                ->route('inmopro.projects.index')
+                ->with('error', $e->getMessage());
         }
 
         return redirect()
-            ->route('inmopro.projects.index')
-            ->with('error', 'No se pudo importar. Verifique que el archivo tenga el formato correcto y que exista el estado de lote LIBRE.');
+            ->route('inmopro.projects.show', $project)
+            ->with('success', 'Proyecto y lotes importados correctamente.');
     }
 
     /**

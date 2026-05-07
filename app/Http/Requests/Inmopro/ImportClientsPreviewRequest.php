@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests\Inmopro;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
-class ImportProjectFromExcelRequest extends FormRequest
+class ImportClientsPreviewRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -12,7 +13,7 @@ class ImportProjectFromExcelRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -21,6 +22,9 @@ class ImportProjectFromExcelRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function messages(): array
     {
         return [

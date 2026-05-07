@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { Edit, Plus, Search, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import Pagination, { type PaginationLink } from '@/components/pagination';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,11 @@ type ProjectTypeRow = {
 type PageProps = {
     projectTypes: { data: ProjectTypeRow[]; links: PaginationLink[] };
     filters: { search?: string };
+    abilities: {
+        create: boolean;
+        update: boolean;
+        delete: boolean;
+    };
 };
 
 type ProjectTypeForm = {
@@ -52,7 +57,13 @@ const emptyForm: ProjectTypeForm = {
     is_active: true,
 };
 
-export default function ProjectTypesIndex({ projectTypes, filters }: PageProps) {
+const DEFAULT_PROJECT_TYPE_COLOR = '#16a34a';
+
+function normalizeColorPickerValue(value: string): string {
+    return /^#[0-9a-fA-F]{6}$/.test(value) ? value : DEFAULT_PROJECT_TYPE_COLOR;
+}
+
+export default function ProjectTypesIndex({ projectTypes, filters, abilities }: PageProps) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<ProjectTypeRow | null>(null);
@@ -66,8 +77,7 @@ export default function ProjectTypesIndex({ projectTypes, filters }: PageProps) 
     ];
 
     const rows = projectTypes.data;
-
-    const activeCount = useMemo(() => rows.filter((r) => r.is_active).length, [rows]);
+    const activeCount = useMemo(() => rows.filter((row) => row.is_active).length, [rows]);
 
     const applyFilter = (e: React.FormEvent) => {
         e.preventDefault();
@@ -88,17 +98,30 @@ export default function ProjectTypesIndex({ projectTypes, filters }: PageProps) 
             sort_order: row.sort_order ?? 0,
             is_active: row.is_active,
         });
+        editForm.clearErrors();
     };
+
+    const normalizePayload = (data: ProjectTypeForm) => ({
+        name: data.name.trim(),
+        code: data.code.trim().toUpperCase(),
+        description: data.description.trim() === '' ? null : data.description.trim(),
+        color: data.color.trim() === '' ? null : data.color.trim(),
+        sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
+        is_active: Boolean(data.is_active),
+    });
 
     const submitCreate = (e: React.FormEvent) => {
         e.preventDefault();
-        createForm.transform((data) => ({
-            ...data,
-            sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
-        })).post('/inmopro/project-types', {
+        createForm.transform((data) => normalizePayload(data));
+        createForm.post('/inmopro/project-types', {
+            preserveScroll: true,
             onSuccess: () => {
                 setCreateOpen(false);
                 createForm.reset();
+                createForm.clearErrors();
+            },
+            onError: () => {
+                setCreateOpen(true);
             },
         });
     };
@@ -109,13 +132,18 @@ export default function ProjectTypesIndex({ projectTypes, filters }: PageProps) 
             return;
         }
 
-        editForm.transform((data) => ({
-            ...data,
-            sort_order: data.sort_order === '' ? 0 : Number(data.sort_order),
-        })).put(`/inmopro/project-types/${editing.id}`, {
+        editForm.transform((data) => normalizePayload(data));
+        editForm.put(`/inmopro/project-types/${editing.id}`, {
+            preserveScroll: true,
             onSuccess: () => {
                 setEditing(null);
                 editForm.reset();
+                editForm.clearErrors();
+            },
+            onError: () => {
+                if (editing) {
+                    setEditing(editing);
+                }
             },
         });
     };
@@ -135,16 +163,20 @@ export default function ProjectTypesIndex({ projectTypes, filters }: PageProps) 
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Tipos de proyecto</h1>
                         <p className="mt-1 text-sm text-slate-500">Catalogo para clasificar y filtrar proyectos comerciales.</p>
                     </div>
-                    <Button type="button" onClick={() => setCreateOpen(true)}>
-                        <Plus className="h-4 w-4" />
-                        Nuevo tipo
-                    </Button>
+                    {abilities.create ? (
+                        <Button type="button" onClick={() => setCreateOpen(true)}>
+                            <Plus className="h-4 w-4" />
+                            Nuevo tipo
+                        </Button>
+                    ) : (
+                        <p className="text-sm text-slate-500">No tienes permiso para crear tipos de proyecto.</p>
+                    )}
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
                     <MetricCard label="Registros visibles" value={String(rows.length)} />
                     <MetricCard label="Tipos activos" value={String(activeCount)} tone="emerald" />
-                    <MetricCard label="Total proyectos asociados" value={String(rows.reduce((s, r) => s + (r.projects_count ?? 0), 0))} tone="blue" />
+                    <MetricCard label="Total proyectos asociados" value={String(rows.reduce((sum, row) => sum + (row.projects_count ?? 0), 0))} tone="blue" />
                 </div>
 
                 <form onSubmit={applyFilter} className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-4">
@@ -157,7 +189,9 @@ export default function ProjectTypesIndex({ projectTypes, filters }: PageProps) 
                             className="pl-9"
                         />
                     </div>
-                    <Button type="submit" variant="secondary">Buscar</Button>
+                    <Button type="submit" variant="secondary">
+                        Buscar
+                    </Button>
                 </form>
 
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -201,12 +235,23 @@ export default function ProjectTypesIndex({ projectTypes, filters }: PageProps) 
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex justify-end gap-1">
-                                            <Button type="button" variant="ghost" size="icon" onClick={() => openEdit(row)} title="Editar tipo">
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button type="button" variant="ghost" size="icon" className="text-slate-500 hover:bg-red-50 hover:text-red-600" onClick={() => removeRow(row)} title="Eliminar tipo">
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            {abilities.update ? (
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => openEdit(row)} title="Editar tipo">
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                            ) : null}
+                                            {abilities.delete ? (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-slate-500 hover:bg-red-50 hover:text-red-600"
+                                                    onClick={() => removeRow(row)}
+                                                    title="Eliminar tipo"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            ) : null}
                                         </div>
                                     </td>
                                 </tr>
@@ -224,37 +269,45 @@ export default function ProjectTypesIndex({ projectTypes, filters }: PageProps) 
                 </div>
             </div>
 
-            <ProjectTypeModal
-                open={createOpen}
-                onOpenChange={(open) => {
-                    setCreateOpen(open);
-                    if (!open) {
-                        createForm.reset();
-                        createForm.clearErrors();
-                    }
-                }}
-                title="Nuevo tipo de proyecto"
-                description="Cree un nuevo tipo para clasificar proyectos."
-                form={createForm}
-                onSubmit={submitCreate}
-                submitLabel="Crear"
-            />
+            {abilities.create ? (
+                <ProjectTypeModal
+                    key="create-project-type-modal"
+                    open={createOpen}
+                    onOpenChange={(open) => {
+                        setCreateOpen(open);
+                        if (!open) {
+                            createForm.reset();
+                            createForm.clearErrors();
+                        }
+                    }}
+                    title="Nuevo tipo de proyecto"
+                    description="Cree un nuevo tipo para clasificar proyectos."
+                    form={createForm}
+                    onSubmit={submitCreate}
+                    submitLabel="Crear"
+                    idPrefix="create"
+                />
+            ) : null}
 
-            <ProjectTypeModal
-                open={!!editing}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        setEditing(null);
-                        editForm.reset();
-                        editForm.clearErrors();
-                    }
-                }}
-                title={editing ? `Editar tipo: ${editing.name}` : 'Editar tipo'}
-                description="Actualice el catálogo de tipos de proyecto."
-                form={editForm}
-                onSubmit={submitEdit}
-                submitLabel="Guardar cambios"
-            />
+            {abilities.update ? (
+                <ProjectTypeModal
+                    key={editing ? `edit-project-type-modal-${editing.id}` : 'edit-project-type-modal'}
+                    open={!!editing}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setEditing(null);
+                            editForm.reset();
+                            editForm.clearErrors();
+                        }
+                    }}
+                    title={editing ? `Editar tipo: ${editing.name}` : 'Editar tipo'}
+                    description="Actualice el catalogo de tipos de proyecto."
+                    form={editForm}
+                    onSubmit={submitEdit}
+                    submitLabel="Guardar cambios"
+                    idPrefix="edit"
+                />
+            ) : null}
         </AppLayout>
     );
 }
@@ -267,6 +320,7 @@ function ProjectTypeModal({
     form,
     onSubmit,
     submitLabel,
+    idPrefix,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -275,7 +329,10 @@ function ProjectTypeModal({
     form: ReturnType<typeof useForm<ProjectTypeForm>>;
     onSubmit: (e: React.FormEvent) => void;
     submitLabel: string;
+    idPrefix: string;
 }) {
+    const formRef = useRef<HTMLFormElement | null>(null);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
@@ -283,11 +340,11 @@ function ProjectTypeModal({
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={onSubmit} className="space-y-3">
+                <form ref={formRef} onSubmit={onSubmit} noValidate className="space-y-3">
                     <div>
-                        <Label htmlFor="project-type-name">Nombre</Label>
+                        <Label htmlFor={`project-type-name-${idPrefix}`}>Nombre</Label>
                         <Input
-                            id="project-type-name"
+                            id={`project-type-name-${idPrefix}`}
                             value={form.data.name}
                             onChange={(e) => form.setData('name', e.target.value)}
                             className="mt-1"
@@ -296,9 +353,9 @@ function ProjectTypeModal({
                         <InputError message={form.errors.name} />
                     </div>
                     <div>
-                        <Label htmlFor="project-type-code">Codigo</Label>
+                        <Label htmlFor={`project-type-code-${idPrefix}`}>Codigo</Label>
                         <Input
-                            id="project-type-code"
+                            id={`project-type-code-${idPrefix}`}
                             value={form.data.code}
                             onChange={(e) => form.setData('code', e.target.value.toUpperCase())}
                             className="mt-1"
@@ -307,9 +364,9 @@ function ProjectTypeModal({
                         <InputError message={form.errors.code} />
                     </div>
                     <div>
-                        <Label htmlFor="project-type-description">Descripcion</Label>
+                        <Label htmlFor={`project-type-description-${idPrefix}`}>Descripcion</Label>
                         <Input
-                            id="project-type-description"
+                            id={`project-type-description-${idPrefix}`}
                             value={form.data.description}
                             onChange={(e) => form.setData('description', e.target.value)}
                             className="mt-1"
@@ -318,20 +375,28 @@ function ProjectTypeModal({
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <Label htmlFor="project-type-color">Color</Label>
-                            <Input
-                                id="project-type-color"
-                                value={form.data.color}
-                                onChange={(e) => form.setData('color', e.target.value)}
-                                placeholder="#16a34a"
-                                className="mt-1"
-                            />
+                            <Label htmlFor={`project-type-color-${idPrefix}`}>Color</Label>
+                            <div className="mt-1 flex items-center gap-3">
+                                <input
+                                    id={`project-type-color-${idPrefix}`}
+                                    type="color"
+                                    value={normalizeColorPickerValue(form.data.color)}
+                                    onChange={(e) => form.setData('color', e.target.value)}
+                                    className="h-10 w-14 cursor-pointer rounded-md border border-slate-200 bg-white p-1"
+                                />
+                                <Input
+                                    value={form.data.color}
+                                    onChange={(e) => form.setData('color', e.target.value)}
+                                    placeholder="#16a34a"
+                                    className="flex-1"
+                                />
+                            </div>
                             <InputError message={form.errors.color} />
                         </div>
                         <div>
-                            <Label htmlFor="project-type-sort">Orden</Label>
+                            <Label htmlFor={`project-type-sort-${idPrefix}`}>Orden</Label>
                             <Input
-                                id="project-type-sort"
+                                id={`project-type-sort-${idPrefix}`}
                                 type="number"
                                 min={0}
                                 value={form.data.sort_order}
@@ -355,7 +420,13 @@ function ProjectTypeModal({
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancelar
                         </Button>
-                        <Button type="submit" disabled={form.processing}>
+                        <Button
+                            type="button"
+                            disabled={form.processing}
+                            onClick={() => {
+                                formRef.current?.requestSubmit();
+                            }}
+                        >
                             {submitLabel}
                         </Button>
                     </DialogFooter>

@@ -33,6 +33,11 @@ class ProjectTypeController extends Controller
         return Inertia::render('inmopro/project-types/index', [
             'projectTypes' => $projectTypes,
             'filters' => $request->only('search'),
+            'abilities' => [
+                'create' => $request->user()?->can('inmopro.project-types.store') ?? false,
+                'update' => $request->user()?->can('inmopro.project-types.update') ?? false,
+                'delete' => $request->user()?->can('inmopro.project-types.destroy') ?? false,
+            ],
         ]);
     }
 

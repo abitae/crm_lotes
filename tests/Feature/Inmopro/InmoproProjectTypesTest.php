@@ -6,6 +6,8 @@ use App\Models\Inmopro\ProjectType;
 use App\Models\User;
 use Database\Seeders\Inmopro\ProjectTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class InmoproProjectTypesTest extends TestCase
@@ -29,7 +31,37 @@ class InmoproProjectTypesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('inmopro/project-types/index')
                 ->has('projectTypes')
-                ->has('filters'));
+                ->has('filters')
+                ->where('abilities.create', true)
+                ->where('abilities.update', true)
+                ->where('abilities.delete', true));
+    }
+
+    public function test_index_exposes_only_the_actions_allowed_by_the_users_permissions(): void
+    {
+        $user = User::factory()->create();
+        $user->syncRoles([]);
+
+        $permissions = collect([
+            'inmopro.project-types.index',
+            'inmopro.project-types.update',
+        ])->map(fn (string $name) => Permission::findOrCreate($name, 'web'));
+
+        $role = Role::firstOrCreate(
+            ['name' => 'project-type-editor', 'guard_name' => 'web'],
+            ['name' => 'project-type-editor', 'guard_name' => 'web'],
+        );
+        $role->syncPermissions($permissions);
+        $user->assignRole($role);
+
+        $this->actingAs($user)
+            ->get(route('inmopro.project-types.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('inmopro/project-types/index')
+                ->where('abilities.create', false)
+                ->where('abilities.update', true)
+                ->where('abilities.delete', false));
     }
 
     public function test_authenticated_users_can_create_project_type(): void
