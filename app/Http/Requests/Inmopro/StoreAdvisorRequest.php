@@ -44,6 +44,14 @@ class StoreAdvisorRequest extends FormRequest
             'material_items.*.advisor_material_type_id' => ['required', 'integer', 'exists:advisor_material_types,id'],
             'material_items.*.delivered_at' => ['nullable', 'date'],
             'material_items.*.notes' => ['nullable', 'string', 'max:500'],
+            'profile' => ['nullable', 'array'],
+            'profile.professional_profile' => ['nullable', 'string', 'max:5000'],
+            'profile.skills_strengths' => ['nullable', 'string', 'max:5000'],
+            'profile.availability' => ['nullable', 'string', 'max:5000'],
+            'profile.document_files' => ['nullable', 'array'],
+            'profile.document_files.*' => ['file', 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,webp', 'max:15360'],
+            'profile.document_titles' => ['nullable', 'array'],
+            'profile.document_titles.*' => ['nullable', 'string', 'max:255'],
         ];
     }
 

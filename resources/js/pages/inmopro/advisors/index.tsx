@@ -1,4 +1,4 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { CalendarDays, Cake, Download, FileSpreadsheet, KeyRound, Package, Pencil, Receipt, Search, TimerReset, Upload, UserPlus } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -28,6 +28,19 @@ type Team = { id: number; name: string; color?: string };
 type CityOption = { id: number; name: string; department?: string | null };
 type MaterialTypeRow = { id: number; code: string; name: string };
 type MaterialFormRow = { advisor_material_type_id: number; delivered_at: string; notes: string };
+type AdvisorProfileDocument = {
+    id: number;
+    title?: string | null;
+    file_name: string;
+    file_size?: number;
+};
+type AdvisorProfile = {
+    id: number;
+    professional_profile?: string | null;
+    skills_strengths?: string | null;
+    availability?: string | null;
+    documents?: AdvisorProfileDocument[];
+};
 type Advisor = {
     id: number;
     name: string;
@@ -60,6 +73,7 @@ type Advisor = {
         notes?: string | null;
         type?: { id: number; name: string; code: string };
     }>;
+    profile?: AdvisorProfile | null;
 };
 type Payment = {
     id: number;
@@ -135,6 +149,26 @@ function defaultAdvisorDateFilterValues(): {
         birthdayFrom: isoLocalDate(today),
         birthdayTo: isoLocalDate(birthdayTo),
     };
+}
+
+/**
+ * Inertia fusiona el `data` de router.get solo con la query del href; si el href no lleva `?`,
+ * hay que partir de la URL del navegador para no perder filtros, paginación o params (modal, etc.).
+ */
+function mergeWindowSearchWithPatch(patch: Record<string, string | null>): Record<string, string> {
+    const merged: Record<string, string> = {};
+    const sp = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    sp.forEach((v, k) => {
+        merged[k] = v;
+    });
+    for (const [key, value] of Object.entries(patch)) {
+        if (value === null || value === '') {
+            delete merged[key];
+        } else {
+            merged[key] = value;
+        }
+    }
+    return merged;
 }
 
 type PageProps = {
@@ -244,6 +278,9 @@ export default function AdvisorsIndex({
     const [modalMembershipDetail, setModalMembershipDetail] = useState<MembershipDetail | null>(null);
     const [modalAdvisorImport, setModalAdvisorImport] = useState(false);
     const [materialsModalAdvisorId, setMaterialsModalAdvisorId] = useState<number | null>(null);
+    const [showJoinedDateFilters, setShowJoinedDateFilters] = useState(false);
+    const [showBirthdayDateFilters, setShowBirthdayDateFilters] = useState(false);
+    const advisorsListUrlRef = useRef<string | null>(null);
     const materialsModalAdvisor =
         materialsModalAdvisorId == null ? null : (advisors.data.find((a) => a.id === materialsModalAdvisorId) ?? null);
 
@@ -265,6 +302,23 @@ export default function AdvisorsIndex({
         }
     }, [openModal, advisorForModal, membershipDetail]);
     /* eslint-enable react-hooks/set-state-in-effect */
+
+    const inertiaPage = usePage();
+    useEffect(() => {
+        const url = String(inertiaPage.url ?? '');
+        if (!url.startsWith('/inmopro/advisors')) {
+            return;
+        }
+        if (advisorsListUrlRef.current === null) {
+            advisorsListUrlRef.current = url;
+            return;
+        }
+        if (advisorsListUrlRef.current !== url) {
+            advisorsListUrlRef.current = url;
+            setShowJoinedDateFilters(false);
+            setShowBirthdayDateFilters(false);
+        }
+    }, [inertiaPage.url]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Inmopro', href: '/inmopro/dashboard' },
@@ -294,95 +348,77 @@ export default function AdvisorsIndex({
     const birthdaysFilterOn = isFilterFlagOn(filters.birthdays_upcoming);
     const subscriptionsFilterOn = isFilterFlagOn(filters.subscriptions_expiring);
 
-    const toggleQuickFilter = (key: 'birthdays_upcoming' | 'subscriptions_expiring', currentlyOn: boolean): void => {
-        const params: Record<string, string> = {};
-        if (filters.search) {
-            params.search = String(filters.search);
-        }
-        if (filters.advisor_level_id != null && String(filters.advisor_level_id) !== '') {
-            params.advisor_level_id = String(filters.advisor_level_id);
-        }
-        if (filters.team_id != null && String(filters.team_id) !== '') {
-            params.team_id = String(filters.team_id);
-        }
-        if (filters.membership_pending) {
-            params.membership_pending = '1';
-        }
-        if (filters.joined_from) {
-            params.joined_from = String(filters.joined_from);
-        }
-        if (filters.joined_to) {
-            params.joined_to = String(filters.joined_to);
-        }
-        if (filters.birthday_from) {
-            params.birthday_from = String(filters.birthday_from);
-        }
-        if (filters.birthday_to) {
-            params.birthday_to = String(filters.birthday_to);
-        }
-        if (key === 'birthdays_upcoming') {
-            if (subscriptionsFilterOn) {
-                params.subscriptions_expiring = '1';
-            }
-            if (!currentlyOn) {
-                params.birthdays_upcoming = '1';
-            }
-        } else {
-            if (birthdaysFilterOn) {
-                params.birthdays_upcoming = '1';
-            }
-            if (!currentlyOn) {
-                params.subscriptions_expiring = '1';
-            }
-        }
-        router.get('/inmopro/advisors', params, { preserveState: true });
+    const navigateAdvisorsWithPatch = (patch: Record<string, string | null>) => {
+        router.get('/inmopro/advisors', mergeWindowSearchWithPatch(patch), { preserveState: true });
     };
 
-    const handleFilterSubmit = (e: React.FormEvent) => {
+    const advisorCriteriaFiltersFormKey = useMemo(
+        () =>
+            [
+                filters.search ?? '',
+                String(filters.advisor_level_id ?? ''),
+                String(filters.team_id ?? ''),
+                filters.membership_pending ? '1' : '',
+            ].join('|'),
+        [filters],
+    );
+
+    const advisorJoinedFiltersFormKey = useMemo(
+        () => [filters.joined_from ?? '', filters.joined_to ?? ''].join('|'),
+        [filters.joined_from, filters.joined_to],
+    );
+
+    const advisorBirthdayFiltersFormKey = useMemo(
+        () => [filters.birthday_from ?? '', filters.birthday_to ?? ''].join('|'),
+        [filters.birthday_from, filters.birthday_to],
+    );
+
+    const handleCriteriaFiltersSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const form = e.target as HTMLFormElement;
-        const fd = new FormData(form);
+        const fd = new FormData(e.target as HTMLFormElement);
         const search = (fd.get('search') as string)?.trim();
         const advisorLevelId = (fd.get('advisor_level_id') as string)?.trim();
         const teamId = (fd.get('team_id') as string)?.trim();
         const membershipPending = fd.get('membership_pending') === '1';
+
+        navigateAdvisorsWithPatch({
+            search: search || null,
+            advisor_level_id: advisorLevelId || null,
+            team_id: teamId || null,
+            membership_pending: membershipPending ? '1' : null,
+        });
+    };
+
+    const handleJoinedFiltersSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const fd = new FormData(e.target as HTMLFormElement);
         const joinedFrom = (fd.get('joined_from') as string)?.trim();
         const joinedTo = (fd.get('joined_to') as string)?.trim();
+
+        navigateAdvisorsWithPatch({
+            joined_from: joinedFrom || null,
+            joined_to: joinedTo || null,
+        });
+    };
+
+    const handleBirthdayFiltersSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const fd = new FormData(e.target as HTMLFormElement);
         const birthdayFrom = (fd.get('birthday_from') as string)?.trim();
         const birthdayTo = (fd.get('birthday_to') as string)?.trim();
 
-        const params: Record<string, string | undefined> = {};
-        if (search) {
-            params.search = search;
+        navigateAdvisorsWithPatch({
+            birthday_from: birthdayFrom || null,
+            birthday_to: birthdayTo || null,
+        });
+    };
+
+    const toggleQuickFilter = (key: 'birthdays_upcoming' | 'subscriptions_expiring', currentlyOn: boolean): void => {
+        if (key === 'birthdays_upcoming') {
+            navigateAdvisorsWithPatch({ birthdays_upcoming: !currentlyOn ? '1' : null });
+        } else {
+            navigateAdvisorsWithPatch({ subscriptions_expiring: !currentlyOn ? '1' : null });
         }
-        if (advisorLevelId) {
-            params.advisor_level_id = advisorLevelId;
-        }
-        if (teamId) {
-            params.team_id = teamId;
-        }
-        if (membershipPending) {
-            params.membership_pending = '1';
-        }
-        if (joinedFrom) {
-            params.joined_from = joinedFrom;
-        }
-        if (joinedTo) {
-            params.joined_to = joinedTo;
-        }
-        if (birthdayFrom) {
-            params.birthday_from = birthdayFrom;
-        }
-        if (birthdayTo) {
-            params.birthday_to = birthdayTo;
-        }
-        if (birthdaysFilterOn) {
-            params.birthdays_upcoming = '1';
-        }
-        if (subscriptionsFilterOn) {
-            params.subscriptions_expiring = '1';
-        }
-        router.get('/inmopro/advisors', params, { preserveState: true });
     };
 
     const advisorsExportQuery = new URLSearchParams();
@@ -464,6 +500,9 @@ export default function AdvisorsIndex({
                             <UserPlus className="h-5 w-5" />
                             Nuevo vendedor
                         </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/inmopro/advisors/new">Registro completo</Link>
+                        </Button>
                     </div>
                 </div>
 
@@ -493,31 +532,32 @@ export default function AdvisorsIndex({
                     />
                 </div>
 
-                <form
-                    onSubmit={handleFilterSubmit}
-                    className="flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-                >
-                    <div className="space-y-3">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Criterios</p>
-                        <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
-                            <div className="relative w-full min-w-0 flex-1 lg:min-w-[14rem] lg:max-w-md">
-                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <form
+                        key={advisorCriteriaFiltersFormKey}
+                        onSubmit={handleCriteriaFiltersSubmit}
+                        className="flex flex-col gap-1.5"
+                    >
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Criterios</p>
+                        <div className="flex flex-wrap items-end gap-2">
+                            <div className="relative min-w-0 flex-1 sm:min-w-[12rem] sm:max-w-md">
+                                <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                                 <input
                                     name="search"
                                     type="text"
-                                    placeholder="Buscar por nombre o email..."
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 font-medium outline-none transition-all focus:ring-2 focus:ring-emerald-500"
+                                    placeholder="Nombre o email…"
+                                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 py-1 pl-8 pr-2 text-xs font-medium outline-none ring-emerald-500/30 focus:ring-2"
                                     defaultValue={filters.search}
                                 />
                             </div>
-                            <div className="w-full min-w-[10rem] sm:w-auto sm:max-w-[11rem]">
-                                <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Nivel</Label>
+                            <div className="w-28 shrink-0 sm:w-32">
+                                <Label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-400">Nivel</Label>
                                 <select
                                     name="advisor_level_id"
                                     defaultValue={filters.advisor_level_id != null ? String(filters.advisor_level_id) : ''}
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-medium outline-none ring-emerald-500/30 focus:ring-2"
                                 >
-                                    <option value="">Todos los niveles</option>
+                                    <option value="">Todos</option>
                                     {advisorLevels.map((lvl) => (
                                         <option key={lvl.id} value={lvl.id}>
                                             {lvl.name}
@@ -525,14 +565,14 @@ export default function AdvisorsIndex({
                                     ))}
                                 </select>
                             </div>
-                            <div className="w-full min-w-[10rem] sm:w-auto sm:max-w-[11rem]">
-                                <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Team</Label>
+                            <div className="w-28 shrink-0 sm:w-32">
+                                <Label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-400">Team</Label>
                                 <select
                                     name="team_id"
                                     defaultValue={filters.team_id != null ? String(filters.team_id) : ''}
-                                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-medium outline-none ring-emerald-500/30 focus:ring-2"
                                 >
-                                    <option value="">Todos los teams</option>
+                                    <option value="">Todos</option>
                                     {teams.map((t) => (
                                         <option key={t.id} value={t.id}>
                                             {t.name}
@@ -540,85 +580,122 @@ export default function AdvisorsIndex({
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex w-full min-w-0 flex-1 items-center gap-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2.5 lg:max-w-sm">
+                            <label
+                                htmlFor="filter-membership-pending"
+                                className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-100/80 bg-amber-50/50 px-2"
+                            >
                                 <input
                                     type="checkbox"
                                     id="filter-membership-pending"
                                     name="membership_pending"
                                     value="1"
                                     defaultChecked={Boolean(filters.membership_pending)}
-                                    className="h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-2 focus:ring-emerald-500"
+                                    className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-emerald-600"
                                 />
-                                <Label htmlFor="filter-membership-pending" className="cursor-pointer text-sm font-medium text-amber-900">
-                                    Pendientes de pago
-                                </Label>
-                            </div>
-                            <Button type="submit" className="w-full shrink-0 lg:ml-auto lg:w-auto">
-                                Aplicar filtros
+                                <span className="whitespace-nowrap text-[11px] font-medium text-amber-900">Pend. pago</span>
+                            </label>
+                            <Button type="submit" size="sm" className="h-8 shrink-0 px-3 text-xs" title="Aplicar criterios de búsqueda y nivel">
+                                Aplicar
                             </Button>
                         </div>
+                    </form>
+
+                    <div className="my-2 border-t border-slate-100" />
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                        <label className="flex cursor-pointer select-none items-center gap-1.5 text-[11px] font-medium text-slate-600">
+                            <input
+                                type="checkbox"
+                                checked={showJoinedDateFilters}
+                                onChange={(e) => setShowJoinedDateFilters(e.target.checked)}
+                                className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-emerald-600"
+                            />
+                            Fecha de ingreso
+                        </label>
+                        <label className="flex cursor-pointer select-none items-center gap-1.5 text-[11px] font-medium text-slate-600">
+                            <input
+                                type="checkbox"
+                                checked={showBirthdayDateFilters}
+                                onChange={(e) => setShowBirthdayDateFilters(e.target.checked)}
+                                className="h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-emerald-600"
+                            />
+                            Cumpleaños (mes y día)
+                        </label>
                     </div>
 
-                    <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fechas</p>
-                        <div className="grid gap-6 sm:grid-cols-2">
-                            <div className="space-y-3">
-                                <p className="text-xs font-semibold text-slate-600">Fecha de ingreso</p>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div className="min-w-0">
-                                        <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                            Desde
-                                        </Label>
-                                        <input
-                                            type="date"
-                                            name="joined_from"
-                                            defaultValue={filters.joined_from ?? defaultDateFilters.joinedFrom}
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
-                                        />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                            Hasta
-                                        </Label>
-                                        <input
-                                            type="date"
-                                            name="joined_to"
-                                            defaultValue={filters.joined_to ?? defaultDateFilters.joinedTo}
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
-                                        />
-                                    </div>
+                    {(showJoinedDateFilters || showBirthdayDateFilters) && (
+                    <div className="mt-2 grid gap-3 lg:grid-cols-2 lg:gap-4">
+                        {showJoinedDateFilters ? (
+                        <form
+                            key={advisorJoinedFiltersFormKey}
+                            onSubmit={handleJoinedFiltersSubmit}
+                            className="flex flex-col gap-1.5"
+                        >
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ingreso</p>
+                            <div className="flex flex-wrap items-end gap-2">
+                                <div className="min-w-0 flex-1 basis-[8.5rem]">
+                                    <Label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-400">Desde</Label>
+                                    <input
+                                        type="date"
+                                        name="joined_from"
+                                        defaultValue={filters.joined_from ?? defaultDateFilters.joinedFrom}
+                                        className="h-8 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-1.5 text-xs font-medium outline-none ring-emerald-500/30 focus:ring-2"
+                                    />
                                 </div>
-                            </div>
-                            <div className="space-y-3">
-                                <p className="text-xs font-semibold text-slate-600">Cumpleaños (mes y día)</p>
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div className="min-w-0">
-                                        <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                            Desde
-                                        </Label>
-                                        <input
-                                            type="date"
-                                            name="birthday_from"
-                                            defaultValue={filters.birthday_from ?? defaultDateFilters.birthdayFrom}
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
-                                        />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                            Hasta
-                                        </Label>
-                                        <input
-                                            type="date"
-                                            name="birthday_to"
-                                            defaultValue={filters.birthday_to ?? defaultDateFilters.birthdayTo}
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
-                                        />
-                                    </div>
+                                <div className="min-w-0 flex-1 basis-[8.5rem]">
+                                    <Label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-400">Hasta</Label>
+                                    <input
+                                        type="date"
+                                        name="joined_to"
+                                        defaultValue={filters.joined_to ?? defaultDateFilters.joinedTo}
+                                        className="h-8 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-1.5 text-xs font-medium outline-none ring-emerald-500/30 focus:ring-2"
+                                    />
                                 </div>
+                                <Button type="submit" size="sm" variant="secondary" className="h-8 shrink-0 px-3 text-xs" title="Aplicar rango de fecha de ingreso">
+                                    Aplicar
+                                </Button>
                             </div>
-                        </div>
+                        </form>
+                        ) : null}
+
+                        {showBirthdayDateFilters ? (
+                        <form
+                            key={advisorBirthdayFiltersFormKey}
+                            onSubmit={handleBirthdayFiltersSubmit}
+                            className={cn(
+                                'flex flex-col gap-1.5',
+                                showJoinedDateFilters && 'lg:border-l lg:border-slate-100 lg:pl-4',
+                            )}
+                        >
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cumpleaños</p>
+                            <div className="flex flex-wrap items-end gap-2">
+                                <div className="min-w-0 flex-1 basis-[8.5rem]">
+                                    <Label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-400">Desde</Label>
+                                    <input
+                                        type="date"
+                                        name="birthday_from"
+                                        defaultValue={filters.birthday_from ?? defaultDateFilters.birthdayFrom}
+                                        className="h-8 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-1.5 text-xs font-medium outline-none ring-emerald-500/30 focus:ring-2"
+                                    />
+                                </div>
+                                <div className="min-w-0 flex-1 basis-[8.5rem]">
+                                    <Label className="mb-0.5 block text-[9px] font-bold uppercase tracking-wider text-slate-400">Hasta</Label>
+                                    <input
+                                        type="date"
+                                        name="birthday_to"
+                                        defaultValue={filters.birthday_to ?? defaultDateFilters.birthdayTo}
+                                        className="h-8 w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-1.5 text-xs font-medium outline-none ring-emerald-500/30 focus:ring-2"
+                                    />
+                                </div>
+                                <Button type="submit" size="sm" variant="secondary" className="h-8 shrink-0 px-3 text-xs" title="Aplicar rango de cumpleaños (mes y día)">
+                                    Aplicar
+                                </Button>
+                            </div>
+                        </form>
+                        ) : null}
                     </div>
-                </form>
+                    )}
+                </div>
 
                 <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
                     <div className="overflow-x-auto">
@@ -1556,11 +1633,22 @@ function EditAdvisorModal({
         bank_account_number: advisor.bank_account_number ?? '',
         bank_cci: advisor.bank_cci ?? '',
         material_items: buildMaterialFormRows(materialTypes, advisor.material_items),
+        profile: {
+            professional_profile: advisor.profile?.professional_profile ?? '',
+            skills_strengths: advisor.profile?.skills_strengths ?? '',
+            availability: advisor.profile?.availability ?? '',
+            document_files: [] as File[],
+            document_titles: [] as string[],
+        },
     });
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/inmopro/advisors/${advisor.id}${listQs}`, { onSuccess: () => onOpenChange(false) });
+        const hasProfileFiles = data.profile.document_files.length > 0;
+        put(`/inmopro/advisors/${advisor.id}${listQs}`, {
+            forceFormData: hasProfileFiles,
+            onSuccess: () => onOpenChange(false),
+        });
     };
 
     const updateMaterialRow = (index: number, patch: Partial<MaterialFormRow>) => {
@@ -1579,7 +1667,7 @@ function EditAdvisorModal({
                     <DialogDescription>Modifique los datos; el formulario está en dos columnas.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="flex flex-col">
-                    <div className="px-6 py-4">
+                    <div className="max-h-[min(70vh,42rem)] overflow-y-auto px-6 py-4">
                         <div className="grid gap-6 md:grid-cols-2 md:items-start">
                             <div className="space-y-3">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Identidad y contacto</p>
@@ -1724,6 +1812,83 @@ function EditAdvisorModal({
                                 <Input id="edit-bank_cci" inputMode="numeric" maxLength={20} value={data.bank_cci} onChange={(e) => setData('bank_cci', e.target.value)} className="mt-1 h-9" />
                                 <InputError message={errors.bank_cci} />
                             </div>
+                        </div>
+
+                        <Separator className="my-5" />
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Perfil profesional</p>
+                        <div className="space-y-3">
+                            <div>
+                                <Label htmlFor="edit-professional_profile">Perfil profesional</Label>
+                                <textarea
+                                    id="edit-professional_profile"
+                                    value={data.profile.professional_profile}
+                                    onChange={(e) => setData('profile', { ...data.profile, professional_profile: e.target.value })}
+                                    rows={3}
+                                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
+                                />
+                                <InputError message={errors['profile.professional_profile']} />
+                            </div>
+                            <div>
+                                <Label htmlFor="edit-skills_strengths">Habilidades y fortalezas</Label>
+                                <textarea
+                                    id="edit-skills_strengths"
+                                    value={data.profile.skills_strengths}
+                                    onChange={(e) => setData('profile', { ...data.profile, skills_strengths: e.target.value })}
+                                    rows={3}
+                                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
+                                />
+                                <InputError message={errors['profile.skills_strengths']} />
+                            </div>
+                            <div>
+                                <Label htmlFor="edit-availability">Disponibilidad</Label>
+                                <textarea
+                                    id="edit-availability"
+                                    value={data.profile.availability}
+                                    onChange={(e) => setData('profile', { ...data.profile, availability: e.target.value })}
+                                    rows={2}
+                                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm"
+                                />
+                                <InputError message={errors['profile.availability']} />
+                            </div>
+                        </div>
+
+                        <Separator className="my-5" />
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Documentación adjunta</p>
+                        {normalizeList(advisor.profile?.documents).length > 0 && (
+                            <ul className="mb-3 space-y-2">
+                                {normalizeList(advisor.profile?.documents).map((document) => (
+                                    <li key={document.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm">
+                                        <span className="truncate">{document.title || document.file_name}</span>
+                                        <a
+                                            href={`/inmopro/advisors/${advisor.id}/profile-documents/${document.id}`}
+                                            className="shrink-0 font-medium text-emerald-700 hover:underline"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Descargar
+                                        </a>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        <div>
+                            <Label htmlFor="edit-document_files">Agregar archivos</Label>
+                            <Input
+                                id="edit-document_files"
+                                type="file"
+                                multiple
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
+                                onChange={(e) => {
+                                    const files = Array.from(e.target.files ?? []);
+                                    setData('profile', {
+                                        ...data.profile,
+                                        document_files: files,
+                                        document_titles: files.map((file) => file.name.replace(/\.[^.]+$/, '')),
+                                    });
+                                }}
+                                className="mt-1"
+                            />
+                            <InputError message={errors['profile.document_files'] || errors['profile.document_files.0']} />
                         </div>
 
                         <Separator className="my-5" />

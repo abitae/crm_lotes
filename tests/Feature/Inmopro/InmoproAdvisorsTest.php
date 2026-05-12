@@ -6,6 +6,8 @@ use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
 use App\Models\Inmopro\AdvisorMaterialItem;
 use App\Models\Inmopro\AdvisorMaterialType;
+use App\Models\Inmopro\AdvisorProfile;
+use App\Models\Inmopro\AdvisorProfileDocument;
 use App\Models\Inmopro\AdvisorMembership;
 use App\Models\Inmopro\AdvisorMembershipPayment;
 use App\Models\Inmopro\City;
@@ -20,6 +22,8 @@ use Database\Seeders\Inmopro\LotStatusSeeder;
 use Database\Seeders\Inmopro\ProjectSeeder;
 use Database\Seeders\Inmopro\TeamSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class InmoproAdvisorsTest extends TestCase
@@ -54,6 +58,22 @@ class InmoproAdvisorsTest extends TestCase
         $response->assertInertia(fn ($page) => $page->component('inmopro/advisors/index')->has('advisors')->has('teams')->has('cities')->has('materialTypes'));
     }
 
+    public function test_authenticated_users_can_visit_advisors_new(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $response = $this->get(route('inmopro.advisors.new'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('inmopro/advisors/new')
+            ->has('advisorLevels')
+            ->has('teams')
+            ->has('cities')
+            ->has('materialTypes'));
+    }
+
     public function test_authenticated_users_can_create_advisor(): void
     {
         $user = User::factory()->create();
@@ -74,7 +94,10 @@ class InmoproAdvisorsTest extends TestCase
             'personal_quota' => 10,
         ]);
 
-        $response->assertRedirect(route('inmopro.advisors.index'));
+        $response->assertRedirect(route('inmopro.advisors.index', [
+            'advisor_level_id' => $level->id,
+            'team_id' => $team->id,
+        ]));
         $this->assertDatabaseHas('advisors', [
             'dni' => '87654321',
             'first_name' => 'Asesor Nuevo',
@@ -84,6 +107,57 @@ class InmoproAdvisorsTest extends TestCase
             'team_id' => $team->id,
             'username' => 'asesor',
         ]);
+    }
+
+    public function test_store_advisor_with_profile_creates_profile_and_documents(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        $level = AdvisorLevel::first();
+        $team = Team::first();
+        $city = City::firstOrFail();
+        $this->actingAs($user);
+
+        $file = UploadedFile::fake()->create('cv.pdf', 100, 'application/pdf');
+
+        $response = $this->post(route('inmopro.advisors.store'), [
+            'dni' => '87654329',
+            'first_name' => 'Perfil',
+            'last_name' => 'Completo',
+            'phone' => '999888779',
+            'email' => 'perfil-completo@example.com',
+            'city_id' => $city->id,
+            'team_id' => $team->id,
+            'advisor_level_id' => $level->id,
+            'personal_quota' => 10,
+            'profile' => [
+                'professional_profile' => 'Perfil profesional de prueba',
+                'skills_strengths' => 'Negociación y cierre',
+                'availability' => 'Lunes a viernes',
+                'document_files' => [$file],
+                'document_titles' => ['CV'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inmopro.advisors.index', [
+            'advisor_level_id' => $level->id,
+            'team_id' => $team->id,
+        ]));
+
+        $advisor = Advisor::query()->where('email', 'perfil-completo@example.com')->firstOrFail();
+        $this->assertDatabaseHas('advisor_profiles', [
+            'advisor_id' => $advisor->id,
+            'professional_profile' => 'Perfil profesional de prueba',
+            'skills_strengths' => 'Negociación y cierre',
+            'availability' => 'Lunes a viernes',
+        ]);
+
+        $profile = AdvisorProfile::query()->where('advisor_id', $advisor->id)->firstOrFail();
+        $document = AdvisorProfileDocument::query()->where('advisor_profile_id', $profile->id)->firstOrFail();
+        $this->assertSame('CV', $document->title);
+        $this->assertSame('cv.pdf', $document->file_name);
+        Storage::disk('local')->assertExists($document->file_path);
     }
 
     public function test_authenticated_users_can_update_advisor(): void
@@ -104,7 +178,10 @@ class InmoproAdvisorsTest extends TestCase
             'personal_quota' => 15,
         ]);
 
-        $response->assertRedirect(route('inmopro.advisors.index'));
+        $response->assertRedirect(route('inmopro.advisors.index', [
+            'advisor_level_id' => $advisor->advisor_level_id,
+            'team_id' => $advisor->team_id,
+        ]));
         $this->assertDatabaseHas('advisors', [
             'id' => $advisor->id,
             'first_name' => 'Asesor',
@@ -113,6 +190,57 @@ class InmoproAdvisorsTest extends TestCase
             'personal_quota' => 15,
             'username' => $advisor->username,
         ]);
+    }
+
+    public function test_update_advisor_updates_profile_and_appends_documents(): void
+    {
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        $advisor = Advisor::firstOrFail();
+        $profile = AdvisorProfile::query()->create([
+            'advisor_id' => $advisor->id,
+            'professional_profile' => 'Perfil inicial',
+            'skills_strengths' => 'Inicial',
+            'availability' => 'Mañanas',
+        ]);
+        $this->actingAs($user);
+
+        $file = UploadedFile::fake()->create('certificado.pdf', 80, 'application/pdf');
+
+        $response = $this->put(route('inmopro.advisors.update', $advisor), [
+            'dni' => $advisor->dni,
+            'first_name' => $advisor->first_name,
+            'last_name' => $advisor->last_name,
+            'phone' => $advisor->phone,
+            'email' => $advisor->email,
+            'city_id' => $advisor->city_id ?? City::firstOrFail()->id,
+            'team_id' => $advisor->team_id,
+            'advisor_level_id' => $advisor->advisor_level_id,
+            'personal_quota' => $advisor->personal_quota,
+            'profile' => [
+                'professional_profile' => 'Perfil actualizado',
+                'skills_strengths' => 'Cierre consultivo',
+                'availability' => 'Tardes',
+                'document_files' => [$file],
+                'document_titles' => ['Certificado'],
+            ],
+        ]);
+
+        $response->assertRedirect(route('inmopro.advisors.index', [
+            'advisor_level_id' => $advisor->advisor_level_id,
+            'team_id' => $advisor->team_id,
+        ]));
+        $this->assertDatabaseHas('advisor_profiles', [
+            'id' => $profile->id,
+            'professional_profile' => 'Perfil actualizado',
+            'skills_strengths' => 'Cierre consultivo',
+            'availability' => 'Tardes',
+        ]);
+
+        $document = AdvisorProfileDocument::query()->where('advisor_profile_id', $profile->id)->firstOrFail();
+        $this->assertSame('Certificado', $document->title);
+        Storage::disk('local')->assertExists($document->file_path);
     }
 
     public function test_store_advisor_rejects_invalid_cci(): void

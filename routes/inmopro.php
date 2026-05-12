@@ -82,6 +82,8 @@ Route::middleware(['auth', 'verified'])->prefix('inmopro')->name('inmopro.')->gr
         Route::get('teams/export-excel', [TeamController::class, 'exportExcel'])->name('teams.export-excel');
         Route::post('teams/import-from-excel', [TeamController::class, 'importFromExcel'])->name('teams.import-from-excel');
         Route::get('advisors/search', [AdvisorController::class, 'search'])->name('advisors.search');
+        Route::get('advisors/new', [AdvisorController::class, 'new'])->name('advisors.new');
+        Route::get('advisors/{advisor}/profile-documents/{document}', [AdvisorController::class, 'downloadProfileDocument'])->name('advisors.profile-documents.download');
         Route::get('advisors/excel-template', [AdvisorController::class, 'excelTemplate'])->name('advisors.excel-template');
         Route::get('advisors/export-excel', [AdvisorController::class, 'exportExcel'])->name('advisors.export-excel');
         Route::post('advisors/import-preview', [AdvisorController::class, 'importPreview'])->name('advisors.import-preview');

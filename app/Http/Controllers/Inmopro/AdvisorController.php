@@ -15,10 +15,12 @@ use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
 use App\Models\Inmopro\AdvisorMaterialItem;
 use App\Models\Inmopro\AdvisorMaterialType;
+use App\Models\Inmopro\AdvisorProfileDocument;
 use App\Models\Inmopro\AdvisorMembership;
 use App\Models\Inmopro\City;
 use App\Models\Inmopro\MembershipType;
 use App\Models\Inmopro\Team;
+use App\Services\Inmopro\AdvisorProfileService;
 use App\Services\Inmopro\AdvisorsExcelImportService;
 use App\Support\InertiaListingRedirect;
 use Carbon\Carbon;
@@ -27,11 +29,13 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdvisorController extends Controller
 {
@@ -160,6 +164,7 @@ class AdvisorController extends Controller
             $advisorForModal = Advisor::with([
                 'level',
                 'city',
+                'profile.documents',
                 'materialItems' => fn ($q) => $q->orderByDesc('delivered_at')->orderByDesc('id'),
                 'materialItems.type',
             ])->find($request->input('advisor_id'));
@@ -355,18 +360,41 @@ class AdvisorController extends Controller
         ]));
     }
 
-    public function store(StoreAdvisorRequest $request): RedirectResponse
+    public function new(): Response
+    {
+        return Inertia::render('inmopro/advisors/new', [
+            'advisorLevels' => AdvisorLevel::orderBy('sort_order')->get(['id', 'name']),
+            'advisorsList' => Advisor::orderBy('name')->get(['id', 'name']),
+            'teams' => Team::orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'color']),
+            'cities' => City::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'department']),
+            'materialTypes' => AdvisorMaterialType::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'code', 'name']),
+        ]);
+    }
+
+    public function store(StoreAdvisorRequest $request, AdvisorProfileService $profileService): RedirectResponse
     {
         $validated = $request->validated();
         $materialItems = $validated['material_items'] ?? null;
-        unset($validated['material_items']);
+        $profileData = $validated['profile'] ?? null;
+        unset($validated['material_items'], $validated['profile']);
 
         $validated['username'] = $validated['username'] ?? str((string) $validated['email'])->before('@')->slug('_')->value();
         $validated['pin'] = $validated['pin'] ?? '123456';
         $validated['is_active'] = $validated['is_active'] ?? true;
 
-        $advisor = Advisor::create($validated);
-        $this->syncAdvisorMaterialItems($advisor, $materialItems);
+        DB::transaction(function () use ($validated, $materialItems, $profileData, $request, $profileService): void {
+            $advisor = Advisor::create($validated);
+            $this->syncAdvisorMaterialItems($advisor, $materialItems);
+            $profileService->syncFromRequest($advisor, $profileData, $request);
+        });
 
         return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))->with('success', 'Vendedor registrado correctamente.');
     }
@@ -387,11 +415,12 @@ class AdvisorController extends Controller
         ]));
     }
 
-    public function update(UpdateAdvisorRequest $request, Advisor $advisor): RedirectResponse
+    public function update(UpdateAdvisorRequest $request, Advisor $advisor, AdvisorProfileService $profileService): RedirectResponse
     {
         $validated = $request->validated();
         $materialItems = $validated['material_items'] ?? null;
-        unset($validated['material_items']);
+        $profileData = $validated['profile'] ?? null;
+        unset($validated['material_items'], $validated['profile']);
 
         $validated['username'] = $validated['username'] ?? $advisor->username ?? str((string) ($validated['email'] ?? $advisor->email))->before('@')->slug('_')->value();
         $validated['is_active'] = $validated['is_active'] ?? $advisor->is_active ?? true;
@@ -400,10 +429,27 @@ class AdvisorController extends Controller
             unset($validated['pin']);
         }
 
-        $advisor->update($validated);
-        $this->syncAdvisorMaterialItems($advisor->fresh(), $materialItems);
+        DB::transaction(function () use ($advisor, $validated, $materialItems, $profileData, $request, $profileService): void {
+            $advisor->update($validated);
+            $this->syncAdvisorMaterialItems($advisor->fresh(), $materialItems);
+            $profileService->syncFromRequest($advisor->fresh(), $profileData, $request);
+        });
 
         return redirect()->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request));
+    }
+
+    public function downloadProfileDocument(Advisor $advisor, AdvisorProfileDocument $document): StreamedResponse
+    {
+        $document->load('profile');
+        abort_unless($document->profile && $document->profile->advisor_id === $advisor->id, 404);
+
+        if (! Storage::disk('local')->exists($document->file_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('local')->response($document->file_path, $document->file_name, [
+            'Content-Type' => $document->mime_type ?: 'application/octet-stream',
+        ]);
     }
 
     public function updateCazadorAccess(UpdateAdvisorCazadorAccessRequest $request, Advisor $advisor): RedirectResponse
