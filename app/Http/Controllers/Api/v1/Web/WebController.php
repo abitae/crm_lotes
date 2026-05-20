@@ -9,6 +9,7 @@ use App\Models\Inmopro\Project;
 use App\Models\Inmopro\ProjectAsset;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -61,17 +62,26 @@ class WebController extends Controller
     }
 
     /**
-     * Sirve un archivo de proyecto (imagen, vídeo o documento) para usar las URLs públicas del JSON.
+     * Redirige al archivo en disco público ({APP_URL}/storage/...).
+     * Compatibilidad: misma ruta que el campo `url` cuando se usaba proxy por API.
      */
-    public function asset(Project $project, ProjectAsset $asset): StreamedResponse
+    public function asset(Project $project, ProjectAsset $asset): RedirectResponse|StreamedResponse
     {
         abort_unless($asset->project_id === $project->id && $asset->is_active, 404);
 
-        if (! Storage::disk('local')->exists($asset->file_path)) {
+        $disk = Storage::disk(ProjectAsset::storageDisk());
+
+        if (! $disk->exists($asset->file_path)) {
             abort(404);
         }
 
-        return Storage::disk('local')->response($asset->file_path, $asset->file_name, [
+        $publicUrl = $disk->url($asset->file_path);
+
+        if ($publicUrl !== '') {
+            return redirect($publicUrl);
+        }
+
+        return $disk->response($asset->file_path, $asset->file_name, [
             'Content-Type' => $asset->mime_type ?: 'application/octet-stream',
         ]);
     }
@@ -134,8 +144,8 @@ class WebController extends Controller
                 'name' => $project->projectType->name,
                 'code' => $project->projectType->code,
             ] : null,
-            'images' => $images->map(fn (ProjectAsset $a) => $this->assetPayload($project, $a))->all(),
-            'videos' => $videos->map(fn (ProjectAsset $a) => $this->assetPayload($project, $a))->all(),
+            'images' => $images->map(fn (ProjectAsset $a) => $this->assetPayload($a))->all(),
+            'videos' => $videos->map(fn (ProjectAsset $a) => $this->assetPayload($a))->all(),
             'images_count' => $images->count(),
             'videos_count' => $videos->count(),
         ];
@@ -144,7 +154,7 @@ class WebController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function assetPayload(Project $project, ProjectAsset $asset): array
+    private function assetPayload(ProjectAsset $asset): array
     {
         return [
             'id' => $asset->id,
@@ -153,7 +163,7 @@ class WebController extends Controller
             'file_name' => $asset->file_name,
             'mime_type' => $asset->mime_type,
             'file_size' => $asset->file_size,
-            'url' => route('api.v1.web.projects.assets.show', [$project, $asset]),
+            'url' => Storage::disk(ProjectAsset::storageDisk())->url($asset->file_path),
         ];
     }
 

@@ -66,8 +66,8 @@ class CazadorCatalogTest extends TestCase
     {
         $advisor = Advisor::firstOrFail();
         $project = Project::query()->firstOrFail();
-        Storage::fake('local');
-        $storedPath = UploadedFile::fake()->image('masterplan.png')->store("projects/{$project->id}/images", 'local');
+        Storage::fake('public');
+        $storedPath = UploadedFile::fake()->image('masterplan.png')->store("projects/{$project->id}/images", 'public');
         ProjectAsset::create([
             'project_id' => $project->id,
             'kind' => 'image',
@@ -91,11 +91,11 @@ class CazadorCatalogTest extends TestCase
 
     public function test_advisor_can_download_project_asset(): void
     {
-        Storage::fake('local');
+        Storage::fake('public');
 
         $advisor = Advisor::firstOrFail();
         $project = Project::query()->firstOrFail();
-        $storedPath = UploadedFile::fake()->create('brochure.pdf', 120, 'application/pdf')->store("projects/{$project->id}/documents", 'local');
+        $storedPath = UploadedFile::fake()->create('brochure.pdf', 120, 'application/pdf')->store("projects/{$project->id}/documents", 'public');
         $asset = ProjectAsset::create([
             'project_id' => $project->id,
             'kind' => 'document',

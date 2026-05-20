@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProjectAsset extends Model
 {
+    public static function storageDisk(): string
+    {
+        return 'public';
+    }
+
     /**
      * @var list<string>
      */

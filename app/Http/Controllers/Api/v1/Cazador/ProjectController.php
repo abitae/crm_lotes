@@ -46,7 +46,7 @@ class ProjectController extends Controller
     {
         abort_unless($asset->project_id === $project->id && $asset->is_active, 404);
 
-        return Storage::disk('local')->download($asset->file_path, $asset->file_name);
+        return Storage::disk(ProjectAsset::storageDisk())->download($asset->file_path, $asset->file_name);
     }
 
     /**

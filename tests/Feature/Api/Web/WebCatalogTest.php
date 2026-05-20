@@ -91,12 +91,39 @@ class WebCatalogTest extends TestCase
             ]);
     }
 
-    public function test_public_asset_response(): void
+    public function test_catalog_returns_public_storage_urls_for_images(): void
     {
-        Storage::fake('local');
+        Storage::fake('public');
 
         $project = Project::query()->firstOrFail();
-        $storedPath = UploadedFile::fake()->image('plan.png')->store("projects/{$project->id}/images", 'local');
+        $storedPath = UploadedFile::fake()->image('plan.png')->store("projects/{$project->id}/images", 'public');
+        ProjectAsset::create([
+            'project_id' => $project->id,
+            'kind' => 'image',
+            'title' => 'Plan',
+            'file_name' => 'plan.png',
+            'file_path' => $storedPath,
+            'mime_type' => 'image/png',
+            'file_size' => 500,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson(route('api.v1.web.projects.show', $project));
+
+        $response->assertOk();
+        $url = $response->json('data.images.0.url');
+        $this->assertIsString($url);
+        $this->assertStringContainsString('/storage/', $url);
+        $this->assertStringContainsString($storedPath, $url);
+    }
+
+    public function test_public_asset_route_redirects_to_storage_url(): void
+    {
+        Storage::fake('public');
+
+        $project = Project::query()->firstOrFail();
+        $storedPath = UploadedFile::fake()->image('plan.png')->store("projects/{$project->id}/images", 'public');
         $asset = ProjectAsset::create([
             'project_id' => $project->id,
             'kind' => 'image',
@@ -109,7 +136,9 @@ class WebCatalogTest extends TestCase
             'is_active' => true,
         ]);
 
+        $expectedUrl = Storage::disk('public')->url($storedPath);
+
         $this->get(route('api.v1.web.projects.assets.show', [$project, $asset]))
-            ->assertOk();
+            ->assertRedirect($expectedUrl);
     }
 }

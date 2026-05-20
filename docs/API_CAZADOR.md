@@ -3,7 +3,7 @@
 ## Resumen
 `Cazador` es el API para vendedores. El acceso es solo para `advisors` y usa autenticacion por token propio.
 
-Catálogo público de proyectos (sin token, para web): [API_WEB.md](./API_WEB.md).
+Catálogo público de proyectos (sin token, para web): [API_WEB.md](./API_WEB.md). Prompt Cursor (React): [PROMPT_CURSOR_REACT_WEB_API.md](./PROMPT_CURSOR_REACT_WEB_API.md).
 
 Análisis de arquitectura y reglas de negocio: [ANALISIS_API_CAZADOR.md](./ANALISIS_API_CAZADOR.md).
 

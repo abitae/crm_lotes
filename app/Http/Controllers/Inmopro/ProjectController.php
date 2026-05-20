@@ -207,7 +207,7 @@ class ProjectController extends Controller
     {
         $project->load('assets');
         foreach ($project->assets as $asset) {
-            Storage::disk('local')->delete($asset->file_path);
+            Storage::disk(ProjectAsset::storageDisk())->delete($asset->file_path);
         }
         $project->delete();
 
@@ -218,14 +218,14 @@ class ProjectController extends Controller
     {
         abort_unless($asset->project_id === $project->id, 404);
 
-        return Storage::disk('local')->download($asset->file_path, $asset->file_name);
+        return Storage::disk(ProjectAsset::storageDisk())->download($asset->file_path, $asset->file_name);
     }
 
     public function destroyAsset(Project $project, ProjectAsset $asset): RedirectResponse
     {
         abort_unless($asset->project_id === $project->id, 404);
 
-        Storage::disk('local')->delete($asset->file_path);
+        Storage::disk(ProjectAsset::storageDisk())->delete($asset->file_path);
         $asset->delete();
 
         return back()->with('success', 'Adjunto eliminado correctamente.');
@@ -301,7 +301,7 @@ class ProjectController extends Controller
     private function createAsset(Project $project, UploadedFile $file, string $kind, int $sortOrder): void
     {
         $directory = sprintf('projects/%d/%ss', $project->id, $kind);
-        $storedPath = $file->store($directory, 'local');
+        $storedPath = $file->store($directory, ProjectAsset::storageDisk());
 
         $project->assets()->create([
             'kind' => $kind,
