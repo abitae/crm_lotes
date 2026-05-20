@@ -92,7 +92,7 @@ Prefijo: **`/api/v1/web`** (montado bajo `/api` en `routes/api.php`).
 
 | Método | Ruta | Auth | Notas |
 |--------|------|------|--------|
-| GET | `projects` | No | Incluye `summary` + `data[]`; throttle 120/min por IP |
+| GET | `projects` | No | Incluye `summary` + `meta` + `data[]`; paginación y filtros por query; throttle 120/min por IP |
 | GET | `projects/{id}` | No | Un proyecto; forma igual a un ítem de `data` |
 | GET | `projects/{project}/assets/{asset}` | No | **Opcional:** redirección 302 a `url` pública; preferir `url` del JSON |
 
@@ -129,6 +129,27 @@ Prefijo: **`/api/v1/web`** (montado bajo `/api` en `routes/api.php`).
 
 ```typescript
 // WEB_API_V1_BASE_PATH = '/api/v1/web'
+
+export type WebProjectsIndexMeta = {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+  from: number | null;
+  to: number | null;
+};
+
+export type WebProjectsIndexQuery = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  location?: string;
+  project_type_id?: number;
+  has_free_lots?: boolean;
+  has_images?: boolean;
+  has_videos?: boolean;
+  order?: 'name' | 'name_desc' | 'lots_desc' | 'free_lots_desc';
+};
 
 export type WebCatalogSummary = {
   projects_count: number;
@@ -172,6 +193,7 @@ export type WebProject = {
 // GET /api/v1/web/projects
 export type WebProjectsIndexResponse = {
   summary: WebCatalogSummary;
+  meta: WebProjectsIndexMeta;
   data: WebProject[];
 };
 
@@ -202,14 +224,25 @@ import {
 
 const baseUrl = resolveWebApiBaseUrl();
 
-// Listado
-const catalog: WebProjectsCatalogPageProps = await fetchWebProjectsCatalog({ baseUrl });
+// Listado (paginación y filtros opcionales)
+const catalog: WebProjectsCatalogPageProps = await fetchWebProjectsCatalog(
+  { baseUrl },
+  {
+    page: 1,
+    per_page: 12,
+    search: 'Olivos',
+    has_free_lots: true,
+    order: 'free_lots_desc',
+  },
+);
+
+// Paginación en UI: catalog.meta.current_page, catalog.meta.last_page, catalog.meta.total
 
 // Detalle
 const detail: WebProjectDetailPageProps = await fetchWebProject(1, { baseUrl });
 ```
 
-Envolver con **TanStack Query** (`queryKey: ['web', 'projects']`) para cache y estados loading/error.
+Envolver con **TanStack Query** (`queryKey: ['web', 'projects', query]`) para cache y estados loading/error; incluir los filtros en `queryKey` cuando cambien.
 
 ---
 
@@ -314,7 +347,7 @@ import { ProjectCard } from '@/components/catalog/ProjectCard';
 import { CatalogSummary } from '@/components/catalog/CatalogSummary';
 
 export function ProjectsCatalogPage(props: WebProjectsCatalogPageProps) {
-  const { summary, data } = props;
+  const { summary, meta, data } = props;
 
   return (
     <main className="mx-auto max-w-6xl p-6">
@@ -348,7 +381,8 @@ export function ProjectsCatalogContainer() {
 
 ## 13. Checklist de aceptación (QA)
 
-- [ ] `GET /projects` sin cabeceras de auth devuelve 200 con `summary` y `data`.
+- [ ] `GET /projects` sin cabeceras de auth devuelve 200 con `summary`, `meta` y `data`.
+- [ ] Paginación/filtros documentados en [API_WEB.md](./API_WEB.md) funcionan (`meta.total`, `page`, `search`).
 - [ ] Cada proyecto muestra `free_lots_count` coherente con la UI.
 - [ ] Imagen de portada carga desde `images[0].url` (ruta `/storage/...`).
 - [ ] Detalle `GET /projects/{id}` muestra galería y vídeos.

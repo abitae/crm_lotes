@@ -357,6 +357,8 @@ class ProjectController extends Controller
      */
     private function assetPayload(Project $project, ProjectAsset $asset): array
     {
+        $previewUrl = $this->assetPreviewUrl($asset);
+
         return [
             'id' => $asset->id,
             'kind' => $asset->kind,
@@ -367,6 +369,24 @@ class ProjectController extends Controller
             'sort_order' => $asset->sort_order,
             'is_active' => $asset->is_active,
             'download_url' => route('inmopro.projects.assets.download', [$project, $asset]),
+            'preview_url' => $previewUrl,
         ];
+    }
+
+    private function assetPreviewUrl(ProjectAsset $asset): ?string
+    {
+        if ($asset->kind !== 'image' && ! str_starts_with((string) $asset->mime_type, 'image/')) {
+            return null;
+        }
+
+        $disk = Storage::disk(ProjectAsset::storageDisk());
+
+        if (! $disk->exists($asset->file_path)) {
+            return null;
+        }
+
+        $url = $disk->url($asset->file_path);
+
+        return $url !== '' ? $url : null;
     }
 }

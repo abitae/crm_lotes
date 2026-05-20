@@ -7,6 +7,29 @@
 /** Base path del API (sin dominio). */
 export const WEB_API_V1_BASE_PATH = '/api/v1/web' as const;
 
+/** Metadatos de paginación en GET /api/v1/web/projects */
+export type WebProjectsIndexMeta = {
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+    from: number | null;
+    to: number | null;
+};
+
+/** Query params opcionales para GET /api/v1/web/projects */
+export type WebProjectsIndexQuery = {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    location?: string;
+    project_type_id?: number;
+    has_free_lots?: boolean;
+    has_images?: boolean;
+    has_videos?: boolean;
+    order?: 'name' | 'name_desc' | 'lots_desc' | 'free_lots_desc';
+};
+
 /** Resumen global en GET /api/v1/web/projects */
 export type WebCatalogSummary = {
     projects_count: number;
@@ -56,6 +79,7 @@ export type WebProject = {
 /** Respuesta exacta: GET /api/v1/web/projects */
 export type WebProjectsIndexResponse = {
     summary: WebCatalogSummary;
+    meta: WebProjectsIndexMeta;
     data: WebProject[];
 };
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\v1\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\v1\Web\IndexWebProjectsRequest;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
@@ -10,6 +11,7 @@ use App\Models\Inmopro\ProjectAsset;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -18,26 +20,22 @@ class WebController extends Controller
     /**
      * Catálogo público de proyectos: totales globales, lotes y activos (imágenes / vídeos).
      */
-    public function index(): JsonResponse
+    public function index(IndexWebProjectsRequest $request): JsonResponse
     {
-        $projects = Project::query()
-            ->with(['projectType'])
-            ->with(['assets' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('id')])
-            ->withCount('lots')
-            ->withCount([
-                'lots as free_lots_count' => fn (Builder $b) => $b->whereHas(
-                    'status',
-                    fn (Builder $s) => $s->where('code', LotStatus::CODE_LIBRE)
-                ),
-            ])
-            ->orderBy('name')
-            ->get();
-
-        $data = $projects->map(fn (Project $project) => $this->projectPayload($project))->all();
+        $paginator = $this->applyIndexFilters(
+            $this->baseProjectQuery(),
+            $request
+        )
+            ->paginate($request->perPage())
+            ->withQueryString();
 
         return response()->json([
             'summary' => $this->summaryPayload(),
-            'data' => $data,
+            'meta' => $this->paginationMeta($paginator),
+            'data' => $paginator->getCollection()
+                ->map(fn (Project $project) => $this->projectPayload($project))
+                ->values()
+                ->all(),
         ]);
     }
 
@@ -87,6 +85,107 @@ class WebController extends Controller
     }
 
     /**
+     * @return Builder<Project>
+     */
+    private function baseProjectQuery(): Builder
+    {
+        return Project::query()
+            ->with(['projectType'])
+            ->with(['assets' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('id')])
+            ->withCount('lots')
+            ->withCount([
+                'lots as free_lots_count' => fn (Builder $b) => $b->whereHas(
+                    'status',
+                    fn (Builder $s) => $s->where('code', LotStatus::CODE_LIBRE)
+                ),
+            ]);
+    }
+
+    /**
+     * @param  Builder<Project>  $query
+     * @return Builder<Project>
+     */
+    private function applyIndexFilters(Builder $query, IndexWebProjectsRequest $request): Builder
+    {
+        $validated = $request->validated();
+
+        if (! empty($validated['search'])) {
+            $term = trim((string) $validated['search']);
+            $query->where(function (Builder $builder) use ($term): void {
+                $builder->where('name', 'like', "%{$term}%")
+                    ->orWhere('location', 'like', "%{$term}%");
+            });
+        }
+
+        if (! empty($validated['location'])) {
+            $query->where('location', (string) $validated['location']);
+        }
+
+        if (! empty($validated['project_type_id'])) {
+            $query->where('project_type_id', (int) $validated['project_type_id']);
+        }
+
+        if (filter_var($validated['has_free_lots'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->whereHas('lots', fn (Builder $b) => $b->whereHas(
+                'status',
+                fn (Builder $s) => $s->where('code', LotStatus::CODE_LIBRE)
+            ));
+        }
+
+        if (filter_var($validated['has_images'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->whereHas('assets', fn (Builder $b) => $b
+                ->where('is_active', true)
+                ->where(fn (Builder $assetQuery) => $this->applyImageAssetScope($assetQuery)));
+        }
+
+        if (filter_var($validated['has_videos'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $query->whereHas('assets', fn (Builder $b) => $b
+                ->where('is_active', true)
+                ->where(fn (Builder $assetQuery) => $this->applyVideoAssetScope($assetQuery)));
+        }
+
+        return match ($validated['order'] ?? 'name') {
+            'name_desc' => $query->orderByDesc('name'),
+            'lots_desc' => $query->orderByDesc('lots_count')->orderBy('name'),
+            'free_lots_desc' => $query->orderByDesc('free_lots_count')->orderBy('name'),
+            default => $query->orderBy('name'),
+        };
+    }
+
+    /**
+     * @param  Builder<ProjectAsset>  $query
+     */
+    private function applyImageAssetScope(Builder $query): void
+    {
+        $query->where('kind', 'image')
+            ->orWhere('mime_type', 'like', 'image/%');
+    }
+
+    /**
+     * @param  Builder<ProjectAsset>  $query
+     */
+    private function applyVideoAssetScope(Builder $query): void
+    {
+        $query->where('kind', 'video')
+            ->orWhere('mime_type', 'like', 'video/%');
+    }
+
+    /**
+     * @return array<string, int|null>
+     */
+    private function paginationMeta(LengthAwarePaginator $paginator): array
+    {
+        return [
+            'current_page' => $paginator->currentPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'last_page' => $paginator->lastPage(),
+            'from' => $paginator->firstItem(),
+            'to' => $paginator->lastItem(),
+        ];
+    }
+
+    /**
      * @return array<string, int>
      */
     private function summaryPayload(): array
@@ -99,16 +198,14 @@ class WebController extends Controller
         $imagesTotal = ProjectAsset::query()
             ->where('is_active', true)
             ->where(function (Builder $q): void {
-                $q->where('kind', 'image')
-                    ->orWhere('mime_type', 'like', 'image/%');
+                $this->applyImageAssetScope($q);
             })
             ->count();
 
         $videosTotal = ProjectAsset::query()
             ->where('is_active', true)
             ->where(function (Builder $q): void {
-                $q->where('kind', 'video')
-                    ->orWhere('mime_type', 'like', 'video/%');
+                $this->applyVideoAssetScope($q);
             })
             ->count();
 

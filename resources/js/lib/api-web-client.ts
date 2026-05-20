@@ -1,6 +1,7 @@
 import {
     WEB_API_V1_BASE_PATH,
     type WebProjectShowResponse,
+    type WebProjectsIndexQuery,
     type WebProjectsIndexResponse,
 } from '@/types/api-web';
 
@@ -36,16 +37,47 @@ async function parseJson<T>(response: Response): Promise<T> {
     return response.json() as Promise<T>;
 }
 
+function buildProjectsIndexQuery(query?: WebProjectsIndexQuery): string {
+    if (!query) {
+        return '';
+    }
+
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(query)) {
+        if (value === undefined || value === null || value === '') {
+            continue;
+        }
+
+        if (typeof value === 'boolean') {
+            params.set(key, value ? '1' : '0');
+            continue;
+        }
+
+        params.set(key, String(value));
+    }
+
+    const serialized = params.toString();
+
+    return serialized ? `?${serialized}` : '';
+}
+
 /** GET /api/v1/web/projects */
-export async function fetchWebProjectsCatalog(options: WebApiClientOptions): Promise<WebProjectsIndexResponse> {
-    const response = await fetch(buildUrl(options.baseUrl, `${WEB_API_V1_BASE_PATH}/projects`), {
-        method: 'GET',
-        headers: {
-            Accept: 'application/json',
-            ...options.headers,
+export async function fetchWebProjectsCatalog(
+    options: WebApiClientOptions,
+    query?: WebProjectsIndexQuery,
+): Promise<WebProjectsIndexResponse> {
+    const response = await fetch(
+        buildUrl(options.baseUrl, `${WEB_API_V1_BASE_PATH}/projects${buildProjectsIndexQuery(query)}`),
+        {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json',
+                ...options.headers,
+            },
+            signal: options.signal,
         },
-        signal: options.signal,
-    });
+    );
 
     return parseJson<WebProjectsIndexResponse>(response);
 }

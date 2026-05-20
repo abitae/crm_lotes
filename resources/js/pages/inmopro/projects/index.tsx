@@ -42,6 +42,7 @@ type ImportPreviewRow = {
     area: number | null;
     price: number | null;
     client_name: string | null;
+    client_phone: string | null;
     client_dni: string | null;
     status: string;
     errors: string[];
@@ -557,7 +558,10 @@ function ProjectExcelImportModal({
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="space-y-2 text-sm text-slate-700">
                                 <p className="text-[11px] font-black uppercase tracking-widest text-emerald-700">Plantilla oficial</p>
-                                <p>La plantilla usa una sola hoja con filas de lotes. El nombre de la hoja se toma como nombre inicial del proyecto.</p>
+                                <p>
+                                    La plantilla incluye la columna <strong>PROYECTO</strong> (mismo nombre en todas las filas),{' '}
+                                    <strong>TELEFONO</strong> del cliente y el resto de campos de lotes.
+                                </p>
                                 <p className="font-semibold text-slate-800">Campos obligatorios del modal</p>
                                 <p>Ubicacion y tipo de proyecto deben completarse antes de validar el Excel.</p>
                             </div>
@@ -698,6 +702,7 @@ function ProjectExcelImportModal({
                                             <th className="px-4 py-3">Area</th>
                                             <th className="px-4 py-3">Monto</th>
                                             <th className="px-4 py-3">Cliente</th>
+                                            <th className="px-4 py-3">Teléfono</th>
                                             <th className="px-4 py-3">Estado</th>
                                             <th className="px-4 py-3">Resultado</th>
                                         </tr>
@@ -711,6 +716,7 @@ function ProjectExcelImportModal({
                                                 <td className="px-4 py-3 text-slate-700">{row.area ?? '-'}</td>
                                                 <td className="px-4 py-3 text-slate-700">{row.price ?? '-'}</td>
                                                 <td className="px-4 py-3 text-slate-700">{row.client_name ?? '-'}</td>
+                                                <td className="px-4 py-3 text-slate-700">{row.client_phone ?? '-'}</td>
                                                 <td className="px-4 py-3 text-slate-700">{row.status}</td>
                                                 <td className="px-4 py-3">
                                                     {row.errors.length === 0 ? (

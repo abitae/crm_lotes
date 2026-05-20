@@ -1,137 +1,435 @@
-# API Web (catálogo público)
+# API Web — Catálogo público de proyectos
 
-## Resumen
+Guía para **aplicaciones externas** (sitio web, app móvil, landing, etc.) que consumen el catálogo de proyectos vía HTTP.
 
-API **sin autenticación** para sitios web, landings o apps que muestran el catálogo de **proyectos Inmopro**: ubicación, tipo, conteo de lotes, lotes libres e imágenes/vídeos promocionales.
+**Alcance:** solo lectura del catálogo. No cubre administración del CRM, subida de archivos ni configuración del servidor.
+
+---
+
+## 1. Resumen
 
 | Concepto | Valor |
 |----------|--------|
-| Base path | `/api/v1/web` |
-| Formato | JSON (`Content-Type: application/json`) |
-| Autenticación | Ninguna |
-| Rate limit | `120` solicitudes por minuto por IP (`throttle:120,1`) |
-| Medios | Disco **`public`** → URLs directas bajo `{APP_URL}/storage/...` |
+| URL base del API | `{BASE_URL}/api/v1/web` |
+| Ejemplo | `https://api.ejemplo.com/api/v1/web` |
+| Formato | JSON |
+| Autenticación | **Ninguna** (no enviar `Authorization`) |
+| Rate limit | 120 solicitudes por minuto por IP |
+| Métodos | Solo `GET` |
 
-Documentación relacionada:
+`{BASE_URL}` es el dominio que te indique el equipo del backend (producción o staging). Todas las rutas de este documento se concatenan a ese origen.
 
-- API vendedores (Cazador): [API_CAZADOR.md](./API_CAZADOR.md)
-- API dateros: [API_DATERO.md](./API_DATERO.md)
-- **Prompt Cursor (React + Laravel):** [PROMPT_CURSOR_REACT_WEB_API.md](./PROMPT_CURSOR_REACT_WEB_API.md)
+**Cabecera recomendada**
 
-Controlador: `App\Http\Controllers\Api\v1\Web\WebController`.
+| Cabecera | Valor |
+|----------|--------|
+| `Accept` | `application/json` |
 
-Tipos y cliente en el monorepo: `resources/js/types/api-web.ts`, `resources/js/lib/api-web-client.ts`.
+---
 
-## Requisitos de almacenamiento (servidor)
+## 2. Inicio rápido
 
-Los archivos de proyecto (imágenes, vídeos, documentos subidos desde Inmopro) se guardan en **`storage/app/public`**, no en el disco privado `local`.
+```bash
+curl -s -H "Accept: application/json" \
+  "https://api.ejemplo.com/api/v1/web/projects?per_page=5"
+```
 
-1. En `.env`, define la URL pública correcta:
-   ```env
-   APP_URL=https://tu-dominio.com
-   ```
-2. Crea el enlace simbólico (una vez por entorno):
-   ```bash
-   php artisan storage:link
-   ```
-3. Tras subir medios en **Inmopro → Proyectos**, el archivo queda en rutas como:
-   `storage/app/public/projects/{projectId}/images/{nombre-generado}.jpg`
-4. El JSON del API expone la URL pública:
-   `https://tu-dominio.com/storage/projects/{projectId}/images/{nombre-generado}.jpg`
-
-Puedes usar esa URL en `<img src="...">`, `<video src="...">` o `fetch` sin pasar por el API.
-
-## Resumen global (`summary`)
-
-Incluido solo en **`GET /api/v1/web/projects`**:
-
-| Campo | Tipo | Descripción |
-|--------|------|-------------|
-| `projects_count` | int | Cantidad de proyectos |
-| `lots_total` | int | Total de lotes en el sistema |
-| `lots_free` | int | Lotes con estado `LIBRE` |
-| `images_total` | int | Activos activos clasificados como imagen |
-| `videos_total` | int | Activos activos clasificados como vídeo |
-
-## Clasificación de medios
-
-Solo activos con `is_active = true`, ordenados por `sort_order` e `id`.
-
-| Grupo | Criterio |
-|--------|-----------|
-| **Imagen** | `kind === "image"` **o** `mime_type` empieza por `image/` |
-| **Vídeo** | `kind === "video"` **o** `mime_type` empieza por `video/` |
-
-Los **documentos** (`kind === "document"`, PDF, etc.) **no** se listan en este API (sí en API Cazador para vendedores autenticados).
-
-## Lotes libres
-
-Un lote es **libre** si `lot_statuses.code === "LIBRE"` (misma regla que el panel Inmopro).
-
-## Objeto `project`
-
-Cada proyecto en `data` (listado o detalle) tiene:
-
-| Campo | Tipo | Descripción |
-|--------|------|-------------|
-| `id` | int | ID del proyecto |
-| `name` | string | Nombre comercial |
-| `location` | string\|null | Ubicación |
-| `blocks` | array | Bloques o sectores (JSON del proyecto) |
-| `total_lots` | int\|null | Total planificado |
-| `lots_count` | int | Lotes registrados en BD |
-| `free_lots_count` | int | Lotes en estado libre |
-| `project_type` | object\|null | `{ id, name, code }` |
-| `images_count` | int | Cantidad de imágenes en la respuesta |
-| `videos_count` | int | Cantidad de vídeos en la respuesta |
-| `images` | array | Lista de activos imagen |
-| `videos` | array | Lista de activos vídeo |
-
-## Objeto activo (imagen / vídeo)
-
-| Campo | Tipo | Descripción |
-|--------|------|-------------|
-| `id` | int | ID del activo |
-| `kind` | string | `image`, `video` (u otro si el MIME coincide) |
-| `title` | string | Título mostrado |
-| `file_name` | string | Nombre original del archivo |
-| `mime_type` | string | Tipo MIME |
-| `file_size` | int | Tamaño en bytes |
-| `url` | string | **URL pública absoluta** al archivo en `/storage/...` |
-
-## Endpoints
-
-### `GET /api/v1/web/projects`
-
-Lista todos los proyectos (orden: `name`) con resumen global.
-
-**Respuesta `200`**
+Respuesta (`200`):
 
 ```json
 {
   "summary": {
-    "projects_count": 3,
-    "lots_total": 150,
-    "lots_free": 42,
-    "images_total": 12,
-    "videos_total": 2
+    "projects_count": 4,
+    "lots_total": 295,
+    "lots_free": 120,
+    "images_total": 8,
+    "videos_total": 0
+  },
+  "meta": {
+    "current_page": 1,
+    "per_page": 5,
+    "total": 4,
+    "last_page": 1,
+    "from": 1,
+    "to": 4
   },
   "data": [
     {
       "id": 1,
+      "name": "Villa Norte - Mito",
+      "location": "Mito",
+      "free_lots_count": 12,
+      "images": [],
+      "videos": []
+    }
+  ]
+}
+```
+
+Detalle de un proyecto:
+
+```bash
+curl -s -H "Accept: application/json" \
+  "https://api.ejemplo.com/api/v1/web/projects/1"
+```
+
+---
+
+## 3. Endpoints
+
+### 3.1 Listado — `GET /projects`
+
+**URL:** `{BASE_URL}/api/v1/web/projects`
+
+Devuelve `summary`, `meta` y `data` (array de proyectos).
+
+#### Query params
+
+| Parámetro | Tipo | Default | Descripción |
+|-----------|------|---------|-------------|
+| `page` | int | `1` | Página actual (mín. 1) |
+| `per_page` | int | `15` | Ítems por página (máx. 50) |
+| `search` | string | — | Busca en nombre y ubicación (parcial) |
+| `location` | string | — | Ubicación exacta |
+| `project_type_id` | int | — | ID del tipo de proyecto |
+| `has_free_lots` | bool | — | `1` o `true`: solo con lotes disponibles (`LIBRE`) |
+| `has_images` | bool | — | Solo con al menos una imagen |
+| `has_videos` | bool | — | Solo con al menos un vídeo |
+| `order` | string | `name` | `name`, `name_desc`, `lots_desc`, `free_lots_desc` |
+
+**Orden (`order`)**
+
+| Valor | Resultado |
+|--------|-----------|
+| `name` | Nombre A→Z |
+| `name_desc` | Nombre Z→A |
+| `lots_desc` | Más lotes registrados primero |
+| `free_lots_desc` | Más lotes libres primero |
+
+**Ejemplo con filtros**
+
+```
+GET /api/v1/web/projects?search=Olivos&has_free_lots=1&per_page=10&page=1&order=free_lots_desc
+```
+
+**Respuestas**
+
+| Código | Significado |
+|--------|-------------|
+| `200` | OK |
+| `422` | Parámetro inválido (ver sección 7) |
+| `429` | Demasiadas peticiones; esperar y reintentar |
+
+---
+
+### 3.2 Detalle — `GET /projects/{id}`
+
+**URL:** `{BASE_URL}/api/v1/web/projects/{id}`
+
+Un solo proyecto en `data`. Misma estructura que un elemento del listado (sin `summary` ni `meta`).
+
+| Código | Significado |
+|--------|-------------|
+| `200` | OK |
+| `404` | Proyecto no existe |
+
+---
+
+### 3.3 Redirección de activo — `GET /projects/{projectId}/assets/{assetId}`
+
+**URL:** `{BASE_URL}/api/v1/web/projects/{projectId}/assets/{assetId}`
+
+**Opcional.** Responde `302` hacia la URL pública del archivo. En integraciones nuevas usa directamente el campo `url` del JSON (listado o detalle); no hace falta llamar a esta ruta.
+
+| Código | Significado |
+|--------|-------------|
+| `302` | Redirección a la URL del archivo |
+| `404` | Activo o proyecto no válido |
+
+---
+
+## 4. Estructura de la respuesta
+
+### 4.1 `summary` (solo listado)
+
+Totales **globales**. No cambian al filtrar el listado.
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `projects_count` | int | Total de proyectos en el sistema |
+| `lots_total` | int | Total de lotes |
+| `lots_free` | int | Lotes con estado `LIBRE` |
+| `images_total` | int | Imágenes activas en el sistema |
+| `videos_total` | int | Vídeos activos en el sistema |
+
+### 4.2 `meta` (solo listado)
+
+Paginación del resultado **filtrado**.
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `current_page` | int | Página actual |
+| `per_page` | int | Tamaño de página |
+| `total` | int | Proyectos que cumplen los filtros |
+| `last_page` | int | Última página |
+| `from` | int\|null | Primer ítem de la página |
+| `to` | int\|null | Último ítem de la página |
+
+`summary.projects_count` ≠ `meta.total` cuando hay filtros activos.
+
+### 4.3 Proyecto (`data[]` o `data`)
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | int | ID del proyecto |
+| `name` | string | Nombre |
+| `location` | string\|null | Ubicación |
+| `blocks` | array | Sectores o bloques |
+| `total_lots` | int\|null | Lotes planificados |
+| `lots_count` | int | Lotes registrados |
+| `free_lots_count` | int | Lotes en estado `LIBRE` |
+| `project_type` | object\|null | `{ id, name, code }` |
+| `images_count` | int | Cantidad de imágenes en la respuesta |
+| `videos_count` | int | Cantidad de vídeos en la respuesta |
+| `images` | array | Activos imagen |
+| `videos` | array | Activos vídeo |
+
+### 4.4 Activo (imagen / vídeo)
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | int | ID del activo |
+| `kind` | string | `image`, `video`, etc. |
+| `title` | string | Título |
+| `file_name` | string | Nombre de archivo |
+| `mime_type` | string | MIME |
+| `file_size` | int | Bytes |
+| `url` | string | URL absoluta del archivo (usar en `<img>`, `<video>`, descarga) |
+
+---
+
+## 5. Reglas que debe conocer tu app
+
+### Lotes libres
+
+- `free_lots_count` cuenta lotes con código de estado **`LIBRE`**.
+- Puedes filtrar el listado con `has_free_lots=1`.
+
+### Medios
+
+- Solo aparecen activos **activos**, ordenados por prioridad de visualización.
+- **Imagen:** `kind` es `image` o `mime_type` empieza por `image/`.
+- **Vídeo:** `kind` es `video` o `mime_type` empieza por `video/`.
+- PDFs y documentos **no** vienen en este API.
+
+### Uso de `url`
+
+Cada imagen o vídeo trae `url` lista para usar:
+
+```html
+<img src="https://api.ejemplo.com/storage/projects/1/images/foto.jpg" alt="..." />
+```
+
+No necesitas token ni cabeceras extra para cargar ese recurso. Si `url` devuelve 404, muestra un placeholder en tu UI.
+
+### Lo que este API no ofrece
+
+- Login ni tokens.
+- Alta o edición de proyectos, lotes o clientes.
+- Listado de lotes por proyecto.
+- Subida de archivos.
+
+Para esas funciones existen otros APIs internos del CRM (no documentados aquí).
+
+---
+
+## 6. Paginación
+
+**Primera página (por defecto):**
+
+```
+GET /api/v1/web/projects
+```
+
+**Página siguiente:** incrementa `page` y repite los mismos filtros:
+
+```
+GET /api/v1/web/projects?page=2&per_page=15&search=Olivos
+```
+
+**Ejemplo en código:**
+
+```javascript
+const hasNext = meta.current_page < meta.last_page;
+const nextPage = meta.current_page + 1;
+```
+
+---
+
+## 7. Errores
+
+| Código | Cuándo | Qué hacer en tu app |
+|--------|--------|---------------------|
+| `422` | Query param inválido | Mostrar error de búsqueda/filtros; revisar `errors` en JSON |
+| `404` | ID de proyecto inexistente | Página “no encontrado” |
+| `429` | Rate limit | Mensaje “intenta más tarde”; backoff |
+
+**Ejemplo `422`** (`per_page` > 50):
+
+```json
+{
+  "message": "The per page field must not be greater than 50.",
+  "errors": {
+    "per_page": ["The per page field must not be greater than 50."]
+  }
+}
+```
+
+---
+
+## 8. Ejemplos por plataforma
+
+### curl
+
+```bash
+BASE="https://api.ejemplo.com"
+
+curl -s -H "Accept: application/json" "$BASE/api/v1/web/projects?per_page=10"
+curl -s -H "Accept: application/json" "$BASE/api/v1/web/projects?search=Mito&has_free_lots=1"
+curl -s -H "Accept: application/json" "$BASE/api/v1/web/projects/4"
+```
+
+### JavaScript / TypeScript (fetch)
+
+```typescript
+const BASE_URL = 'https://api.ejemplo.com';
+
+type CatalogResponse = {
+  summary: { projects_count: number; lots_free: number };
+  meta: { current_page: number; last_page: number; total: number };
+  data: Array<{
+    id: number;
+    name: string;
+    location: string | null;
+    free_lots_count: number;
+    images: Array<{ url: string; title: string }>;
+  }>;
+};
+
+async function fetchProjects(page = 1): Promise<CatalogResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: '12',
+    has_free_lots: '1',
+  });
+
+  const res = await fetch(`${BASE_URL}/api/v1/web/projects?${params}`, {
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}`);
+  }
+
+  return res.json();
+}
+```
+
+### React (web)
+
+```jsx
+<img
+  src={project.images[0]?.url}
+  alt={project.images[0]?.title ?? project.name}
+  loading="lazy"
+/>
+```
+
+### React Native
+
+```jsx
+import { Image } from 'react-native';
+
+<Image
+  source={{ uri: project.images[0]?.url }}
+  accessibilityLabel={project.images[0]?.title}
+  style={{ width: '100%', height: 200 }}
+/>
+```
+
+Usa la misma `BASE_URL` en una variable de entorno de tu app (`.env`, `app.config.js`, etc.).
+
+---
+
+## 9. Flujo de integración
+
+```mermaid
+sequenceDiagram
+  participant App as App_externa
+  participant API as API_Web
+  participant CDN as URL_publica_medios
+
+  App->>API: GET /projects
+  API-->>App: JSON con images_url
+  App->>CDN: GET url del activo
+  CDN-->>App: imagen o video
+```
+
+1. Configura `BASE_URL` en tu aplicación.
+2. Listado: `GET /projects` con paginación y filtros según tu UI.
+3. Detalle: `GET /projects/{id}` al abrir un proyecto.
+4. Renderiza medios con `images[].url` y `videos[].url`.
+5. Maneja `404`, `422` y `429` en la interfaz.
+
+---
+
+## 10. Checklist del integrador
+
+- [ ] Tienes la `BASE_URL` correcta (staging vs producción).
+- [ ] Todas las peticiones llevan `Accept: application/json`.
+- [ ] No envías cabeceras de autenticación.
+- [ ] Paginación: usas `meta.last_page` y repites filtros en cada `page`.
+- [ ] Imágenes/vídeos cargan desde `url`, no desde rutas inventadas.
+- [ ] Probaste un `url` de ejemplo en navegador o emulador.
+- [ ] Manejas `429` sin reintentar en bucle agresivo.
+
+---
+
+## 11. Respuesta completa de ejemplo (listado)
+
+```json
+{
+  "summary": {
+    "projects_count": 4,
+    "lots_total": 295,
+    "lots_free": 120,
+    "images_total": 8,
+    "videos_total": 2
+  },
+  "meta": {
+    "current_page": 1,
+    "per_page": 15,
+    "total": 4,
+    "last_page": 1,
+    "from": 1,
+    "to": 4
+  },
+  "data": [
+    {
+      "id": 4,
       "name": "Residencial Los Olivos",
-      "location": "Lima Norte",
+      "location": "Concepción",
       "blocks": ["A", "B"],
-      "total_lots": 100,
-      "lots_count": 100,
-      "free_lots_count": 30,
+      "total_lots": 120,
+      "lots_count": 120,
+      "free_lots_count": 45,
       "project_type": {
         "id": 1,
-        "name": "Lotes residenciales",
-        "code": "RES"
+        "name": "Residencial",
+        "code": "RESIDENCIAL"
       },
-      "images_count": 2,
-      "videos_count": 1,
+      "images_count": 1,
+      "videos_count": 0,
       "images": [
         {
           "id": 10,
@@ -140,167 +438,15 @@ Lista todos los proyectos (orden: `name`) con resumen global.
           "file_name": "plan.png",
           "mime_type": "image/png",
           "file_size": 245760,
-          "url": "https://tu-dominio.com/storage/projects/1/images/abc123.png"
+          "url": "https://api.ejemplo.com/storage/projects/4/images/abc123.png"
         }
       ],
-      "videos": [
-        {
-          "id": 11,
-          "kind": "video",
-          "title": "Recorrido virtual",
-          "file_name": "tour.mp4",
-          "mime_type": "video/mp4",
-          "file_size": 15728640,
-          "url": "https://tu-dominio.com/storage/projects/1/videos/def456.mp4"
-        }
-      ]
+      "videos": []
     }
   ]
 }
 ```
 
-### `GET /api/v1/web/projects/{id}`
+---
 
-Detalle de un proyecto. Misma estructura que un elemento de `data` (sin `summary`).
-
-**Respuesta `200`**
-
-```json
-{
-  "data": {
-    "id": 1,
-    "name": "Residencial Los Olivos",
-    "location": "Lima Norte",
-    "blocks": ["A", "B"],
-    "total_lots": 100,
-    "lots_count": 100,
-    "free_lots_count": 30,
-    "project_type": { "id": 1, "name": "Lotes residenciales", "code": "RES" },
-    "images_count": 2,
-    "videos_count": 1,
-    "images": [],
-    "videos": []
-  }
-}
-```
-
-**Respuesta `404`**: proyecto inexistente.
-
-### `GET /api/v1/web/projects/{projectId}/assets/{assetId}` (opcional / compatibilidad)
-
-Redirige (`302`) a la **misma URL pública** que el campo `url` del JSON. Útil si guardaste enlaces antiguos al API en lugar del `/storage/...`.
-
-**Respuesta `302`**: `Location: {url pública}`
-
-**Respuesta `404`**: activo inactivo, pertenece a otro proyecto, o archivo no existe en disco.
-
-Ruta nombrada: `api.v1.web.projects.assets.show`.
-
-## Errores habituales
-
-| Código | Situación |
-|--------|-----------|
-| `404` | Proyecto o activo no encontrado, activo inactivo, archivo borrado del disco |
-| `429` | Demasiadas solicitudes (superar 120/min por IP) |
-
-Cuerpo de error Laravel estándar (JSON o HTML según cabecera `Accept`).
-
-## Ejemplos
-
-### curl
-
-```bash
-# Listado con resumen
-curl -s -H "Accept: application/json" \
-  "https://tu-dominio.com/api/v1/web/projects" | jq .
-
-# Detalle de proyecto
-curl -s -H "Accept: application/json" \
-  "https://tu-dominio.com/api/v1/web/projects/1" | jq .
-
-# Descargar / abrir imagen (URL directa recomendada)
-curl -sI "https://tu-dominio.com/storage/projects/1/images/abc123.png"
-
-# Compatibilidad: redirección desde ruta API
-curl -sI "https://tu-dominio.com/api/v1/web/projects/1/assets/10"
-```
-
-### JavaScript (fetch + UI)
-
-```javascript
-const baseUrl = 'https://tu-dominio.com';
-
-const res = await fetch(`${baseUrl}/api/v1/web/projects`, {
-  headers: { Accept: 'application/json' },
-});
-const { summary, data } = await res.json();
-
-console.log(`${summary.projects_count} proyectos, ${summary.lots_free} lotes libres`);
-
-for (const project of data) {
-  const cover = project.images[0]?.url;
-  if (cover) {
-    // Usar url directamente; no requiere token ni cabeceras extra
-    console.log(project.name, cover);
-  }
-}
-```
-
-### React (imagen de portada)
-
-```jsx
-{project.images[0] ? (
-  <img
-    src={project.images[0].url}
-    alt={project.images[0].title}
-    loading="lazy"
-  />
-) : null}
-```
-
-## Flujo recomendado para el front web
-
-```mermaid
-sequenceDiagram
-  participant Web as Sitio_web
-  participant API as API_v1_web
-  participant Storage as Public_storage
-
-  Web->>API: GET /projects
-  API-->>Web: JSON con url por imagen
-  Web->>Storage: GET url /storage/projects/...
-  Storage-->>Web: binario imagen o video
-```
-
-1. Cargar catálogo con `GET /projects` (o detalle con `GET /projects/{id}`).
-2. Mostrar `free_lots_count`, `location`, `project_type`.
-3. Usar `images[].url` y `videos[].url` como `src` directo.
-4. No cachear el JSON más de lo necesario; las URLs de `/storage` son estables mientras no se reemplace el archivo.
-
-## Subida de archivos (panel Inmopro)
-
-Este API **no** sube archivos. La carga se hace en el panel:
-
-- **Inmopro → Proyectos → Editar** → campos `image_files` y `document_files`.
-- Ruta en disco: `projects/{id}/images/` y `projects/{id}/documents/` en disco **`public`**.
-- Tras guardar, el catálogo web refleja los activos activos en el siguiente `GET /projects`.
-
-Para vídeos en el catálogo web, el activo debe registrarse con `kind = video` o `mime_type` `video/*` (según cómo se incorpore en negocio; hoy el formulario web sube imágenes y documentos).
-
-## Rutas registradas
-
-| Método | URI | Nombre |
-|--------|-----|--------|
-| GET | `/api/v1/web/projects` | `api.v1.web.projects.index` |
-| GET | `/api/v1/web/projects/{project}` | `api.v1.web.projects.show` |
-| GET | `/api/v1/web/projects/{project}/assets/{asset}` | `api.v1.web.projects.assets.show` |
-
-Definidas en `routes/api.php`.
-
-## Checklist de despliegue
-
-- [ ] `APP_URL` apunta al dominio público real (HTTPS en producción).
-- [ ] `php artisan storage:link` ejecutado.
-- [ ] Permisos de escritura en `storage/app/public`.
-- [ ] Probar una URL de ejemplo del JSON en el navegador (debe devolver la imagen, no 404).
-- [ ] Rate limit adecuado si el sitio tiene mucho tráfico (ajustar en `routes/api.php` si hace falta).
+*Contrato implementado en el backend Laravel (`/api/v1/web`). Ante cambios de campos o rutas, el equipo del API debe actualizar este documento.*

@@ -2,6 +2,9 @@
 
 namespace App\Services\Inmopro;
 
+use App\Models\Inmopro\Advisor;
+use App\Models\Inmopro\Client;
+use App\Models\Inmopro\ClientType;
 use App\Models\Inmopro\Lot;
 use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
@@ -26,6 +29,7 @@ class ProjectsExcelImportService
         'project_name' => ['PROYECTO'],
         'item' => ['ITEM'],
         'client_name' => ['NOMBRE CLIENTE'],
+        'client_phone' => ['TELEFONO', 'TELEFONO CLIENTE', 'CELULAR'],
         'block' => ['MZ', 'MANZANA'],
         'number' => ['LOTE', 'NRO LOTE', 'NUMERO LOTE'],
         'area' => ['AREA'],
@@ -130,6 +134,7 @@ class ProjectsExcelImportService
             $advance = $this->parseDecimalByField($cells, $headerMap, 'advance');
             $remainingBalance = $this->parseDecimalByField($cells, $headerMap, 'remaining_balance');
             $clientName = $this->cellStringByField($cells, $headerMap, 'client_name');
+            $clientPhone = $this->normalizeNullableDigits($this->cellStringByField($cells, $headerMap, 'client_phone'));
             $clientDni = $this->normalizeNullableDigits($this->cellStringByField($cells, $headerMap, 'client_dni'));
             $paymentLimitDate = $this->parseDateByField($cells, $headerMap, 'payment_limit_date');
             $contractDate = $this->parseDateByField($cells, $headerMap, 'contract_date');
@@ -195,6 +200,7 @@ class ProjectsExcelImportService
                 'area' => $area,
                 'price' => $price,
                 'client_name' => $clientName,
+                'client_phone' => $clientPhone,
                 'client_dni' => $clientDni,
                 'status' => $statusCode,
                 'errors' => array_map(fn (array $error): string => $error['message'], $rowErrors),
@@ -208,6 +214,7 @@ class ProjectsExcelImportService
                     'price' => $price,
                     'lot_status_id' => $lotStatusId,
                     'client_name' => $clientName,
+                    'client_phone' => $clientPhone,
                     'client_dni' => $clientDni,
                     'advance' => $advance,
                     'remaining_balance' => $remainingBalance,
@@ -323,7 +330,7 @@ class ProjectsExcelImportService
 
             foreach ($lotsPayload as $lotPayload) {
                 Lot::query()->create([
-                    ...$lotPayload,
+                    ...$this->lotAttributesForCreate($lotPayload),
                     'project_id' => $project->id,
                 ]);
             }
@@ -684,6 +691,61 @@ class ProjectsExcelImportService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $lotPayload
+     * @return array<string, mixed>
+     */
+    private function lotAttributesForCreate(array $lotPayload): array
+    {
+        $clientName = isset($lotPayload['client_name']) ? trim((string) $lotPayload['client_name']) : '';
+        $clientDni = $lotPayload['client_dni'] ?? null;
+        $clientPhone = $lotPayload['client_phone'] ?? null;
+
+        unset($lotPayload['client_phone']);
+
+        if ($clientName === '') {
+            return [
+                ...$lotPayload,
+                'client_id' => null,
+                'client_name' => null,
+                'client_dni' => null,
+            ];
+        }
+
+        $client = null;
+        if ($clientDni !== null && $clientDni !== '') {
+            $client = Client::query()->where('dni', $clientDni)->first();
+        }
+        if ($client === null) {
+            $client = Client::query()->where('name', $clientName)->first();
+        }
+
+        if ($client) {
+            $client->update([
+                'name' => $clientName,
+                'dni' => $clientDni ?? $client->dni,
+                'phone' => $clientPhone ?? $client->phone,
+            ]);
+        } else {
+            $defaultClientTypeId = ClientType::query()->where('code', 'PROSPECTO')->value('id')
+                ?? ClientType::query()->orderBy('sort_order')->value('id');
+            $client = Client::create([
+                'name' => $clientName,
+                'dni' => $clientDni ?: null,
+                'phone' => $clientPhone ?: null,
+                'client_type_id' => $defaultClientTypeId,
+                'advisor_id' => Advisor::query()->value('id'),
+            ]);
+        }
+
+        return [
+            ...$lotPayload,
+            'client_id' => $client->id,
+            'client_name' => $clientName,
+            'client_dni' => $clientDni,
+        ];
     }
 
     private function cacheKey(int $userId, string $token): string

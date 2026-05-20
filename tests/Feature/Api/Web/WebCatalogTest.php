@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Api\Web;
 
+use App\Models\Inmopro\LotStatus;
 use App\Models\Inmopro\Project;
 use App\Models\Inmopro\ProjectAsset;
+use App\Models\Inmopro\ProjectType;
 use Database\Seeders\Inmopro\AdvisorLevelSeeder;
 use Database\Seeders\Inmopro\AdvisorSeeder;
 use Database\Seeders\Inmopro\CitySeeder;
@@ -51,6 +53,14 @@ class WebCatalogTest extends TestCase
                     'images_total',
                     'videos_total',
                 ],
+                'meta' => [
+                    'current_page',
+                    'per_page',
+                    'total',
+                    'last_page',
+                    'from',
+                    'to',
+                ],
                 'data' => [
                     '*' => [
                         'id',
@@ -68,6 +78,65 @@ class WebCatalogTest extends TestCase
                     ],
                 ],
             ]);
+
+        $this->assertSame(Project::query()->count(), $response->json('meta.total'));
+    }
+
+    public function test_projects_catalog_supports_pagination(): void
+    {
+        $response = $this->getJson(route('api.v1.web.projects.index', [
+            'page' => 1,
+            'per_page' => 2,
+        ]));
+
+        $response->assertOk()
+            ->assertJsonPath('meta.current_page', 1)
+            ->assertJsonPath('meta.per_page', 2)
+            ->assertJsonPath('meta.total', Project::query()->count())
+            ->assertJsonCount(2, 'data');
+    }
+
+    public function test_projects_catalog_filters_by_search(): void
+    {
+        $project = Project::query()->where('name', 'Mirador 3.1')->firstOrFail();
+
+        $this->getJson(route('api.v1.web.projects.index', ['search' => 'Mirador']))
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $project->id);
+    }
+
+    public function test_projects_catalog_filters_by_project_type(): void
+    {
+        $type = ProjectType::query()->where('code', 'RESIDENCIAL')->firstOrFail();
+        $expectedCount = Project::query()->where('project_type_id', $type->id)->count();
+
+        $this->getJson(route('api.v1.web.projects.index', ['project_type_id' => $type->id]))
+            ->assertOk()
+            ->assertJsonPath('meta.total', $expectedCount);
+    }
+
+    public function test_projects_catalog_filters_projects_with_free_lots(): void
+    {
+        $expectedCount = Project::query()
+            ->whereHas('lots', fn ($q) => $q->whereHas(
+                'status',
+                fn ($s) => $s->where('code', LotStatus::CODE_LIBRE)
+            ))
+            ->count();
+
+        $this->getJson(route('api.v1.web.projects.index', ['has_free_lots' => 1]))
+            ->assertOk()
+            ->assertJsonPath('meta.total', $expectedCount);
+    }
+
+    public function test_projects_catalog_rejects_invalid_filters(): void
+    {
+        $this->getJson(route('api.v1.web.projects.index', [
+            'per_page' => 100,
+            'order' => 'invalid',
+        ]))
+            ->assertUnprocessable();
     }
 
     public function test_show_project_returns_payload(): void
