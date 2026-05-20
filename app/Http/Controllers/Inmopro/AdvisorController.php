@@ -15,8 +15,8 @@ use App\Models\Inmopro\Advisor;
 use App\Models\Inmopro\AdvisorLevel;
 use App\Models\Inmopro\AdvisorMaterialItem;
 use App\Models\Inmopro\AdvisorMaterialType;
-use App\Models\Inmopro\AdvisorProfileDocument;
 use App\Models\Inmopro\AdvisorMembership;
+use App\Models\Inmopro\AdvisorProfileDocument;
 use App\Models\Inmopro\City;
 use App\Models\Inmopro\MembershipType;
 use App\Models\Inmopro\Team;
@@ -112,6 +112,8 @@ class AdvisorController extends Controller
 
         $advisors = $query->orderBy('name')->paginate(20)->withQueryString();
         $advisors->getCollection()->transform(function (Advisor $advisor): Advisor {
+            $this->normalizeAdvisorDateAttributes($advisor);
+
             if (! $advisor->relationLoaded('memberships')) {
                 return $advisor;
             }
@@ -168,6 +170,10 @@ class AdvisorController extends Controller
                 'materialItems' => fn ($q) => $q->orderByDesc('delivered_at')->orderByDesc('id'),
                 'materialItems.type',
             ])->find($request->input('advisor_id'));
+
+            if ($advisorForModal instanceof Advisor) {
+                $this->normalizeAdvisorDateAttributes($advisorForModal);
+            }
         }
 
         $today = Carbon::now()->startOfDay();
@@ -505,6 +511,17 @@ class AdvisorController extends Controller
         return redirect()
             ->route('inmopro.advisors.index', InertiaListingRedirect::advisorsIndexQuery($request))
             ->with('success', 'Entrega de material registrada.');
+    }
+
+    private function normalizeAdvisorDateAttributes(Advisor $advisor): void
+    {
+        foreach (['birth_date', 'joined_at'] as $attribute) {
+            $value = $advisor->getAttribute($attribute);
+
+            if ($value instanceof \DateTimeInterface) {
+                $advisor->setAttribute($attribute, $value->format('Y-m-d'));
+            }
+        }
     }
 
     /**
