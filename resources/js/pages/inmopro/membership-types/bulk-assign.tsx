@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
+import { todayIsoDate } from '@/lib/date';
 import type { BreadcrumbItem } from '@/types';
 
 type MembershipType = {
@@ -25,7 +26,7 @@ type PageProps = {
 
 export default function MembershipTypesBulkAssign({ membershipType, advisors, alreadyAssignedIds }: PageProps) {
     const [search, setSearch] = useState('');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
     const { data, setData, post, processing, errors } = useForm({
         advisor_ids: [] as number[],
         start_date: today,

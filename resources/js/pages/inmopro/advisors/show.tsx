@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { formatCalendarDate } from '@/lib/date';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -42,13 +43,11 @@ export default function AdvisorsShow({ advisor }: { advisor: Advisor }) {
                     <p>Cuota: S/ {Number(advisor.personal_quota).toLocaleString()}</p>
                     <p>
                         Fecha de ingreso:{' '}
-                        {advisor.joined_at
-                            ? new Date(String(advisor.joined_at).slice(0, 10)).toLocaleDateString('es-PE', {
-                                  day: '2-digit',
-                                  month: 'long',
-                                  year: 'numeric',
-                              })
-                            : '—'}
+                        {formatCalendarDate(advisor.joined_at, {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric',
+                        })}
                     </p>
                 </div>
                 {advisor.lots && advisor.lots.length > 0 && (

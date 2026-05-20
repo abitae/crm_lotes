@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InmoproMobileFormLayout from '@/layouts/inmopro/mobile-form-layout';
+import { todayIsoDate } from '@/lib/date';
 import { advisorsListingQuerySuffix } from '@/lib/inmopro-listing-query';
 import { cn } from '@/lib/utils';
 
@@ -284,7 +285,7 @@ export default function AdvisorsNew({
                                             checked={Boolean(row.delivered_at)}
                                             onCheckedChange={(checked) => {
                                                 updateMaterialRow(index, {
-                                                    delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
+                                                    delivered_at: checked === true ? todayIsoDate() : '',
                                                 });
                                             }}
                                         />

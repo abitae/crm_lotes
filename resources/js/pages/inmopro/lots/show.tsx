@@ -2,7 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { CheckCircle2, Image, MapPin, Pencil } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
-import { formatDateTime } from '@/lib/date';
+import { formatDate, formatDateTime } from '@/lib/date';
 import type { BreadcrumbItem } from '@/types';
 
 type Lot = {
@@ -44,7 +44,6 @@ export default function LotsShow({ lot, canConfirmTransfer }: { lot: Lot; canCon
         { title: `Lote ${lot.block}-${lot.number}`, href: `/inmopro/lots/${lot.id}` },
     ];
 
-    const formatDate = (d: string | undefined) => (d ? new Date(d).toLocaleDateString('es') : '—');
     const formatMoney = (v: string | undefined) => (v != null && v !== '' ? Number(v).toLocaleString('es') : '—');
     const transferQueueUrl = `/inmopro/lot-transfer-confirmations?search=${encodeURIComponent(`${lot.block}-${lot.number}`)}`;
 

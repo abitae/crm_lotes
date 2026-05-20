@@ -18,6 +18,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
+import {
+    addMonthsToIsoDate,
+    calendarDateTimestamp,
+    formatCalendarDate,
+    todayIsoDate,
+    toIsoDate,
+} from '@/lib/date';
 import { advisorsListingQuerySuffix } from '@/lib/inmopro-listing-query';
 import { confirmDelete } from '@/lib/swal';
 import { cn } from '@/lib/utils';
@@ -228,8 +235,8 @@ function membershipToDetail(m: Membership, advisor?: { id: number; name: string 
 function buildMaterialFormRows(types: MaterialTypeRow[], existing?: Advisor['material_items']): MaterialFormRow[] {
     const list = normalizeList(existing);
     const sorted = [...list].sort((a, b) => {
-        const da = a.delivered_at ? new Date(String(a.delivered_at)).getTime() : 0;
-        const db = b.delivered_at ? new Date(String(b.delivered_at)).getTime() : 0;
+        const da = calendarDateTimestamp(a.delivered_at);
+        const db = calendarDateTimestamp(b.delivered_at);
         if (db !== da) {
             return db - da;
         }
@@ -748,22 +755,10 @@ export default function AdvisorsIndex({
                                         </td>
                                         <td className="px-4 py-3 text-slate-700">{adv.superior?.name ?? 'Alta Gerencia'}</td>
                                         <td className="px-4 py-3 text-xs text-slate-600 tabular-nums whitespace-nowrap">
-                                            {adv.birth_date
-                                                ? new Date(String(adv.birth_date).slice(0, 10)).toLocaleDateString('es-PE', {
-                                                      day: '2-digit',
-                                                      month: 'short',
-                                                      year: 'numeric',
-                                                  })
-                                                : '—'}
+                                            {formatCalendarDate(adv.birth_date)}
                                         </td>
                                         <td className="px-4 py-3 text-xs text-slate-600 tabular-nums">
-                                            {adv.joined_at
-                                                ? new Date(String(adv.joined_at).slice(0, 10)).toLocaleDateString('es-PE', {
-                                                      day: '2-digit',
-                                                      month: 'short',
-                                                      year: 'numeric',
-                                                  })
-                                                : '—'}
+                                            {formatCalendarDate(adv.joined_at)}
                                         </td>
                                         <td className="px-4 py-3 font-medium text-slate-700">S/ {Number(adv.personal_quota).toLocaleString()}</td>
                                         <td className="px-2 py-2 text-center">
@@ -1550,7 +1545,7 @@ function CreateAdvisorModal({
                                                 checked={Boolean(row.delivered_at)}
                                                 onCheckedChange={(checked) => {
                                                     updateMaterialRow(index, {
-                                                        delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
+                                                        delivered_at: checked === true ? todayIsoDate() : '',
                                                     });
                                                 }}
                                             />
@@ -1906,7 +1901,7 @@ function EditAdvisorModal({
                                                 checked={Boolean(row.delivered_at)}
                                                 onCheckedChange={(checked) => {
                                                     updateMaterialRow(index, {
-                                                        delivered_at: checked === true ? new Date().toISOString().slice(0, 10) : '',
+                                                        delivered_at: checked === true ? todayIsoDate() : '',
                                                     });
                                                 }}
                                             />
@@ -2061,7 +2056,7 @@ function AdvisorMaterialsQuickModal({
 
     const addForm = useForm({
         advisor_material_type_id: (materialTypes[0]?.id ?? 0) as number,
-        delivered_at: new Date().toISOString().slice(0, 10),
+        delivered_at: todayIsoDate(),
         notes: '',
     });
 
@@ -2071,7 +2066,7 @@ function AdvisorMaterialsQuickModal({
         }
         addForm.setData({
             advisor_material_type_id: materialTypes[0]!.id,
-            delivered_at: new Date().toISOString().slice(0, 10),
+            delivered_at: todayIsoDate(),
             notes: '',
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps -- reiniciar al abrir / cambiar vendedor
@@ -2079,8 +2074,8 @@ function AdvisorMaterialsQuickModal({
 
     const historyRows = advisor
         ? [...normalizeList(advisor.material_items)].sort((a, b) => {
-              const da = a.delivered_at ? new Date(String(a.delivered_at)).getTime() : 0;
-              const db = b.delivered_at ? new Date(String(b.delivered_at)).getTime() : 0;
+              const da = calendarDateTimestamp(a.delivered_at);
+              const db = calendarDateTimestamp(b.delivered_at);
               if (db !== da) {
                   return db - da;
               }
@@ -2099,7 +2094,7 @@ function AdvisorMaterialsQuickModal({
             onSuccess: () => {
                 router.reload({ only: ['advisors'] });
                 addForm.setData('notes', '');
-                addForm.setData('delivered_at', new Date().toISOString().slice(0, 10));
+                addForm.setData('delivered_at', todayIsoDate());
             },
         });
     };
@@ -2206,16 +2201,7 @@ function AdvisorMaterialsQuickModal({
                                             {historyRows.map((row) => (
                                                 <tr key={row.id} className="bg-white">
                                                     <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700">
-                                                        {row.delivered_at
-                                                            ? new Date(String(row.delivered_at).slice(0, 10)).toLocaleDateString(
-                                                                  'es-PE',
-                                                                  {
-                                                                      day: '2-digit',
-                                                                      month: 'short',
-                                                                      year: 'numeric',
-                                                                  },
-                                                              )
-                                                            : '—'}
+                                                        {formatCalendarDate(row.delivered_at)}
                                                     </td>
                                                     <td className="px-3 py-2 font-medium text-slate-800">
                                                         {row.type?.name ?? materialTypes.find((t) => t.id === row.advisor_material_type_id)?.name ?? '—'}
@@ -2250,7 +2236,7 @@ function CreateMembershipModal({
     membershipTypes: MembershipTypeOption[];
     preselectedAdvisorId: number | null;
 }) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
     const [submitting, setSubmitting] = useState(false);
     const { data, setData, reset } = useForm({
         advisor_id: (advisorsList[0]?.id ?? 0) as number,
@@ -2283,10 +2269,7 @@ function CreateMembershipModal({
         if (type) {
             setData('amount', String(type.amount));
             if (data.start_date) {
-                const start = new Date(data.start_date);
-                const end = new Date(start);
-                end.setMonth(end.getMonth() + type.months);
-                setData('end_date', end.toISOString().slice(0, 10));
+                setData('end_date', addMonthsToIsoDate(data.start_date, type.months));
             }
         }
     };
@@ -2294,10 +2277,7 @@ function CreateMembershipModal({
     const onStartDateChange = (date: string) => {
         setData('start_date', date);
         if (selectedType && date) {
-            const start = new Date(date);
-            const end = new Date(start);
-            end.setMonth(end.getMonth() + selectedType.months);
-            setData('end_date', end.toISOString().slice(0, 10));
+            setData('end_date', addMonthsToIsoDate(date, selectedType.months));
         }
     };
 
@@ -2430,7 +2410,7 @@ function MembershipDetailModal({
 }) {
     const listQs = advisorsListingQuerySuffix(usePage().url);
     const { membership, totalPaid, balanceDue, isPaid } = detail;
-    const defaultDate = () => new Date().toISOString().slice(0, 10);
+    const defaultDate = () => todayIsoDate();
     const [editAmountOpen, setEditAmountOpen] = useState(false);
 
     const installments = useMemo(
@@ -2488,9 +2468,9 @@ function MembershipDetailModal({
     };
 
     const payments = normalizeList(membership.payments);
-    const sortedPayments = [...payments].sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
-    const startDate = membership.start_date ? new Date(membership.start_date).toLocaleDateString('es-PE') : null;
-    const endDate = membership.end_date ? new Date(membership.end_date).toLocaleDateString('es-PE') : null;
+    const sortedPayments = [...payments].sort((a, b) => calendarDateTimestamp(b.paid_at) - calendarDateTimestamp(a.paid_at));
+    const startDate = membership.start_date ? formatCalendarDate(membership.start_date) : null;
+    const endDate = membership.end_date ? formatCalendarDate(membership.end_date) : null;
     const vigencia = startDate && endDate ? `${startDate} – ${endDate}` : membership.year?.toString() ?? '—';
 
     return (
@@ -2597,7 +2577,7 @@ function MembershipDetailModal({
                                 {installments.map((inst) => (
                                     <li key={inst.id} className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                                         <span className="text-slate-600">
-                                            #{inst.sequence} · {inst.due_date ? new Date(inst.due_date).toLocaleDateString('es-PE') : '—'}
+                                            #{inst.sequence} · {formatCalendarDate(inst.due_date)}
                                             {` · S/ ${Number(inst.paid_amount).toLocaleString('es-PE')} / S/ ${Number(inst.amount).toLocaleString('es-PE')}`}
                                         </span>
                                         <span
@@ -2693,7 +2673,7 @@ function MembershipDetailModal({
                                     return (
                                         <li key={p.id} className="flex flex-col gap-0.5 sm:flex-row sm:justify-between">
                                             <span>
-                                                {new Date(p.paid_at).toLocaleDateString('es-PE')}
+                                                {formatCalendarDate(p.paid_at)}
                                                 {toCuota ? ` · Cuota #${toCuota.sequence}` : ''}
                                                 {p.notes ? ` · ${p.notes}` : ''}
                                             </span>
@@ -2733,12 +2713,12 @@ function EditMembershipModal({
     onOpenChange: (open: boolean) => void;
 }) {
     const listQs = advisorsListingQuerySuffix(usePage().url);
-    const startDate = membership.start_date ? new Date(membership.start_date).toISOString().slice(0, 10) : '';
-    const endDate = membership.end_date ? new Date(membership.end_date).toISOString().slice(0, 10) : '';
+    const startDate = toIsoDate(membership.start_date);
+    const endDate = toIsoDate(membership.end_date);
     const { data, setData, put, processing, errors } = useForm({
         amount: String(membership.amount),
-        start_date: startDate || new Date().toISOString().slice(0, 10),
-        end_date: endDate || new Date().toISOString().slice(0, 10),
+        start_date: startDate || todayIsoDate(),
+        end_date: endDate || todayIsoDate(),
     });
 
     const submit = (e: FormEvent) => {

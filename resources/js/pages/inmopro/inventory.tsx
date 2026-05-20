@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { Search, MapPin, UserPlus, Info, Eye, Pencil, FileDown } from 'lucide-react';
+import { formatDate } from '@/lib/date';
 import AppLayout from '@/layouts/app-layout';
 import {
     Dialog,
@@ -63,7 +64,6 @@ export default function Inventory({
     const transferredCount = lots.filter((lot) => lot.status.code === 'TRANSFERIDO').length;
     const installmentsCount = lots.filter((lot) => lot.status.code === 'CUOTAS').length;
 
-    const formatDate = (d: string | undefined) => (d ? new Date(d).toLocaleDateString('es') : '—');
     const formatMoney = (v: string | undefined) => (v != null && v !== '' ? Number(v).toLocaleString('es') : '—');
 
     const breadcrumbs: BreadcrumbItem[] = [

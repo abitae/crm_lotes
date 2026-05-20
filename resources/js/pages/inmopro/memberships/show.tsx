@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
+import { calendarDateTimestamp, formatCalendarDate, todayIsoDate } from '@/lib/date';
 import { confirmDelete } from '@/lib/swal';
 import type { BreadcrumbItem } from '@/types';
 
@@ -39,7 +40,7 @@ export default function MembershipsShow({
         { title: `${membership.advisor?.name ?? 'Vendedor'} – ${membership.year}`, href: `/inmopro/advisor-memberships/${membership.id}` },
     ];
 
-    const defaultDate = () => new Date().toISOString().slice(0, 10);
+    const defaultDate = () => todayIsoDate();
     const paymentForm = useForm({
         amount: '',
         paid_at: defaultDate(),
@@ -60,7 +61,7 @@ export default function MembershipsShow({
     };
 
     const payments = membership.payments ?? [];
-    const sortedPayments = [...payments].sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime());
+    const sortedPayments = [...payments].sort((a, b) => calendarDateTimestamp(b.paid_at) - calendarDateTimestamp(a.paid_at));
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -196,7 +197,7 @@ export default function MembershipsShow({
                                         {sortedPayments.map((p) => (
                                             <tr key={p.id} className="hover:bg-slate-50/50">
                                                 <td className="px-4 py-3 text-slate-700">
-                                                    {new Date(p.paid_at).toLocaleDateString('es-PE', { dateStyle: 'long' })}
+                                                    {formatCalendarDate(p.paid_at, { dateStyle: 'long' })}
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-medium text-slate-800">S/ {Number(p.amount).toLocaleString('es-PE')}</td>
                                                 <td className="px-4 py-3 text-slate-600">{p.notes ?? '—'}</td>
